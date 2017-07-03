@@ -36,14 +36,17 @@
  */
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Arrays;
 import java.util.List;
+import net.sourceforge.jnlp.OptionsDefinitions;
 import net.sourceforge.jnlp.ProcessResult;
 import net.sourceforge.jnlp.ServerAccess;
+import net.sourceforge.jnlp.closinglisteners.StringBasedClosingListener;
+import net.sourceforge.jnlp.util.FileUtils;
+import net.sourceforge.jnlp.util.optionparser.ParsedOption;
 import org.junit.Assert;
 
 import org.junit.Test;
@@ -51,7 +54,7 @@ import org.junit.Test;
 public class SimpleTest1Test {
 
     private static final ServerAccess server = new ServerAccess();
-    private static final List<String> strict = Arrays.asList(new String[]{"-strict", ServerAccess.VERBOSE_OPTION});
+    private static final List<String> strict = Arrays.asList(new String[]{OptionsDefinitions.OPTIONS.STRICT.option, ServerAccess.VERBOSE_OPTION});
 
     static void checkLaunched(ProcessResult pr) {
         checkLaunched(pr, false);
@@ -82,13 +85,24 @@ public class SimpleTest1Test {
             } else {
                 Assert.assertEquals((Integer) 0, pr.returnValue);
             }
-       }
+        }
     }
 
     @Test
     public void testSimpletest1lunchOk() throws Exception {
         ProcessResult pr = server.executeJavawsHeadless(null, "/simpletest1.jnlp");
         checkLaunched(pr);
+    }
+    
+     @Test
+    public void testSimpletestJnlpProtocolMainArgument() throws Exception {
+        ProcessResult pr = ServerAccess.executeProcess(Arrays.asList(new String[]{server.getJavawsLocation(),  "jnlp://localhost:"+server.getPort()+"/simpletest1.jnlp"}), new StringBasedClosingListener("Good simple javaws exapmle"), null);
+        checkLaunched(pr, false, false);
+    }
+    @Test
+    public void testSimpletestJnlpProtocolJnlpArgument() throws Exception {
+        ProcessResult pr = ServerAccess.executeProcess(Arrays.asList(new String[]{server.getJavawsLocation(), OptionsDefinitions.OPTIONS.JNLP.option , "jnlp://localhost:"+server.getPort()+"/simpletest1.jnlp"}), new StringBasedClosingListener("Good simple javaws exapmle"), null);
+        checkLaunched(pr, false, false);
     }
 
     @Test
@@ -116,9 +130,10 @@ public class SimpleTest1Test {
     }
 
     private void createStrictFile(String originalResourceName, String newResourceName, URL codebase) throws MalformedURLException, IOException {
-        String originalContent = ServerAccess.getContentOfStream(new FileInputStream(new File(server.getDir(), originalResourceName)));
-        String nwContent1 = originalContent.replaceAll("href=\""+originalResourceName+"\"", "href=\""+newResourceName+"\"");
+        String originalContent = FileUtils.loadFileAsString(new File(server.getDir(), originalResourceName));
+        String nwContent1 = originalContent.replaceAll("href=\"" + originalResourceName + "\"", "href=\"" + newResourceName + "\"");
         String nwContent = nwContent1.replaceAll("codebase=\".\"", "codebase=\"" + codebase + "\"");
+        nwContent = nwContent.replace("<description>simpletest2</description>", "");
         ServerAccess.saveFile(nwContent, new File(server.getDir(), newResourceName));
     }
 }

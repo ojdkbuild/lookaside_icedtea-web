@@ -140,8 +140,7 @@ public class SimpleTestDefaultRedirects {
             if (pass) {
                 Assert.assertTrue(0 == pr.returnValue);
             } else {
-                //1.6 have wrong handling of pr.return value
-                //Assert.assertFalse(0 == pr.returnValue);
+                Assert.assertFalse(0 == pr.returnValue);
             }
         } finally {
             for (int i = 0; i < servers.length; i++) {

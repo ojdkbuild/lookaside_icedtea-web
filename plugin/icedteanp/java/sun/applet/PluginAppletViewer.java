@@ -120,6 +120,7 @@ import sun.awt.SunToolkit;
 import sun.awt.X11.XEmbeddedFrame;
 
 /*
+ * Waring! Warious EmbeddedFrames are sedded during windows builds!
  */
 // FIXME: declare JSProxy implementation
 @SuppressWarnings("serial")
@@ -731,9 +732,10 @@ public class PluginAppletViewer extends XEmbeddedFrame
 
                 panel.setSize(width, height);
                 panel.validate();
-
-                panel.getApplet().resize(width, height);
-                panel.getApplet().validate();
+                if (panel.getApplet() != null) {
+                    panel.getApplet().resize(width, height);
+                    panel.getApplet().validate();
+                }
             }
         });
     }

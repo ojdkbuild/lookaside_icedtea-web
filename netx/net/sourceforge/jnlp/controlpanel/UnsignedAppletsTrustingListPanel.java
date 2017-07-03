@@ -37,16 +37,21 @@ package net.sourceforge.jnlp.controlpanel;
 
 import java.awt.BorderLayout;
 import java.awt.Component;
+import java.awt.Container;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.WindowEvent;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStreamWriter;
 import java.text.DateFormat;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
@@ -87,13 +92,13 @@ import javax.swing.table.TableRowSorter;
 import net.sourceforge.jnlp.config.DeploymentConfiguration;
 import net.sourceforge.jnlp.config.PathsAndFiles;
 import net.sourceforge.jnlp.runtime.Translator;
-import net.sourceforge.jnlp.security.appletextendedsecurity.AppletSecurityActions;
 import net.sourceforge.jnlp.security.appletextendedsecurity.AppletSecurityLevel;
-import net.sourceforge.jnlp.security.appletextendedsecurity.ExecuteAppletAction;
 import net.sourceforge.jnlp.security.appletextendedsecurity.ExtendedAppletSecurityHelp;
 import net.sourceforge.jnlp.security.appletextendedsecurity.UnsignedAppletActionEntry;
 import net.sourceforge.jnlp.security.appletextendedsecurity.UrlRegEx;
 import net.sourceforge.jnlp.security.appletextendedsecurity.impl.UnsignedAppletActionStorageExtendedImpl;
+import net.sourceforge.jnlp.security.dialogs.remember.AppletSecurityActions;
+import net.sourceforge.jnlp.security.dialogs.remember.ExecuteAppletAction;
 import net.sourceforge.jnlp.util.ScreenFinder;
 import net.sourceforge.jnlp.util.logging.OutputController;
 
@@ -161,6 +166,7 @@ public class UnsignedAppletsTrustingListPanel extends JPanel {
             }
         });
     }
+    private final UnsignedAppletsTrustingListPanel self;
 
     public UnsignedAppletsTrustingListPanel(File globalSettings, File customSettings, DeploymentConfiguration conf) {
         customBackEnd = new UnsignedAppletActionStorageExtendedImpl(customSettings);
@@ -169,24 +175,9 @@ public class UnsignedAppletsTrustingListPanel extends JPanel {
         globalModel = new UnsignedAppletActionTableModel(globalBackEnd);
         customFilter = new ByPermanencyFilter(customModel);
         globalFilter = new ByPermanencyFilter(globalModel);
-        initComponents();
-        userTable.setRowSorter(customFilter);
-        globalTable.setRowSorter(globalFilter);
+        self=this;
         this.conf = conf;
-        AppletSecurityLevel gs = AppletSecurityLevel.getDefault();
-        String s = conf.getProperty(DeploymentConfiguration.KEY_SECURITY_LEVEL);
-        if (s != null) {
-            gs = AppletSecurityLevel.fromString(s);
-        }
-        mainPolicyComboBox.setSelectedItem(gs);
-        userTable.getSelectionModel().addListSelectionListener(new SingleSelectionListenerImpl(userTable));
-        globalTable.getSelectionModel().addListSelectionListener(new SingleSelectionListenerImpl(globalTable));
-
-        userTable.addKeyListener(new DeleteAdapter(userTable));
-        globalTable.addKeyListener(new DeleteAdapter(globalTable));
-        currentTable = userTable;
-        currentModel = customModel;
-        setButtons((!currentModel.back.isReadOnly()));
+        reloadGui();
     }
 
     public static String appletItemsToCaption(List<UnsignedAppletActionEntry> ii, String caption) {
@@ -262,9 +253,9 @@ public class UnsignedAppletsTrustingListPanel extends JPanel {
         public final Component getListCellRendererComponent(final JList<?> list,
                 final Object value, final int index, final boolean isSelected,
                 final boolean cellHasFocus) {
-        	if (value != null) {
-        		setToolTipText(value.toString());
-        	}
+            if (value != null) {
+                setToolTipText(value.toString());
+            }
             return super.getListCellRendererComponent(list, value, index, isSelected,
                     cellHasFocus);
         }
@@ -278,15 +269,15 @@ public class UnsignedAppletsTrustingListPanel extends JPanel {
         userTable = createTable(customModel);
         globalTable = createTable(globalModel);
         helpButton = new JButton();
-        mainPolicyComboBox = new JComboBox<>(new AppletSecurityLevel[] {
-                    AppletSecurityLevel.DENY_ALL,
-                    AppletSecurityLevel.DENY_UNSIGNED,
-                    AppletSecurityLevel.ASK_UNSIGNED,
-                    AppletSecurityLevel.ALLOW_UNSIGNED
-                });
+        mainPolicyComboBox = new JComboBox<>(new AppletSecurityLevel[]{
+            AppletSecurityLevel.DENY_ALL,
+            AppletSecurityLevel.DENY_UNSIGNED,
+            AppletSecurityLevel.ASK_UNSIGNED,
+            AppletSecurityLevel.ALLOW_UNSIGNED
+        });
         mainPolicyComboBox.setSelectedItem(AppletSecurityLevel.getDefault());
         mainPolicyComboBox.setRenderer(comboRendererWithToolTips);
-        
+
         securityLevelLabel = new JLabel();
         globalBehaviourLabel = new JLabel();
         deleteTypeComboBox = new JComboBox<>();
@@ -361,27 +352,26 @@ public class UnsignedAppletsTrustingListPanel extends JPanel {
             }
         });
 
-
         securityLevelLabel.setText(Translator.R("APPEXTSECguiPanelSecurityLevel"));
 
         globalBehaviourLabel.setText(Translator.R("APPEXTSECguiPanelGlobalBehaviourCaption"));
 
-        deleteTypeComboBox.setModel(new DefaultComboBoxModel<>(new String[] {
-                    Translator.R("APPEXTSECguiPanelDeleteMenuSelected"),
-                    Translator.R("APPEXTSECguiPanelDeleteMenuAllA"),
-                    Translator.R("APPEXTSECguiPanelDeleteMenuAllN"),
-                    Translator.R("APPEXTSECguiPanelDeleteMenuAlly"),
-                    Translator.R("APPEXTSECguiPanelDeleteMenuAlln"),
-                    Translator.R("APPEXTSECguiPanelDeleteMenuAllAll")}));
+        deleteTypeComboBox.setModel(new DefaultComboBoxModel<>(new String[]{
+            Translator.R("APPEXTSECguiPanelDeleteMenuSelected"),
+            Translator.R("APPEXTSECguiPanelDeleteMenuAllA"),
+            Translator.R("APPEXTSECguiPanelDeleteMenuAllN"),
+            Translator.R("APPEXTSECguiPanelDeleteMenuAlly"),
+            Translator.R("APPEXTSECguiPanelDeleteMenuAlln"),
+            Translator.R("APPEXTSECguiPanelDeleteMenuAllAll")}));
         deleteTypeComboBox.setRenderer(comboRendererWithToolTips);
-        viewFilter.setModel(new DefaultComboBoxModel<>(new String[] {
-                    Translator.R("APPEXTSECguiPanelShowOnlyPermanent"),
-                    Translator.R("APPEXTSECguiPanelShowOnlyTemporal"),
-                    Translator.R("APPEXTSECguiPanelShowAll"),
-                    Translator.R("APPEXTSECguiPanelShowOnlyPermanentA"),
-                    Translator.R("APPEXTSECguiPanelShowOnlyPermanentN"),
-                    Translator.R("APPEXTSECguiPanelShowOnlyTemporalY"),
-                    Translator.R("APPEXTSECguiPanelShowOnlyTemporalN")}));
+        viewFilter.setModel(new DefaultComboBoxModel<>(new String[]{
+            Translator.R("APPEXTSECguiPanelShowOnlyPermanent"),
+            Translator.R("APPEXTSECguiPanelShowOnlyTemporal"),
+            Translator.R("APPEXTSECguiPanelShowAll"),
+            Translator.R("APPEXTSECguiPanelShowOnlyPermanentA"),
+            Translator.R("APPEXTSECguiPanelShowOnlyPermanentN"),
+            Translator.R("APPEXTSECguiPanelShowOnlyTemporalY"),
+            Translator.R("APPEXTSECguiPanelShowOnlyTemporalN")}));
         viewFilter.setRenderer(comboRendererWithToolTips);
         deleteButton.setText(Translator.R("APPEXTSECguiPanelDeleteButton"));
         deleteButton.setToolTipText(Translator.R("APPEXTSECguiPanelDeleteButtonToolTip"));
@@ -458,54 +448,54 @@ public class UnsignedAppletsTrustingListPanel extends JPanel {
         layout.setHorizontalGroup(
                 layout.createParallelGroup(GroupLayout.Alignment.LEADING)
                 .addGroup(GroupLayout.Alignment.TRAILING, layout.createSequentialGroup().addContainerGap()
-                .addGroup(layout.createParallelGroup(GroupLayout.Alignment.TRAILING)
-                .addComponent(mainTabPanel, GroupLayout.Alignment.LEADING, 0, 583, Short.MAX_VALUE)
-                .addComponent(globalBehaviourLabel, GroupLayout.Alignment.LEADING, 0, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                .addGroup(GroupLayout.Alignment.LEADING, layout.createSequentialGroup()
-                .addComponent(securityLevelLabel, 0, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE).addPreferredGap(LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(mainPolicyComboBox, 0, 474, Short.MAX_VALUE))
-                .addGroup(GroupLayout.Alignment.LEADING, layout.createSequentialGroup()
-                .addComponent(addRowButton, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE).addPreferredGap(LayoutStyle.ComponentPlacement.UNRELATED)
-                .addComponent(validateTableButton, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE).addPreferredGap(LayoutStyle.ComponentPlacement.UNRELATED)
-                .addComponent(testUrlButton, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE).addPreferredGap(LayoutStyle.ComponentPlacement.RELATED, 94, Short.MAX_VALUE)
-                .addComponent(moveRowDownButton, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE).addPreferredGap(LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(moveRowUpButton, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                .addGroup(layout.createSequentialGroup()
-                .addGroup(layout.createParallelGroup(GroupLayout.Alignment.LEADING)
-                .addGroup(layout.createSequentialGroup()
-                .addComponent(deleteButton, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE).addPreferredGap(LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(deleteTypeComboBox, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, GroupLayout.PREFERRED_SIZE).addPreferredGap(LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(invertSelectionButton, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                .addGroup(layout.createSequentialGroup()
-                .addComponent(askBeforeActionCheckBox, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE).addPreferredGap(LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(filterRegexesCheckBox, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE).addPreferredGap(LayoutStyle.ComponentPlacement.RELATED, 93, Short.MAX_VALUE)
-                .addComponent(viewFilter, 0, GroupLayout.PREFERRED_SIZE, Short.MAX_VALUE))).addPreferredGap(LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(helpButton, GroupLayout.PREFERRED_SIZE, 108, GroupLayout.PREFERRED_SIZE))).addContainerGap()));
+                        .addGroup(layout.createParallelGroup(GroupLayout.Alignment.TRAILING)
+                                .addComponent(mainTabPanel, GroupLayout.Alignment.LEADING, 0, 583, Short.MAX_VALUE)
+                                .addComponent(globalBehaviourLabel, GroupLayout.Alignment.LEADING, 0, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                .addGroup(GroupLayout.Alignment.LEADING, layout.createSequentialGroup()
+                                        .addComponent(securityLevelLabel, 0, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE).addPreferredGap(LayoutStyle.ComponentPlacement.RELATED)
+                                        .addComponent(mainPolicyComboBox, 0, 474, Short.MAX_VALUE))
+                                .addGroup(GroupLayout.Alignment.LEADING, layout.createSequentialGroup()
+                                        .addComponent(addRowButton, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE).addPreferredGap(LayoutStyle.ComponentPlacement.UNRELATED)
+                                        .addComponent(validateTableButton, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE).addPreferredGap(LayoutStyle.ComponentPlacement.UNRELATED)
+                                        .addComponent(testUrlButton, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE).addPreferredGap(LayoutStyle.ComponentPlacement.RELATED, 94, Short.MAX_VALUE)
+                                        .addComponent(moveRowDownButton, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE).addPreferredGap(LayoutStyle.ComponentPlacement.RELATED)
+                                        .addComponent(moveRowUpButton, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                                .addGroup(layout.createSequentialGroup()
+                                        .addGroup(layout.createParallelGroup(GroupLayout.Alignment.LEADING)
+                                                .addGroup(layout.createSequentialGroup()
+                                                        .addComponent(deleteButton, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE).addPreferredGap(LayoutStyle.ComponentPlacement.RELATED)
+                                                        .addComponent(deleteTypeComboBox, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, GroupLayout.PREFERRED_SIZE).addPreferredGap(LayoutStyle.ComponentPlacement.RELATED)
+                                                        .addComponent(invertSelectionButton, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                                                .addGroup(layout.createSequentialGroup()
+                                                        .addComponent(askBeforeActionCheckBox, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE).addPreferredGap(LayoutStyle.ComponentPlacement.RELATED)
+                                                        .addComponent(filterRegexesCheckBox, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE).addPreferredGap(LayoutStyle.ComponentPlacement.RELATED, 93, Short.MAX_VALUE)
+                                                        .addComponent(viewFilter, 0, GroupLayout.PREFERRED_SIZE, Short.MAX_VALUE))).addPreferredGap(LayoutStyle.ComponentPlacement.RELATED)
+                                        .addComponent(helpButton, GroupLayout.PREFERRED_SIZE, 108, GroupLayout.PREFERRED_SIZE))).addContainerGap()));
         layout.setVerticalGroup(
                 layout.createParallelGroup(GroupLayout.Alignment.LEADING)
                 .addGroup(layout.createSequentialGroup().addContainerGap()
-                .addComponent(globalBehaviourLabel).addPreferredGap(LayoutStyle.ComponentPlacement.RELATED)
-                .addGroup(layout.createParallelGroup(GroupLayout.Alignment.LEADING)
-                .addComponent(securityLevelLabel)
-                .addComponent(mainPolicyComboBox, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, GroupLayout.PREFERRED_SIZE)).addPreferredGap(LayoutStyle.ComponentPlacement.RELATED)
-                .addGroup(layout.createParallelGroup(GroupLayout.Alignment.TRAILING)
-                .addGroup(layout.createSequentialGroup()
-                .addGroup(layout.createParallelGroup(GroupLayout.Alignment.LEADING, false)
-                .addComponent(deleteButton)
-                .addComponent(deleteTypeComboBox)
-                .addComponent(invertSelectionButton, GroupLayout.DEFAULT_SIZE, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)).addPreferredGap(LayoutStyle.ComponentPlacement.RELATED)
-                .addGroup(layout.createParallelGroup(GroupLayout.Alignment.BASELINE)
-                .addComponent(askBeforeActionCheckBox)
-                .addComponent(filterRegexesCheckBox)
-                .addComponent(viewFilter)))
-                .addComponent(helpButton, GroupLayout.PREFERRED_SIZE, 53, GroupLayout.PREFERRED_SIZE)).addPreferredGap(LayoutStyle.ComponentPlacement.UNRELATED)
-                .addComponent(mainTabPanel, GroupLayout.DEFAULT_SIZE, 161, Short.MAX_VALUE).addPreferredGap(LayoutStyle.ComponentPlacement.RELATED)
-                .addGroup(layout.createParallelGroup(GroupLayout.Alignment.BASELINE)
-                .addComponent(addRowButton)
-                .addComponent(validateTableButton)
-                .addComponent(testUrlButton)
-                .addComponent(moveRowUpButton)
-                .addComponent(moveRowDownButton)).addContainerGap()));
+                        .addComponent(globalBehaviourLabel).addPreferredGap(LayoutStyle.ComponentPlacement.RELATED)
+                        .addGroup(layout.createParallelGroup(GroupLayout.Alignment.LEADING)
+                                .addComponent(securityLevelLabel)
+                                .addComponent(mainPolicyComboBox, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, GroupLayout.PREFERRED_SIZE)).addPreferredGap(LayoutStyle.ComponentPlacement.RELATED)
+                        .addGroup(layout.createParallelGroup(GroupLayout.Alignment.TRAILING)
+                                .addGroup(layout.createSequentialGroup()
+                                        .addGroup(layout.createParallelGroup(GroupLayout.Alignment.LEADING, false)
+                                                .addComponent(deleteButton)
+                                                .addComponent(deleteTypeComboBox)
+                                                .addComponent(invertSelectionButton, GroupLayout.DEFAULT_SIZE, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)).addPreferredGap(LayoutStyle.ComponentPlacement.RELATED)
+                                        .addGroup(layout.createParallelGroup(GroupLayout.Alignment.BASELINE)
+                                                .addComponent(askBeforeActionCheckBox)
+                                                .addComponent(filterRegexesCheckBox)
+                                                .addComponent(viewFilter)))
+                                .addComponent(helpButton, GroupLayout.PREFERRED_SIZE, 53, GroupLayout.PREFERRED_SIZE)).addPreferredGap(LayoutStyle.ComponentPlacement.UNRELATED)
+                        .addComponent(mainTabPanel, GroupLayout.DEFAULT_SIZE, 161, Short.MAX_VALUE).addPreferredGap(LayoutStyle.ComponentPlacement.RELATED)
+                        .addGroup(layout.createParallelGroup(GroupLayout.Alignment.BASELINE)
+                                .addComponent(addRowButton)
+                                .addComponent(validateTableButton)
+                                .addComponent(testUrlButton)
+                                .addComponent(moveRowUpButton)
+                                .addComponent(moveRowDownButton)).addContainerGap()));
 
         JPanel userPanel = new JPanel(new BorderLayout());
         JPanel globalPanel = new JPanel(new BorderLayout());
@@ -520,19 +510,23 @@ public class UnsignedAppletsTrustingListPanel extends JPanel {
         mainTabPanel.addChangeListener(new ChangeListener() {
             @Override
             public void stateChanged(ChangeEvent e) {
-                switch (mainTabPanel.getSelectedIndex()) {
-                    case 0:
-                        currentModel = customModel;
-                        currentTable = userTable;
-                        break;
-                    case 1:
-                        currentModel = globalModel;
-                        currentTable = globalTable;
-                        break;
-                }
-                setButtons((!currentModel.back.isReadOnly()));
+                selectCurrentTable();
             }
         });
+    }
+
+    private void selectCurrentTable() {
+        switch (mainTabPanel.getSelectedIndex()) {
+            case 0:
+                currentModel = customModel;
+                currentTable = userTable;
+                break;
+            case 1:
+                currentModel = globalModel;
+                currentTable = globalTable;
+                break;
+        }
+        setButtons((!currentModel.back.isReadOnly()));
     }
 
     private void mainPolicyComboBoxActionPerformed(java.awt.event.ActionEvent evt) {
@@ -725,24 +719,20 @@ public class UnsignedAppletsTrustingListPanel extends JPanel {
     }
 
     private JTable createTable(final TableModel model) {
-        JTable jt = new JTable() {
+        final JTable jt = new JTable() {
             @Override
             public TableCellEditor getCellEditor(int row, int column) {
                 int columnx = convertColumnIndexToModel(column);
-                if (columnx == 0 || columnx == 1) {
-                    return new DefaultCellEditor(new JComboBox<>(new ExecuteAppletAction[] {
-                            ExecuteAppletAction.ALWAYS,
-                            ExecuteAppletAction.NEVER,
-                            ExecuteAppletAction.YES,
-                            ExecuteAppletAction.NO,
-                            ExecuteAppletAction.UNSET }));
+                if (columnx == 0) {
+                    //FIXME add proper editor her egoes jbutton, popupr dialog
+                    return new DefaultCellEditor(new JTextField());
                 }
-                if (columnx == 3) {
+                if (columnx == 2) {
                     column = convertColumnIndexToModel(column);
                     row = convertRowIndexToModel(row);
                     return new DefaultCellEditor(new MyTextField((UrlRegEx) (model.getValueAt(row, column))));
                 }
-                if (columnx == 4) {
+                if (columnx == 3) {
                     column = convertColumnIndexToModel(column);
                     row = convertRowIndexToModel(row);
                     return new DefaultCellEditor(new MyTextField((UrlRegEx) (model.getValueAt(row, column))));
@@ -753,19 +743,19 @@ public class UnsignedAppletsTrustingListPanel extends JPanel {
             @Override
             public TableCellRenderer getCellRenderer(int row, int column) {
                 int columnx = convertColumnIndexToModel(column);
-                if (columnx == 2) {
+                if (columnx == 1) {
                     column = convertColumnIndexToModel(column);
                     row = convertRowIndexToModel(row);
                     return new UrlRegexCellRenderer.MyDateCellRenderer((Date) (model.getValueAt(row, column)));
                 }
-                if (columnx == 3) {
+                if (columnx == 2) {
                     if (!filterRegexesCheckBox.isSelected()) {
                         column = convertColumnIndexToModel(column);
                         row = convertRowIndexToModel(row);
                         return new UrlRegexCellRenderer((UrlRegEx) (model.getValueAt(row, column)));
                     }
                 }
-                if (columnx == 4) {
+                if (columnx == 3) {
                     if (!filterRegexesCheckBox.isSelected()) {
                         column = convertColumnIndexToModel(column);
                         row = convertRowIndexToModel(row);
@@ -777,6 +767,39 @@ public class UnsignedAppletsTrustingListPanel extends JPanel {
         };
         jt.setRowHeight(jt.getRowHeight() + jt.getRowHeight() / 2);
         jt.setModel(model);
+
+        jt.addMouseListener(new MouseAdapter() {
+
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() > 1 & jt.getSelectedRowCount() == 1) {
+                    RemmeberableDialogueEditor d = new RemmeberableDialogueEditor(grabParentFrame(self), true, jt.getModel().getValueAt(jt.convertRowIndexToModel(jt.getSelectedRow()), 0));
+                    d.setVisible(true);
+                    AppletSecurityActions result = d.getResult();
+                    d.dispose();
+                    if (result != null) {
+                        ((UnsignedAppletActionTableModel) (jt.getModel())).setValueAt(
+                                result, jt.convertRowIndexToModel(jt.getSelectedRow()), 0);
+                        userTableScrollPane.repaint();
+                        globalTableScrollPane.repaint();
+                    }
+                }
+            }
+
+            private JFrame grabParentFrame(Component self) {
+                Container parent = self.getParent();
+                while (parent!=null){
+                    if (parent instanceof  JFrame){
+                        return (JFrame) parent;
+                    }
+                    parent=parent.getParent();
+                    
+                }
+                return null;
+            }
+
+        });
+        jt.setToolTipText(Translator.R("EPEhelp5"));
         return jt;
 
     }
@@ -798,11 +821,11 @@ public class UnsignedAppletsTrustingListPanel extends JPanel {
             List<UnsignedAppletActionEntry> toBeDeleted = new ArrayList<>();
             for (UnsignedAppletActionEntry unsignedAppletActionEntry : items) {
                 AppletSecurityActions actions = unsignedAppletActionEntry.getAppletSecurityActions();
-                 for (int j = 0; j < actions.getRealCount(); j++) {
-                    ExecuteAppletAction action = actions.getAction(j);
-                    if (action == unsignedAppletAction) {
-                        toBeDeleted.add(unsignedAppletActionEntry);
-                    }
+                for (int j = 0; j < actions.getRealCount(); j++) {
+//                    ExecuteAppletAction action = actions.getAction(j);
+//                    if (action == unsignedAppletAction) {
+//                        toBeDeleted.add(unsignedAppletActionEntry);
+//                    }
                 }
             }
             String s = Translator.R("APPEXTSECguiPanelConfirmDeletionOf", toBeDeleted.size()) + ": \n";
@@ -815,6 +838,27 @@ public class UnsignedAppletsTrustingListPanel extends JPanel {
             }
         }
         currentModel.removeByBehaviour(unsignedAppletAction);
+    }
+
+    private void reloadGui() {
+        this.removeAll();
+        initComponents();
+        userTable.setRowSorter(customFilter);
+        globalTable.setRowSorter(globalFilter);
+        AppletSecurityLevel gs = AppletSecurityLevel.getDefault();
+        String s = this.conf.getProperty(DeploymentConfiguration.KEY_SECURITY_LEVEL);
+        if (s != null) {
+            gs = AppletSecurityLevel.fromString(s);
+        }
+        mainPolicyComboBox.setSelectedItem(gs);
+        userTable.getSelectionModel().addListSelectionListener(new SingleSelectionListenerImpl(userTable));
+        globalTable.getSelectionModel().addListSelectionListener(new SingleSelectionListenerImpl(globalTable));
+
+        userTable.addKeyListener(new DeleteAdapter(userTable));
+        globalTable.addKeyListener(new DeleteAdapter(globalTable));
+        currentTable = userTable;
+        currentModel = customModel;
+        setButtons((!currentModel.back.isReadOnly()));
     }
 
     public static final class MyTextField extends JTextField {
@@ -842,7 +886,7 @@ public class UnsignedAppletsTrustingListPanel extends JPanel {
 
         private UrlRegexCellRenderer(UrlRegEx urlRegEx) {
             if (urlRegEx == null) {
-                keeper =  UrlRegEx.exact("");
+                keeper = UrlRegEx.exact("");
             } else {
                 this.keeper = urlRegEx;
             }
@@ -940,8 +984,9 @@ public class UnsignedAppletsTrustingListPanel extends JPanel {
 
             @Override
             public boolean include(Entry<? extends UnsignedAppletActionTableModel, ? extends Integer> entry) {
-                for (int i = 0; i < AppletSecurityActions.REMEMBER_COLUMNS_COUNT; i++) {
-                    ExecuteAppletAction o = (ExecuteAppletAction) entry.getModel().getValueAt(entry.getIdentifier(), i);
+                AppletSecurityActions as = (AppletSecurityActions) entry.getModel().getValueAt(entry.getIdentifier(), 0);
+                Collection<ExecuteAppletAction> l = as.getActions();
+                for (ExecuteAppletAction o : l) {
                     if (o.equals(ExecuteAppletAction.ALWAYS) || o.equals(ExecuteAppletAction.NEVER)) {
                         return true;
                     }
@@ -954,8 +999,9 @@ public class UnsignedAppletsTrustingListPanel extends JPanel {
 
             @Override
             public boolean include(Entry<? extends UnsignedAppletActionTableModel, ? extends Integer> entry) {
-                for (int i = 0; i < AppletSecurityActions.REMEMBER_COLUMNS_COUNT; i++) {
-                    ExecuteAppletAction o = (ExecuteAppletAction) entry.getModel().getValueAt(entry.getIdentifier(), i);
+                AppletSecurityActions as = (AppletSecurityActions) entry.getModel().getValueAt(entry.getIdentifier(), 0);
+                Collection<ExecuteAppletAction> l = as.getActions();
+                for (ExecuteAppletAction o : l) {
                     if (o.equals(ExecuteAppletAction.ALWAYS)) {
                         return true;
                     }
@@ -969,8 +1015,9 @@ public class UnsignedAppletsTrustingListPanel extends JPanel {
 
             @Override
             public boolean include(Entry<? extends UnsignedAppletActionTableModel, ? extends Integer> entry) {
-                for (int i = 0; i < AppletSecurityActions.REMEMBER_COLUMNS_COUNT; i++) {
-                    ExecuteAppletAction o = (ExecuteAppletAction) entry.getModel().getValueAt(entry.getIdentifier(), i);
+                AppletSecurityActions as = (AppletSecurityActions) entry.getModel().getValueAt(entry.getIdentifier(), 0);
+                Collection<ExecuteAppletAction> l = as.getActions();
+                for (ExecuteAppletAction o : l) {
                     if (o.equals(ExecuteAppletAction.NEVER)) {
                         return true;
                     }
@@ -983,8 +1030,9 @@ public class UnsignedAppletsTrustingListPanel extends JPanel {
 
             @Override
             public boolean include(Entry<? extends UnsignedAppletActionTableModel, ? extends Integer> entry) {
-                for (int i = 0; i < AppletSecurityActions.REMEMBER_COLUMNS_COUNT; i++) {
-                    ExecuteAppletAction o = (ExecuteAppletAction) entry.getModel().getValueAt(entry.getIdentifier(), i);
+                AppletSecurityActions as = (AppletSecurityActions) entry.getModel().getValueAt(entry.getIdentifier(), 0);
+                Collection<ExecuteAppletAction> l = as.getActions();
+                for (ExecuteAppletAction o : l) {
                     if (o.equals(ExecuteAppletAction.YES) || o.equals(ExecuteAppletAction.NO)) {
                         return true;
                     }
@@ -997,8 +1045,9 @@ public class UnsignedAppletsTrustingListPanel extends JPanel {
 
             @Override
             public boolean include(Entry<? extends UnsignedAppletActionTableModel, ? extends Integer> entry) {
-                for (int i = 0; i < AppletSecurityActions.REMEMBER_COLUMNS_COUNT; i++) {
-                    ExecuteAppletAction o = (ExecuteAppletAction) entry.getModel().getValueAt(entry.getIdentifier(), i);
+                AppletSecurityActions as = (AppletSecurityActions) entry.getModel().getValueAt(entry.getIdentifier(), 0);
+                Collection<ExecuteAppletAction> l = as.getActions();
+                for (ExecuteAppletAction o : l) {
                     if (o.equals(ExecuteAppletAction.YES)) {
                         return true;
                     }
@@ -1012,8 +1061,9 @@ public class UnsignedAppletsTrustingListPanel extends JPanel {
 
             @Override
             public boolean include(Entry<? extends UnsignedAppletActionTableModel, ? extends Integer> entry) {
-                for (int i = 0; i < AppletSecurityActions.REMEMBER_COLUMNS_COUNT; i++) {
-                    ExecuteAppletAction o = (ExecuteAppletAction) entry.getModel().getValueAt(entry.getIdentifier(), i);
+                AppletSecurityActions as = (AppletSecurityActions) entry.getModel().getValueAt(entry.getIdentifier(), 0);
+                Collection<ExecuteAppletAction> l = as.getActions();
+                for (ExecuteAppletAction o : l) {
                     if (o.equals(ExecuteAppletAction.NO)) {
                         return true;
                     }

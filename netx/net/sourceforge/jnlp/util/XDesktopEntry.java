@@ -37,17 +37,17 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import javax.swing.filechooser.FileSystemView;
 
 import net.sourceforge.jnlp.IconDesc;
 import net.sourceforge.jnlp.JNLPFile;
 import net.sourceforge.jnlp.OptionsDefinitions;
 import net.sourceforge.jnlp.PluginBridge;
-import net.sourceforge.jnlp.StreamEater;
 import net.sourceforge.jnlp.cache.CacheUtil;
 import net.sourceforge.jnlp.cache.UpdatePolicy;
 import net.sourceforge.jnlp.config.PathsAndFiles;
 import net.sourceforge.jnlp.runtime.JNLPRuntime;
-import net.sourceforge.jnlp.security.dialogs.AccessWarningPaneComplexReturn;
+import net.sourceforge.jnlp.security.dialogresults.AccessWarningPaneComplexReturn;
 
 /**
  * This class builds a (freedesktop.org) desktop entry out of a {@link JNLPFile}
@@ -150,40 +150,42 @@ public class XDesktopEntry {
         if (file.getInformation().getVendor() != null) {
             fileContents += "X-Vendor=" + sanitize(file.getInformation().getVendor()) + "\n";
         }
-
+        String exec;
+        String title = "xdesktop writing";
         if (JNLPRuntime.isWebstartApplication()) {
             String htmlSwitch = "";
             if (JNLPRuntime.isHtml()){
                 htmlSwitch = " "+OptionsDefinitions.OPTIONS.HTML.option;
             }
-            fileContents += "Exec="
+            exec = "Exec="
                     + getJavaWsBin() + htmlSwitch + " \"" + file.getSourceLocation() + "\"\n";
-            OutputController.getLogger().log("Using " + getJavaWsBin()  + htmlSwitch + " as binary for " + file.getSourceLocation());
+            fileContents += exec;
         } else {
             if (info.getShortcutType() == AccessWarningPaneComplexReturn.ShortcutResult.Shortcut.BROWSER) {
                 String browser = info.getBrowser();
                 if (browser == null) {
                     browser = getBrowserBin();
                 }
-                fileContents += "Exec="
+                exec = "Exec="
                         + browser + " \"" + file.getSourceLocation() + "\"\n";
-                OutputController.getLogger().log("Using " + browser + " as binary for " + file.getSourceLocation());
+                fileContents += exec;
             } else if ((info.getShortcutType() == AccessWarningPaneComplexReturn.ShortcutResult.Shortcut.GENERATED_JNLP
                     || info.getShortcutType() == AccessWarningPaneComplexReturn.ShortcutResult.Shortcut.JNLP_HREF) && generatedJnlp != null) {
-                fileContents += "Exec="
+                exec =  "Exec="
                         + getJavaWsBin() + " \"" + generatedJnlp.getAbsolutePath() + "\"\n";
-                OutputController.getLogger().log("Using " + getJavaWsBin() + " (generated) as binary for " + file.getSourceLocation() + " to " + generatedJnlp.getAbsolutePath());
+                fileContents += exec;
+                title = title + " (generated jnlp)";
             } else if (info.getShortcutType() == AccessWarningPaneComplexReturn.ShortcutResult.Shortcut.JAVAWS_HTML) {
-                fileContents += "Exec="
+                exec =  "Exec="
                         + getJavaWsBin() + " -html  \"" + file.getSourceLocation() + "\"\n";
-                OutputController.getLogger().log("Using " + getJavaWsBin() + " -html as binary for " + file.getSourceLocation());
+                fileContents += exec;
             } else {
-                fileContents += "Exec="
+                exec = "Exec="
                         + getBrowserBin() + " \"" + file.getSourceLocation() + "\"\n";
-                OutputController.getLogger().log("Using " + getBrowserBin() + " as binary for " + file.getSourceLocation());
+                fileContents += exec;
             }
         }
-
+        OutputController.getLogger().log(title + " " + exec);
         return new StringReader(fileContents);
 
     }
@@ -378,15 +380,11 @@ public class XDesktopEntry {
             String[] execString = new String[] { "xdg-desktop-icon", "install", "--novendor",
                     shortcutFile.getCanonicalPath() };
             OutputController.getLogger().log(OutputController.Level.ERROR_DEBUG, "Execing: " + Arrays.toString(execString));
-            Process installer = Runtime.getRuntime().exec(execString);
-            new StreamEater(installer.getInputStream()).start();
-            new StreamEater(installer.getErrorStream()).start();
+            ProcessBuilder pb = new ProcessBuilder(execString);
+            pb.inheritIO();
+            Process installer = pb.start();
 
-            try {
-                installer.waitFor();
-            } catch (InterruptedException e) {
-                OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e);
-            }
+            StreamUtils.waitForSafely(installer);
 
             if (!shortcutFile.delete()) {
                 throw new IOException("Unable to delete temporary file:" + shortcutFile);
@@ -501,8 +499,16 @@ public class XDesktopEntry {
         return sanitize(file.createJnlpTitle());
     }
 
-    public File getLinuxDesktopIconFile() {
-        return new File(findFreedesktopOrgDesktopPathCatch() + "/" + getDesktopIconFileName());
+    public File getDesktopIconFile() {
+            return new File(getDesktop(), getDesktopIconFileName());
+    }
+    public static File getDesktop(){
+        if (JNLPRuntime.isWindows()) {
+            FileSystemView filesys = FileSystemView.getFileSystemView();
+            return filesys.getHomeDirectory();
+        } else {
+            return new File(findFreedesktopOrgDesktopPathCatch());
+        }
     }
 
     public File getLinuxMenuIconFile() {

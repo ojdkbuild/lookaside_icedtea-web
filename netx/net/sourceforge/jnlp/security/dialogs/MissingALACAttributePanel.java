@@ -62,16 +62,25 @@ import javax.swing.JPanel;
 import javax.swing.SwingConstants;
 import javax.swing.event.HyperlinkEvent;
 import javax.swing.event.HyperlinkListener;
+import net.sourceforge.jnlp.JNLPFile;
 import net.sourceforge.jnlp.runtime.Translator;
 import net.sourceforge.jnlp.security.SecurityDialog;
+import net.sourceforge.jnlp.security.dialogresults.DialogResult;
+import net.sourceforge.jnlp.security.dialogresults.SetValueHandler;
+import net.sourceforge.jnlp.security.dialogresults.YesNo;
+import net.sourceforge.jnlp.security.dialogs.remember.RememberPanel;
+import net.sourceforge.jnlp.security.dialogs.remember.RememberPanelResult;
+import net.sourceforge.jnlp.security.dialogs.remember.RememberableDialog;
 import net.sourceforge.jnlp.util.UrlUtils;
 import net.sourceforge.jnlp.util.logging.OutputController;
 
 /**
  * http://docs.oracle.com/javase/7/docs/technotes/guides/jweb/security/manifest.html#app_library
  */
-public class MissingALACAttributePanel extends SecurityDialogPanel {
+public class MissingALACAttributePanel extends SecurityDialogPanel implements  RememberableDialog{
 
+    private RememberPanel rememberPanel;
+            
     public MissingALACAttributePanel(SecurityDialog x, String title, String codebase, String remoteUrls) {
         super(x);
         try {
@@ -80,7 +89,7 @@ public class MissingALACAttributePanel extends SecurityDialogPanel {
             throw new RuntimeException(ex);
         }
         if (x != null) {
-            x.setMinimumSize(new Dimension(600, 400));
+            x.getViwableDialog().setMinimumSize(new Dimension(600, 400));
         }
     }
 
@@ -111,9 +120,7 @@ public class MissingALACAttributePanel extends SecurityDialogPanel {
                     if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED) {
                         Desktop.getDesktop().browse(e.getURL().toURI());
                     }
-                } catch (IOException ex) {
-                    OutputController.getLogger().log(ex);
-                } catch (URISyntaxException ex) {
+                } catch (IOException | URISyntaxException ex) {
                     OutputController.getLogger().log(ex);
                 }
             }
@@ -129,8 +136,9 @@ public class MissingALACAttributePanel extends SecurityDialogPanel {
 
         JButton yes = new JButton(Translator.R("ButYes"));
         JButton no = new JButton(Translator.R("ButNo"));
-        yes.addActionListener(createSetValueListener(parent, 0));
-        no.addActionListener(createSetValueListener(parent, 1));
+        rememberPanel = new RememberPanel(codebase);
+        yes.addActionListener(SetValueHandler.createSetValueListener(parent, YesNo.yes()));
+        no.addActionListener(SetValueHandler.createSetValueListener(parent, YesNo.no()));
         initialFocusComponent = no;
         buttonPanel.add(yes);
         buttonPanel.add(no);
@@ -140,11 +148,13 @@ public class MissingALACAttributePanel extends SecurityDialogPanel {
         add(topPanel);
         add(infoPanel);
         add(buttonPanel);
-
+        
+        
+        add(rememberPanel);
     }
 
     public static void main(String[] args) throws MalformedURLException {
-        Set<URL> s = new HashSet<URL>();
+        Set<URL> s = new HashSet<>();
         s.add(new URL("http:/blah.com/blah"));
         s.add(new URL("http:/blah.com/blah/blah"));
         MissingALACAttributePanel w = new MissingALACAttributePanel(null, "HelloWorld", "http://nbblah.url", UrlUtils.setOfUrlsToHtmlList(s));
@@ -153,5 +163,47 @@ public class MissingALACAttributePanel extends SecurityDialogPanel {
         f.add(w, BorderLayout.CENTER);
         f.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         f.setVisible(true);
+    }
+
+        
+     @Override
+    public RememberPanelResult  getRemeberAction() {
+        return rememberPanel.getRememberAction();
+    }
+
+    @Override
+    public DialogResult getValue() {
+        return parent.getValue();
+    }
+
+   
+    @Override
+    public JNLPFile getFile() {
+        return parent.getFile();
+    }
+    
+    @Override
+    public DialogResult readValue(String s) {
+        return YesNo.readValue(s);
+    }
+
+    @Override
+    public DialogResult getDefaultNegativeAnswer() {
+        return YesNo.no();
+    }
+
+    @Override
+    public DialogResult getDefaultPositiveAnswer() {
+        return YesNo.yes();
+    }
+
+    @Override
+    public DialogResult readFromStdIn(String what) {
+        return YesNo.readValue(what);
+    }
+
+    @Override
+    public String helpToStdIn() {
+        return YesNo.no().getAllowedValues().toString();
     }
 }

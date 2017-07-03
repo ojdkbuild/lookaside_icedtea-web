@@ -579,11 +579,11 @@ public class CodebasesAttsNoDialogsTest1 extends BrowserTest {
         Assert.assertTrue(pr.stdout.contains("BID0"));
     }
 
-    private static void prepare(String codebase) throws IOException {
+    public static void prepare(String codebase) throws IOException {
         prepare(codebase, codebase);
     }
 
-    private static void prepare(String codebase1, String codebase2) throws IOException {
+    public static void prepare(String codebase1, String codebase2) throws IOException {
         prepareSingle(codebase1, null, null, '1', ServerAccess.getInstance().getDir(), files);
         prepareSingle(codebase2, null, null, '2', secondValidServer.getDir(), files);
     }

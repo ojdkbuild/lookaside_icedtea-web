@@ -65,6 +65,9 @@ import javax.swing.tree.TreeSelectionModel;
 import net.sourceforge.jnlp.security.CertVerifier;
 import net.sourceforge.jnlp.security.SecurityDialog;
 import net.sourceforge.jnlp.security.SecurityUtil;
+import net.sourceforge.jnlp.security.dialogresults.DialogResult;
+import net.sourceforge.jnlp.security.dialogresults.SetValueHandler;
+import net.sourceforge.jnlp.security.dialogresults.Yes;
 
 /**
  * Provides the panel for the Certificate Info dialog. This dialog displays data from
@@ -230,7 +233,7 @@ public class CertsInfoPane extends SecurityDialogPanel {
         JPanel buttonPane = new JPanel(new BorderLayout());
         JButton close = new JButton(R("ButClose"));
         JButton copyToClipboard = new JButton(R("ButCopy"));
-        close.addActionListener(createSetValueListener(parent, 0));
+        close.addActionListener(SetValueHandler.createSetValueListener(parent, new Yes()));
         copyToClipboard.addActionListener(new CopyToClipboardHandler());
         buttonPane.add(close, BorderLayout.EAST);
         buttonPane.add(copyToClipboard, BorderLayout.WEST);
@@ -353,5 +356,25 @@ public class CertsInfoPane extends SecurityDialogPanel {
                                 ((hash[i] & 0xFF) | 0x100)).substring(1, 3);
         }
         return fingerprint.toUpperCase();
+    }
+
+    @Override
+    public DialogResult getDefaultNegativeAnswer() {
+        return null;
+    }
+
+    @Override
+    public DialogResult getDefaultPositiveAnswer() {
+        return new Yes();
+    }
+    
+    @Override
+    public DialogResult readFromStdIn(String what) {
+        return Yes.readValue(what);
+    }
+    
+    @Override
+    public String helpToStdIn() {
+        return new Yes().getAllowedValues().toString();
     }
 }

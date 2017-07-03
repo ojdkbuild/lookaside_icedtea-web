@@ -89,14 +89,7 @@ public class UnicodeLineBreakTests extends BrowserTest {
     public static void resetSecurity() throws IOException{
         dp.restoreProperties();
         
-
     }
-
-    //placeholder to make junit happy
-    @Test
-    public void unicodeLineBreakTestFake() throws Exception {
-    }
-
     //headless dialogues now works only for javaws. press ok, otherwise first assert  fails
     //@Test
     @TestInBrowsers(testIn = { Browsers.all })
@@ -112,5 +105,36 @@ public class UnicodeLineBreakTests extends BrowserTest {
         }
     }
     
-
+    //javaws -html is imune to this trick when tagsoup is used
+    
+    @Test
+    @NeedsDisplay
+    public void unicodeLineBreakTestJavaWsHtmlTagsupProbablyOn() throws Exception {
+        PathsAndFiles.APPLET_TRUST_SETTINGS_USER.getFile().delete(); //clean file to examine later
+        //tagsoup remove the new line. So here we must really test the startWith, which may be fragile
+        ProcessWrapper pw =  new ProcessWrapper(server.getJavawsLocation(), Arrays.asList(new String[]{OptionsDefinitions.OPTIONS.HEADLESS.option,OptionsDefinitions.OPTIONS.HTML.option}), server.getUrl("/UnicodeLineBreak.html"), new AutoOkClosingListener(), null, null);
+        pw.setWriter("YES\n");
+        ProcessResult pr = pw.execute();
+        assertTrue(pr.stdout.contains(AutoOkClosingListener.MAGICAL_OK_CLOSING_STRING));
+        String s = FileUtils.loadFileAsString(PathsAndFiles.APPLET_TRUST_SETTINGS_USER.getFile());
+        String[] ss = s.split("\n");
+        for (String string : ss) {
+            Assert.assertFalse(string.startsWith("A 1432197956873 \\Qhttp://evil-site/evil.page/\\E \\Qhttp://evil-site/\\E malware.jar"));
+        }
+    }
+    
+    @Test
+    @NeedsDisplay
+    public void unicodeLineBreakTestJavaWsHtmlTagsupForcedOff() throws Exception {
+        PathsAndFiles.APPLET_TRUST_SETTINGS_USER.getFile().delete(); //clean file to examine later
+         ProcessWrapper pw =  new ProcessWrapper(server.getJavawsLocation(), Arrays.asList(new String[]{OptionsDefinitions.OPTIONS.XML.option, OptionsDefinitions.OPTIONS.HEADLESS.option, OptionsDefinitions.OPTIONS.HTML.option}), server.getUrl("/UnicodeLineBreak.html"), new AutoOkClosingListener(), null, null);
+        pw.setWriter("YES\n");
+        ProcessResult pr = pw.execute();
+        assertTrue(pr.stdout.contains(AutoOkClosingListener.MAGICAL_OK_CLOSING_STRING));
+        String s = FileUtils.loadFileAsString(PathsAndFiles.APPLET_TRUST_SETTINGS_USER.getFile());
+        String[] ss = s.split("\n");
+        for (String string : ss) {
+            Assert.assertFalse(string.contains("\\Qhttp://evil-site/evil.page/\\E \\Qhttp://evil-site/\\E malware.jar"));
+        }
+    }
 }

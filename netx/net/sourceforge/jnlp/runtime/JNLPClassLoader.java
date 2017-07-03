@@ -65,6 +65,7 @@ import net.sourceforge.jnlp.JARDesc;
 import net.sourceforge.jnlp.JNLPFile;
 import net.sourceforge.jnlp.JNLPMatcher;
 import net.sourceforge.jnlp.JNLPMatcherException;
+import net.sourceforge.jnlp.jdk89acesses.JarIndexAccess;
 import net.sourceforge.jnlp.LaunchDesc;
 import net.sourceforge.jnlp.LaunchException;
 import net.sourceforge.jnlp.NullJnlpFileException;
@@ -89,7 +90,6 @@ import net.sourceforge.jnlp.util.JarFile;
 import net.sourceforge.jnlp.util.StreamUtils;
 import net.sourceforge.jnlp.util.UrlUtils;
 import net.sourceforge.jnlp.util.logging.OutputController;
-import sun.misc.JarIndex;
 
 /**
  * Classloader that takes it's resources from a JNLP file. If the
@@ -180,7 +180,7 @@ public class JNLPClassLoader extends URLClassLoader {
      * Synchronized since this field may become shared data between multiple classloading threads/
      * See loadClass(String) and CodebaseClassLoader.findClassNonRecursive(String).
      */
-    private final List<JarIndex> jarIndexes = Collections.synchronizedList(new ArrayList<JarIndex>());
+    private final List<JarIndexAccess> jarIndexes = Collections.synchronizedList(new ArrayList<JarIndexAccess>());
 
     /** Set of classpath strings declared in the manifest.mf files
      * Synchronized since this field may become shared data between multiple classloading threads.
@@ -1059,16 +1059,11 @@ public class JNLPClassLoader extends URLClassLoader {
      * @throws LaunchException if the user does not approve every dialog prompt.
      */
     private void checkTrustWithUser() throws LaunchException {
-        if (JNLPRuntime.isTrustNone()) {
-            if (!securityDelegate.getRunInSandbox()) {
-                setRunInSandbox();
-            }
+        
+        if (securityDelegate.getRunInSandbox()) {
             return;
         }
-        if (JNLPRuntime.isTrustAll() || securityDelegate.getRunInSandbox()) {
-            return;
-        }
-
+        
         if (getSigningState() == SigningState.FULL && jcv.isFullySigned() && !jcv.getAlreadyTrustPublisher()) {
             jcv.checkTrustWithUser(securityDelegate, file);
         }
@@ -1342,7 +1337,7 @@ public class JNLPClassLoader extends URLClassLoader {
                                     classpaths.addAll(getClassPathsFromManifest(mf, jar.getLocation().getPath()));
                                 }
                                 
-                                JarIndex index = JarIndex.getJarIndex(jarFile, null);
+                                JarIndexAccess index = JarIndexAccess.getJarIndex(jarFile);
                                 if (index != null)
                                     jarIndexes.add(index);
                             }
@@ -1529,7 +1524,7 @@ public class JNLPClassLoader extends URLClassLoader {
                 // This field synchronized before iterating over it since it may
                 // be shared data between threads
                 synchronized (jarIndexes) {
-                    for (JarIndex index : jarIndexes) {
+                    for (JarIndexAccess index : jarIndexes) {
                         // Non-generic code in sun.misc.JarIndex
                         @SuppressWarnings("unchecked")
                         LinkedList<String> jarList = index.get(name.replace('.', '/'));
@@ -2432,7 +2427,7 @@ public class JNLPClassLoader extends URLClassLoader {
 
         @Override
         public void promptUserOnPartialSigning() throws LaunchException {
-            if (promptedForPartialSigning || JNLPRuntime.isTrustAll()) {
+            if (promptedForPartialSigning) {
                 return;
             }
             promptedForPartialSigning = true;

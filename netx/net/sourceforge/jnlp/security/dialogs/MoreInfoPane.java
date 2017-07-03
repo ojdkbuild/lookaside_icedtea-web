@@ -54,6 +54,10 @@ import javax.swing.JPanel;
 import javax.swing.SwingConstants;
 import net.sourceforge.jnlp.security.CertVerifier;
 import net.sourceforge.jnlp.security.SecurityDialog;
+import net.sourceforge.jnlp.security.dialogresults.DialogResult;
+import net.sourceforge.jnlp.security.dialogresults.SetValueHandler;
+import net.sourceforge.jnlp.security.dialogresults.Yes;
+import net.sourceforge.jnlp.jdk89acesses.SunMiscLauncher;
 
 /**
  * Provides the panel for the More Info dialog. This dialog shows details about an
@@ -63,7 +67,7 @@ import net.sourceforge.jnlp.security.SecurityDialog;
  */
 public class MoreInfoPane extends SecurityDialogPanel {
 
-    private boolean showSignedJNLPWarning;
+    private final boolean showSignedJNLPWarning;
 
     public MoreInfoPane(SecurityDialog x, CertVerifier certVerifier) {
         super(x, certVerifier);
@@ -89,12 +93,11 @@ public class MoreInfoPane extends SecurityDialogPanel {
 
         for (int i = 0; i < numLabels; i++) {
             ImageIcon icon = null;
-            if (details.get(i).equals(R("STrustedCertificate")))
-                icon = new ImageIcon((new sun.misc.Launcher())
-                                                .getClassLoader().getResource("net/sourceforge/jnlp/resources/info-small.png"));
-            else
-                icon = new ImageIcon((new sun.misc.Launcher())
-                                                .getClassLoader().getResource("net/sourceforge/jnlp/resources/warning-small.png"));
+            if (details.get(i).equals(R("STrustedCertificate"))) {
+                icon = SunMiscLauncher.getSecureImageIcon("net/sourceforge/jnlp/resources/info-small.png");
+            } else {
+                icon = SunMiscLauncher.getSecureImageIcon("net/sourceforge/jnlp/resources/warning-small.png");
+            }
 
             errorPanel.add(new JLabel(htmlWrap(details.get(i)), icon, SwingConstants.LEFT));
         }
@@ -108,7 +111,7 @@ public class MoreInfoPane extends SecurityDialogPanel {
         JButton certDetails = new JButton(R("SCertificateDetails"));
         certDetails.addActionListener(new CertInfoButtonListener());
         JButton close = new JButton(R("ButClose"));
-        close.addActionListener(createSetValueListener(parent, 0));
+        close.addActionListener(SetValueHandler.createSetValueListener(parent, new Yes()));
         buttonsPanel.add(certDetails, BorderLayout.WEST);
         buttonsPanel.add(close, BorderLayout.EAST);
         buttonsPanel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
@@ -122,7 +125,27 @@ public class MoreInfoPane extends SecurityDialogPanel {
         @Override
         public void actionPerformed(ActionEvent e) {
             SecurityDialog.showCertInfoDialog(parent.getCertVerifier(),
-                                parent);
+                                parent.getSecurityDialogPanel());
         }
+    }
+
+    @Override
+    public DialogResult getDefaultNegativeAnswer() {
+        return null;
+    }
+
+    @Override
+    public DialogResult getDefaultPositiveAnswer() {
+        return new Yes();
+    }
+
+    @Override
+    public DialogResult readFromStdIn(String what) {
+        return Yes.readValue(what);
+    }
+
+    @Override
+    public String helpToStdIn() {
+        return new Yes().getAllowedValues().toString();
     }
 }

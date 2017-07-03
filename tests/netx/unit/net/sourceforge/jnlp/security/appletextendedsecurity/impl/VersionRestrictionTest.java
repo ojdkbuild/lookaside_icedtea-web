@@ -42,10 +42,12 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import net.sourceforge.jnlp.ServerAccess;
-import net.sourceforge.jnlp.security.appletextendedsecurity.AppletSecurityActions;
-import net.sourceforge.jnlp.security.appletextendedsecurity.ExecuteAppletAction;
 import net.sourceforge.jnlp.security.appletextendedsecurity.UnsignedAppletActionEntry;
 import net.sourceforge.jnlp.security.appletextendedsecurity.UrlRegEx;
+import net.sourceforge.jnlp.security.dialogs.remember.AppletSecurityActions;
+import net.sourceforge.jnlp.security.dialogs.remember.ExecuteAppletAction;
+import net.sourceforge.jnlp.security.dialogs.remember.RememberableDialog;
+import net.sourceforge.jnlp.security.dialogs.remember.SavedRememberAction;
 import net.sourceforge.jnlp.util.FileUtils;
 import net.sourceforge.jnlp.util.logging.NoStdOutErrTest;
 import org.junit.After;
@@ -56,12 +58,14 @@ import org.junit.Test;
 public class VersionRestrictionTest extends NoStdOutErrTest {
 
     private static File testFile;
-    private static final AppletSecurityActions asa = AppletSecurityActions.fromAction(0, ExecuteAppletAction.ALWAYS);
+    private static final SavedRememberAction sra = new SavedRememberAction(ExecuteAppletAction.ALWAYS, "NO");
+    private static final AppletSecurityActions asa = AppletSecurityActions.fromAction(cN.class, sra);
     private static final UrlRegEx urx = UrlRegEx.quote("http://aa.bb/");
     private static final List<String> archs = Arrays.asList("res.jar");
     private static final UnsignedAppletActionEntry aq = new UnsignedAppletActionEntry(asa, new Date(1l), urx, urx, archs);
 
-    
+    private abstract static class cN implements RememberableDialog {
+    };
 
     @Before
     public void preapreNewTestFile() throws IOException {
@@ -124,7 +128,7 @@ public class VersionRestrictionTest extends NoStdOutErrTest {
     @Test
     public void numberFormatExceptionInOnInLoad1() throws IOException {
         ServerAccess.saveFile("#VERSION X\n"
-                + "N 1 \\Qhttp://some.url/\\E \\Qhttp://some.url/\\E jar.jar", testFile);
+                + "cN:N{YES}; 1 \\Qhttp://some.url/\\E \\Qhttp://some.url/\\E jar.jar", testFile);
         UnsignedAppletActionStorageImpl i1 = new UnsignedAppletActionStorageImpl(testFile);
         i1.readContents();
         Assert.assertEquals(0, i1.items.size());
@@ -176,7 +180,7 @@ public class VersionRestrictionTest extends NoStdOutErrTest {
     @Test
     public void correctLoad() throws IOException {
         ServerAccess.saveFile("#VERSION 2\n"
-                + "N 1 \\Qhttp://some.url/\\E \\Qhttp://some.url/\\E jar.jar", testFile);
+                + "cN:N{YES}; 1 \\Qhttp://some.url/\\E \\Qhttp://some.url/\\E jar.jar", testFile);
         UnsignedAppletActionStorageImpl i1 = new UnsignedAppletActionStorageImpl(testFile);
         i1.readContents();
         Assert.assertEquals(1, i1.items.size());
@@ -190,9 +194,9 @@ public class VersionRestrictionTest extends NoStdOutErrTest {
     public void correctLoad2() throws IOException {
         ServerAccess.saveFile("#VERSION 2"
                 + "\n"
-                + "N 1 \\Qhttp://some.url/\\E \\Qhttp://some.url/\\E jar.jar"
+                + "cN:N{YES}; 1 \\Qhttp://some.url/\\E \\Qhttp://some.url/\\E jar.jar"
                 + "\n"
-                + "N 1 \\Qhttp://some2.url/\\E \\Qhttp://some2.url/\\E jar.jar", testFile);
+                + "cN:N{YES}; 1 \\Qhttp://some2.url/\\E \\Qhttp://some2.url/\\E jar.jar", testFile);
         UnsignedAppletActionStorageImpl i1 = new UnsignedAppletActionStorageImpl(testFile);
         i1.readContents();
         Assert.assertEquals(2, i1.items.size());
@@ -209,9 +213,9 @@ public class VersionRestrictionTest extends NoStdOutErrTest {
                 + "#VERSION 2"
                 + "\n"
                 + "\n"
-                + "N 1 \\Qhttp://some.url/\\E \\Qhttp://some.url/\\E jar.jar"
+                + "cN:N{YES}; 1 \\Qhttp://some.url/\\E \\Qhttp://some.url/\\E jar.jar"
                 + "\n"
-                + "N 1 \\Qhttp://some2.url/\\E \\Qhttp://some2.url/\\E jar.jar", testFile);
+                + "cN:N{YES}; 1 \\Qhttp://some2.url/\\E \\Qhttp://some2.url/\\E jar.jar", testFile);
         UnsignedAppletActionStorageImpl i1 = new UnsignedAppletActionStorageImpl(testFile);
         i1.readContents();
         Assert.assertEquals(2, i1.items.size());
@@ -230,9 +234,9 @@ public class VersionRestrictionTest extends NoStdOutErrTest {
                 + "#VERSION 1"
                 + "\n"
                 + "\n"
-                + "N 1 \\Qhttp://some.url/\\E \\Qhttp://some.url/\\E jar.jar"
+                + "cN:N{YES}; 1 \\Qhttp://some.url/\\E \\Qhttp://some.url/\\E jar.jar"
                 + "\n"
-                + "N 1 \\Qhttp://some2.url/\\E \\Qhttp://some2.url/\\E jar.jar", testFile);
+                + "cN:N{YES}; 1 \\Qhttp://some2.url/\\E \\Qhttp://some2.url/\\E jar.jar", testFile);
         UnsignedAppletActionStorageImpl i1 = new UnsignedAppletActionStorageImpl(testFile);
         i1.readContents();
         Assert.assertEquals(2, i1.items.size());
@@ -251,9 +255,9 @@ public class VersionRestrictionTest extends NoStdOutErrTest {
                 + "#VERSION 2"
                 + "\n"
                 + "\n"
-                + "N 1 \\Qhttp://some.url/\\E \\Qhttp://some.url/\\E jar.jar"
+                + "cN:N{YES}; 1 \\Qhttp://some.url/\\E \\Qhttp://some.url/\\E jar.jar"
                 + "\n"
-                + "N 1 \\Qhttp://some2.url/\\E \\Qhttp://some2.url/\\E jar.jar", testFile);
+                + "cN:N{YES}; 1 \\Qhttp://some2.url/\\E \\Qhttp://some2.url/\\E jar.jar", testFile);
         UnsignedAppletActionStorageImpl i1 = new UnsignedAppletActionStorageImpl(testFile);
         i1.readContents();
         Assert.assertEquals(0, i1.items.size());
@@ -268,9 +272,9 @@ public class VersionRestrictionTest extends NoStdOutErrTest {
         ServerAccess.saveFile("\n"
                 + "\n"
                 + "\n"
-                + "N 1 \\Qhttp://some.url/\\E \\Qhttp://some.url/\\E jar.jar"
+                + "cN:N{YES}; 1 \\Qhttp://some.url/\\E \\Qhttp://some.url/\\E jar.jar"
                 + "#VERSION 2\n"
-                + "N 1 \\Qhttp://some2.url/\\E \\Qhttp://some2.url/\\E jar.jar", testFile);
+                + "cN:N{YES}; 1 \\Qhttp://some2.url/\\E \\Qhttp://some2.url/\\E jar.jar", testFile);
         UnsignedAppletActionStorageImpl i1 = new UnsignedAppletActionStorageImpl(testFile);
         i1.readContents();
         Assert.assertEquals(0, i1.items.size());
@@ -283,7 +287,7 @@ public class VersionRestrictionTest extends NoStdOutErrTest {
     @Test
     public void incorrectLoad() throws IOException {
         ServerAccess.saveFile("#VERSION 1\n"
-                + "N 1 \\Qhttp://some.url/\\E \\Qhttp://some.url/\\E jar.jar", testFile);
+                + "cN:N{YES}; 1 \\Qhttp://some.url/\\E \\Qhttp://some.url/\\E jar.jar", testFile);
         UnsignedAppletActionStorageImpl i1 = new UnsignedAppletActionStorageImpl(testFile);
         i1.readContents();
         Assert.assertEquals(0, i1.items.size());
@@ -296,7 +300,7 @@ public class VersionRestrictionTest extends NoStdOutErrTest {
     @Test
     public void incorrectLoad1() throws IOException {
         ServerAccess.saveFile("#VERSION2\n"
-                + "N 1 \\Qhttp://some.url/\\E \\Qhttp://some.url/\\E jar.jar", testFile);
+                + "cN:N{YES}; 1 \\Qhttp://some.url/\\E \\Qhttp://some.url/\\E jar.jar", testFile);
         UnsignedAppletActionStorageImpl i1 = new UnsignedAppletActionStorageImpl(testFile);
         i1.readContents();
         Assert.assertEquals(0, i1.items.size());
@@ -310,9 +314,9 @@ public class VersionRestrictionTest extends NoStdOutErrTest {
     public void incorrectLoad2() throws IOException {
         ServerAccess.saveFile("#VERSION 1"
                 + "\n"
-                + "N 1 \\Qhttp://some.url/\\E \\Qhttp://some.url/\\E jar.jar"
+                + "cN:N{YES}; 1 \\Qhttp://some.url/\\E \\Qhttp://some.url/\\E jar.jar"
                 + "\n"
-                + "N 1 \\Qhttp://some2.url/\\E \\Qhttp://some2.url/\\E jar.jar", testFile);
+                + "cN:N{YES}; 1 \\Qhttp://some2.url/\\E \\Qhttp://some2.url/\\E jar.jar", testFile);
         UnsignedAppletActionStorageImpl i1 = new UnsignedAppletActionStorageImpl(testFile);
         i1.readContents();
         Assert.assertEquals(0, i1.items.size());
@@ -325,9 +329,9 @@ public class VersionRestrictionTest extends NoStdOutErrTest {
     @Test
     public void noVersionNoLoad() throws IOException {
         ServerAccess.saveFile("\n"
-                + "N 1 \\Qhttp://some.url/\\E \\Qhttp://some.url/\\E jar.jar"
+                + "cN:N{YES}; 1 \\Qhttp://some.url/\\E \\Qhttp://some.url/\\E jar.jar"
                 + "\n"
-                + "N 1 \\Qhttp://some2.url/\\E \\Qhttp://some2.url/\\E jar.jar", testFile);
+                + "cN:N{YES}; 1 \\Qhttp://some2.url/\\E \\Qhttp://some2.url/\\E jar.jar", testFile);
         UnsignedAppletActionStorageImpl i1 = new UnsignedAppletActionStorageImpl(testFile);
         i1.readContents();
         Assert.assertEquals(0, i1.items.size());

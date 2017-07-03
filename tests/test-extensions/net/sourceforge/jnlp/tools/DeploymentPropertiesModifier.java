@@ -55,7 +55,7 @@ public class DeploymentPropertiesModifier {
      */
     public static class MultipleDeploymentPropertiesModifier {
 
-        private final InfrastructureFileDescriptor src;
+        public final InfrastructureFileDescriptor src;
         private final AbstractMap.SimpleEntry<String, String>[] keyValue;
         private List<DeploymentPropertiesModifier> modifications;
 
@@ -86,7 +86,7 @@ public class DeploymentPropertiesModifier {
 
     }
 
-    private final InfrastructureFileDescriptor src;
+    public final InfrastructureFileDescriptor src;
     private String savedValue;
     private String requestedProperty;
     private String requestedValue;

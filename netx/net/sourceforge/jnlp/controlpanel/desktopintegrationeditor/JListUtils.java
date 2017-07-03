@@ -40,13 +40,11 @@ import java.awt.Component;
 import java.awt.Image;
 import java.awt.image.BufferedImage;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FilenameFilter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Pattern;
 import javax.imageio.ImageIO;
-import javax.imageio.stream.ImageInputStream;
 import javax.swing.DefaultListCellRenderer;
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
@@ -56,7 +54,6 @@ import javax.swing.JList;
 import javax.swing.ListModel;
 import javax.swing.event.ListDataListener;
 import net.sourceforge.jnlp.config.InfrastructureFileDescriptor;
-import net.sourceforge.jnlp.tools.ico.impl.ImageInputStreamIco;
 import net.sourceforge.jnlp.util.XDesktopEntry;
 
 public class JListUtils {
@@ -139,6 +136,9 @@ public class JListUtils {
                     return mask.matcher(name).matches();
                 }
             });
+            if (list == null) {
+                list = new File[0];
+            }
             return list;
         }
 
@@ -154,6 +154,9 @@ public class JListUtils {
         public Object getElementAt(int index) {
             if (list == null) {
                 populateList();
+            }
+            if (list.length == 0) {
+                return "??";
             }
             return list[index];
         }
@@ -360,17 +363,7 @@ public class JListUtils {
      */
     private static ImageIcon createImageIcon(File f, String description) {
         try {
-            BufferedImage i;
-            try(ImageInputStream is = ImageIO.createImageInputStream(new FileInputStream(f))) {
-                ImageInputStreamIco ico = new ImageInputStreamIco(is);
-                i = ico.getImage(0);
-            } catch (Exception eex) {
-                //not ico
-                i = null;
-            }
-            if (i == null) {
-                i = ImageIO.read(f);
-            }
+            BufferedImage i = ImageIO.read(f);
             return new ImageIcon(i.getScaledInstance(50, 50, Image.SCALE_SMOOTH));
         } catch (Exception ex) {
             //not worthy to log it. No image is there and so be it.

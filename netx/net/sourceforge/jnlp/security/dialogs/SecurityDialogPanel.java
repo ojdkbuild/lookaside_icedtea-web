@@ -38,13 +38,20 @@ exception statement from your version.
 package net.sourceforge.jnlp.security.dialogs;
 
 import java.awt.BorderLayout;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
+import java.awt.Component;
+import java.awt.Container;
+import java.lang.reflect.Method;
+import javax.swing.JButton;
+import javax.swing.JCheckBox;
 
 import javax.swing.JComponent;
 import javax.swing.JPanel;
+import javax.swing.JRadioButton;
 import net.sourceforge.jnlp.security.CertVerifier;
 import net.sourceforge.jnlp.security.SecurityDialog;
+import net.sourceforge.jnlp.security.dialogresults.DialogResult;
+import net.sourceforge.jnlp.util.docprovider.formatters.formatters.PlainTextFormatter;
+import net.sourceforge.jnlp.util.logging.OutputController;
 
 /**
  * Provides a JPanel for use in JNLP warning dialogs.
@@ -70,20 +77,11 @@ public abstract class SecurityDialogPanel extends JPanel {
 
     /**
      * Needed to get word wrap working in JLabels.
+     * @param s string to be wrapped to html tag
+     * @return 
      */
     public  static String htmlWrap(String s) {
         return "<html>" + s + "</html>";
-    }
-
-    /**
-     * Create an ActionListener suitable for use with buttons. When this {@link ActionListener}
-     * is invoked, it will set the value of the {@link SecurityDialog} and then dispossed.
-     *
-     * @param buttonIndex the index of the button. By convention 0 = Yes. 1 = No, 2 = Cancel
-     * @return the ActionListener instance.
-     */
-    protected ActionListener createSetValueListener(SecurityDialog dialog, int buttonIndex) {
-        return new SetValueHandler(dialog, buttonIndex);
     }
 
     @Override
@@ -98,24 +96,99 @@ public abstract class SecurityDialogPanel extends JPanel {
         }
     }
 
-    /**
-     * Creates a handler that sets a dialog's value and then disposes it when activated
-     *
+    public abstract DialogResult getDefaultNegativeAnswer() ;
+
+    public abstract DialogResult getDefaultPositiveAnswer();
+
+    /** this is default SecurityDialog "toString".
+     * All extending panels are recommended to override this.
+     * However, this method is reading possible shown gui,  and printing it to output
+     * so free of code, this to string have pretty nice results
+     * @return text gathered from components placed on this panel and cleaned from some html tags
      */
-    private static class SetValueHandler implements ActionListener {
-
-        Integer buttonIndex;
-        SecurityDialog dialog;
-
-        public SetValueHandler(SecurityDialog dialog, int buttonIndex) {
-            this.dialog = dialog;
-            this.buttonIndex = buttonIndex;
+    public String getText() {
+        String s = traverse(this);
+        if (s != null) {
+            s = s.replace("<html>", "").replace("</html>", "")
+                    .replace("<head>", "").replace("</head>", "")
+                    .replace("<body>", "").replace("</body>", "")
+                    .replace("<br>", PlainTextFormatter.getLineSeparator())
+                    .replace("<BR>", PlainTextFormatter.getLineSeparator())
+                    .replace("<br/>", PlainTextFormatter.getLineSeparator())
+                    .replace("<BR/>", PlainTextFormatter.getLineSeparator()); //see htmlWrap and its usages.. but eg a href is ok to keep
+            s = s.replaceAll("(?m)^\\s+$", "");
+            while (s.contains(PlainTextFormatter.getLineSeparator() + PlainTextFormatter.getLineSeparator())) {
+                s = s.replace(PlainTextFormatter.getLineSeparator() + PlainTextFormatter.getLineSeparator(), PlainTextFormatter.getLineSeparator());
+            }
         }
+        
+        return s;
+    }
 
-        @Override
-        public void actionPerformed(ActionEvent e) {
-            dialog.setValue(buttonIndex);
-            dialog.dispose();
+    private String traverse(Container co) {
+        return traverse(co, true, JButton.class, JRadioButton.class, JCheckBox.class);
+    }
+
+    private String traverse(Container co, boolean skipClassName, Class... skipClasses) {
+        StringBuilder sb = new StringBuilder();
+        Component[] c = co.getComponents();
+        compIter:
+        for (Component c1 : c) {
+            //searching to depth is important
+            if (c1 instanceof Container){
+                String s = traverse((Container) c1);
+                sb.append(s);
+            } 
+            //eg jlabel is also container
+            for (Class clazz : skipClasses) {
+                if (c1.getClass() == clazz){
+                    continue compIter;
+                }
+            }            
+            String s;
+            Method getText = getGetText(c1.getClass());
+            if (getText != null) {
+                s = getText(c1, getText);
+            } else {
+                s = c1.toString();
+            }
+            if (s != null) {
+                s = s.trim();
+                if (s.isEmpty()){
+                    continue;
+                }
+                if (!skipClassName){
+                    sb.append(s).append(PlainTextFormatter.getLineSeparator());
+                } else 
+                if (!s.contains(c1.getClass().getSimpleName()))  {
+                    sb.append(s).append(PlainTextFormatter.getLineSeparator());
+                }
+            }
+        }
+        return sb.toString();
+    }
+
+    private Method getGetText(Class aClass) {
+        try {
+            String methodName = "getText";
+            return aClass.getMethod(methodName);
+        } catch (Exception ex) {
+            OutputController.getLogger().log(ex);
+            return null;
         }
     }
+
+    private String getText(Component c1, Method getText) {
+        try {
+            return (String) getText.invoke(c1);
+        } catch (Exception ex) {
+            OutputController.getLogger().log(ex);
+            return null;
+        }
+    }
+
+    public abstract DialogResult readFromStdIn(String what);
+
+    public abstract String helpToStdIn() ;
+
 }

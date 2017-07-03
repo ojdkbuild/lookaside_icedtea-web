@@ -37,10 +37,23 @@ exception statement from your version.
 
 package net.sourceforge.jnlp.security;
 
+import java.io.IOException;
+
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import net.sourceforge.jnlp.config.DeploymentConfiguration;
+import net.sourceforge.jnlp.runtime.JNLPRuntime;
+import net.sourceforge.jnlp.runtime.Translator;
+import net.sourceforge.jnlp.security.appletextendedsecurity.UnsignedAppletTrustConfirmation;
+import net.sourceforge.jnlp.security.dialogresults.BasicDialogValue;
+import net.sourceforge.jnlp.security.dialogs.CertWarningPane;
+import net.sourceforge.jnlp.security.dialogs.remember.RememberDialog;
+import net.sourceforge.jnlp.security.dialogs.remember.RememberableDialog;
+import net.sourceforge.jnlp.security.dialogs.remember.SavedRememberAction;
 
 import sun.awt.AppContext;
 
@@ -63,10 +76,10 @@ import net.sourceforge.jnlp.util.logging.OutputController;
  * {@link SecurityDialogMessage#userResponse} to the appropriate value.
  * </p>
  */
-public final class SecurityDialogMessageHandler implements Runnable {
+public class SecurityDialogMessageHandler implements Runnable {
 
     /** the queue of incoming messages to show security dialogs */
-    private BlockingQueue<SecurityDialogMessage> queue = new LinkedBlockingQueue<SecurityDialogMessage>();
+    private BlockingQueue<SecurityDialogMessage> queue = new LinkedBlockingQueue<>();
 
     /**
      * Runs the message handler loop. This waits for incoming security messages
@@ -96,31 +109,145 @@ public final class SecurityDialogMessageHandler implements Runnable {
      * @param message the message indicating what type of security dialog to
      * show
      */
-    private void handleMessage(SecurityDialogMessage message) {
-        final SecurityDialogMessage msg = message;
+    protected void handleMessage(final SecurityDialogMessage message) {
 
         final SecurityDialog dialog = new SecurityDialog(message.dialogType,
                 message.accessType, message.file, message.certVerifier, message.certificate, message.extras);
+        
+        if (processAutomatedAnswers(message, dialog)){
+            return;
+        }
 
-        dialog.addActionListener(new ActionListener() {
-
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                msg.userResponse = dialog.getValue();
-                /* Allow the client to continue on the other side */
-                if (msg.toDispose != null) {
-                    msg.toDispose.dispose();
-                }
-                if (msg.lock != null) {
-                    msg.lock.release();
-                }
+        final RememberableDialog found = RememberDialog.getInstance().findRememberablePanel(dialog.getSecurityDialogPanel());
+        SavedRememberAction action = null;
+        if (found!=null){
+            action = RememberDialog.getInstance().getRememberedState(found);
+        }
+        if (action != null && action.isRemember()) {
+            message.userResponse = found.readValue(action.getSavedValue());
+            UnsignedAppletTrustConfirmation.updateAppletAction(found.getFile(), action, null, (Class<RememberableDialog>) found.getClass());
+            unlockMessagesClient(message);
+        } else {
+            
+            if (!shouldPromptUser()) {
+                message.userResponse =  dialog.getDefaultNegativeAnswer();
+                unlockMessagesClient(message);
+            } else if (isHeadless()) {
+                processMessageInHeadless(dialog, message);
+            } else {
+                processMessageInGui(dialog, found, message);
             }
-        });
-        dialog.setVisible(true);
+        }
 
     }
 
-    /**
+    private boolean processAutomatedAnswers(final SecurityDialogMessage message, final SecurityDialog dialog) {
+        if (isXtrustNone()) {
+            message.userResponse =  dialog.getDefaultNegativeAnswer();
+            unlockMessagesClient(message);
+            return true;
+        }
+        if (isXtrustAll()) {
+            message.userResponse =  dialog.getDefaultPositiveAnswer();
+            unlockMessagesClient(message);
+            return true;
+        }
+        return false;
+    }
+
+    private void processMessageInGui(final SecurityDialog dialog, final RememberableDialog found, final SecurityDialogMessage message) {
+        dialog.getViwableDialog().addActionListener(new ActionListener() {
+            
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (found == null) {
+                    message.userResponse = dialog.getValue();
+                } else {
+                    message.userResponse = found.getValue();
+                    RememberDialog.getInstance().setOrUpdateRememberedState(dialog);
+                }
+                unlockMessagesClient(message);
+            }
+            
+        });
+        dialog.getViwableDialog().show();
+    }
+
+    private void processMessageInHeadless(final SecurityDialog dialog, final SecurityDialogMessage message) {
+        try {
+            boolean keepGoing = true;
+            boolean repeatAll = true;
+            do {
+                try {
+                    if (repeatAll){
+                        OutputController.getLogger().printOutLn(dialog.getText());
+                    }
+                    OutputController.getLogger().printOutLn(Translator.R("HeadlessDialogues"));
+                    OutputController.getLogger().printOutLn(dialog.helpToStdIn());
+                    String s = OutputController.getLogger().readLine();
+                    if (s == null) {
+                         throw new IOException("Stream closed");
+                    }
+                    if (s.trim().toLowerCase().equals("exit")) {
+                        JNLPRuntime.exit(0);
+                    }
+                    boolean codebase = false;
+                    boolean remember = false;
+                    if (s.startsWith("RC ")){
+                        codebase = true;
+                        remember = true;
+                        s=s.substring(3);
+                    }
+                    if (s.startsWith("R ")){
+                        remember = true;
+                        s=s.substring(2);
+                    }
+                    message.userResponse = dialog.readFromStdIn(s);
+                    keepGoing = false;
+                    try {
+                        String value = BasicDialogValue.writeNUll();
+                        if (message.userResponse != null) {
+                            value = message.userResponse.writeValue();
+                        }
+                        if (dialog.getSecurityDialogPanel() instanceof CertWarningPane) {
+                            CertWarningPane cp = (CertWarningPane) (dialog.getSecurityDialogPanel());
+                            if (remember) {
+                                cp.saveCert();
+                            }
+                        }
+                        RememberDialog.getInstance().setOrUpdateRememberedState(dialog, codebase, new SavedRememberAction(RememberDialog.createAction(remember, message.userResponse), value));
+                    } catch (Exception ex) {    
+                        OutputController.getLogger().log(OutputController.Level.ERROR_DEBUG, ex);
+                    }
+                } catch (IOException eex) {
+                    OutputController.getLogger().log(eex);
+                    keepGoing = false;
+                } catch (IllegalArgumentException eeex){
+                    OutputController.getLogger().log(OutputController.Level.MESSAGE_ALL, eeex.toString());
+                    OutputController.getLogger().log(OutputController.Level.ERROR_DEBUG, eeex);
+                    OutputController.getLogger().log(OutputController.Level.MESSAGE_ALL, Translator.R("HDwrongValue"));
+                    repeatAll = false;
+                } catch (Exception ex) {
+                    OutputController.getLogger().log(OutputController.Level.MESSAGE_ALL, ex.toString());
+                    OutputController.getLogger().log(OutputController.Level.ERROR_ALL, ex);
+                    repeatAll = true;
+                }
+            } while (keepGoing);
+        } finally {
+            unlockMessagesClient(message);
+        }
+    }
+
+    protected void unlockMessagesClient(final SecurityDialogMessage msg) {
+        /* Allow the client to continue on the other side */
+        if (msg.toDispose != null) {
+            msg.toDispose.dispose();
+        }
+        if (msg.lock != null) {
+            msg.lock.release();
+        }
+    }
+        /**
      * Post a message to the security event queue. This message will be picked
      * up by the security thread and used to show the appropriate security
      * dialog.
@@ -138,6 +265,65 @@ public final class SecurityDialogMessageHandler implements Runnable {
         } catch (InterruptedException e) {
             OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e);
         }
+    }
+    
+    
+    /**
+     * Returns whether the current runtime configuration allows prompting user
+     * for security warnings.
+     *
+     * @return true if security warnings should be shown to the user.
+     */
+    private static boolean shouldPromptUser() {
+        return AccessController.doPrivileged(new PrivilegedAction<Boolean>() {
+            @Override
+            public Boolean run() {
+                return Boolean.valueOf(JNLPRuntime.getConfiguration()
+                        .getProperty(DeploymentConfiguration.KEY_SECURITY_PROMPT_USER));
+            }
+        });
+    }
+    
+     /**
+     * Returns whether the current runtime configuration is headless
+     *
+     * @return true X is used
+     */
+    private static boolean isHeadless() {
+        return AccessController.doPrivileged(new PrivilegedAction<Boolean>() {
+            @Override
+            public Boolean run() {
+                return JNLPRuntime.isHeadless();
+            }
+        });
+    }
+
+     /**
+     * Returns whether the current runtime configuration is trustAll
+     *
+     * @return true if xtrustall was specified
+     */
+    private static boolean isXtrustAll() {
+        return AccessController.doPrivileged(new PrivilegedAction<Boolean>() {
+            @Override
+            public Boolean run() {
+                return JNLPRuntime.isTrustAll();
+            }
+        });
+    }
+
+     /**
+     * Returns whether the current runtime configuration is trustNone
+     *
+     * @return true if xtrustnone was specified
+     */
+    private static boolean isXtrustNone() {
+        return AccessController.doPrivileged(new PrivilegedAction<Boolean>() {
+            @Override
+            public Boolean run() {
+                return JNLPRuntime.isTrustNone();
+            }
+        });
     }
 
 }

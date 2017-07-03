@@ -1,37 +1,37 @@
 /*   Copyright (C) 2014 Red Hat, Inc.
 
-This file is part of IcedTea.
+ This file is part of IcedTea.
 
-IcedTea is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License as published by
-the Free Software Foundation, version 2.
+ IcedTea is free software; you can redistribute it and/or
+ modify it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, version 2.
 
-IcedTea is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-General Public License for more details.
+ IcedTea is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ General Public License for more details.
 
-You should have received a copy of the GNU General Public License
-along with IcedTea; see the file COPYING.  If not, write to
-the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
-02110-1301 USA.
+ You should have received a copy of the GNU General Public License
+ along with IcedTea; see the file COPYING.  If not, write to
+ the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+ 02110-1301 USA.
 
-Linking this library statically or dynamically with other modules is
-making a combined work based on this library.  Thus, the terms and
-conditions of the GNU General Public License cover the whole
-combination.
+ Linking this library statically or dynamically with other modules is
+ making a combined work based on this library.  Thus, the terms and
+ conditions of the GNU General Public License cover the whole
+ combination.
 
-As a special exception, the copyright holders of this library give you
-permission to link this library with independent modules to produce an
-executable, regardless of the license terms of these independent
-modules, and to copy and distribute the resulting executable under
-terms of your choice, provided that you also meet, for each linked
-independent module, the terms and conditions of the license of that
-module.  An independent module is a module which is not derived from
-or based on this library.  If you modify this library, you may extend
-this exception to your version of the library, but you are not
-obligated to do so.  If you do not wish to do so, delete this
-exception statement from your version.
+ As a special exception, the copyright holders of this library give you
+ permission to link this library with independent modules to produce an
+ executable, regardless of the license terms of these independent
+ modules, and to copy and distribute the resulting executable under
+ terms of your choice, provided that you also meet, for each linked
+ independent module, the terms and conditions of the license of that
+ module.  An independent module is a module which is not derived from
+ or based on this library.  If you modify this library, you may extend
+ this exception to your version of the library, but you are not
+ obligated to do so.  If you do not wish to do so, delete this
+ exception statement from your version.
  */
 package net.sourceforge.jnlp.security.appletextendedsecurity;
 
@@ -54,6 +54,8 @@ import net.sourceforge.jnlp.config.PathsAndFiles;
 import net.sourceforge.jnlp.mock.DummyJNLPFileWithJar;
 import net.sourceforge.jnlp.security.appletextendedsecurity.impl.UnsignedAppletActionStorageImpl;
 import net.sourceforge.jnlp.security.dialogs.apptrustwarningpanel.UnsignedAppletTrustWarningPanel;
+import net.sourceforge.jnlp.security.dialogs.remember.ExecuteAppletAction;
+import net.sourceforge.jnlp.security.dialogs.remember.SavedRememberAction;
 import net.sourceforge.jnlp.util.FileUtils;
 import net.sourceforge.jnlp.util.UrlUtils;
 import org.junit.AfterClass;
@@ -125,22 +127,20 @@ public class UnsignedAppletTrustConfirmationTest {
         PathsAndFiles.APPLET_TRUST_SETTINGS_USER.getFile().delete(); //clean file to examine later
         UnsignedAppletTrustConfirmation.updateAppletAction(
                 new DummyJnlpWithTitleAndUrls(url4),
-                ExecuteAppletAction.ALWAYS,
+                new SavedRememberAction(ExecuteAppletAction.ALWAYS, "YES"),
                 Boolean.FALSE,
-                0);
+                UnsignedAppletTrustWarningPanel.class);
         String s = FileUtils.loadFileAsString(PathsAndFiles.APPLET_TRUST_SETTINGS_USER.getFile());
-        s = s.replaceAll("#.*\n", ""); 
-        Assert.assertTrue(s.startsWith("A"));
+        Assert.assertTrue(s.contains("UnsignedAppletTrustWarningPanel:A{YES}"));
         Assert.assertTrue(s.contains(url41+url42));
         Assert.assertTrue(s.contains(surl1));
         UnsignedAppletTrustConfirmation.updateAppletAction(
                 new DummyJnlpWithTitleAndUrls(url4),
-                ExecuteAppletAction.NEVER,
+                new SavedRememberAction(ExecuteAppletAction.NEVER, "NO"),
                 Boolean.TRUE,
-                0);
+                UnsignedAppletTrustWarningPanel.class);
         s = FileUtils.loadFileAsString(PathsAndFiles.APPLET_TRUST_SETTINGS_USER.getFile());
-        s = s.replaceAll("#.*\n", "");
-        Assert.assertTrue(s.startsWith("N"));
+        Assert.assertTrue(s.contains("UnsignedAppletTrustWarningPanel:N{NO}"));
         Assert.assertFalse(s.contains(url41+url42));
         Assert.assertTrue(s.contains(surl1));        
     }
@@ -236,24 +236,24 @@ public class UnsignedAppletTrustConfirmationTest {
         PathsAndFiles.APPLET_TRUST_SETTINGS_USER.getFile().delete(); //clean file to examine later
         UnsignedAppletTrustConfirmation.updateAppletAction(
                 new DummyJnlpWithTitleAndUrlsWithOverwrite(urlY1),
-                ExecuteAppletAction.ALWAYS,
+                new SavedRememberAction(ExecuteAppletAction.ALWAYS, "YES"),
                 Boolean.FALSE,
-                0);
+                UnsignedAppletTrustWarningPanel.class);
         UnsignedAppletTrustConfirmation.updateAppletAction(
                 new DummyJnlpWithTitleAndUrlsWithOverwrite(urlY2),
-                ExecuteAppletAction.ALWAYS,
+                new SavedRememberAction(ExecuteAppletAction.ALWAYS, "YES"),
                 Boolean.FALSE,
-                0);
+                UnsignedAppletTrustWarningPanel.class);
         UnsignedAppletTrustConfirmation.updateAppletAction(
                 new DummyJnlpWithTitleAndUrlsWithOverwrite(urlY3),
-                ExecuteAppletAction.ALWAYS,
+                new SavedRememberAction(ExecuteAppletAction.ALWAYS, "YES"),
                 Boolean.FALSE,
-                0);
+                UnsignedAppletTrustWarningPanel.class);
         UnsignedAppletTrustConfirmation.updateAppletAction(
                 new DummyJnlpWithTitleAndUrlsWithOverwrite(urlY4),
-                ExecuteAppletAction.ALWAYS,
+                new SavedRememberAction(ExecuteAppletAction.ALWAYS, "YES"),
                 Boolean.FALSE,
-                0);
+                UnsignedAppletTrustWarningPanel.class);
         AppletStartupSecuritySettings securitySettings = AppletStartupSecuritySettings.getInstance();
         UnsignedAppletActionStorageImpl userActionStorage = (UnsignedAppletActionStorageImpl) securitySettings.getUnsignedAppletActionCustomStorage();
         List<UnsignedAppletActionEntry> ll = userActionStorage.getMatchingItems(null, null, null);
@@ -265,24 +265,24 @@ public class UnsignedAppletTrustConfirmationTest {
         PathsAndFiles.APPLET_TRUST_SETTINGS_USER.getFile().delete(); //clean file to examine later
         UnsignedAppletTrustConfirmation.updateAppletAction(
                 new DummyJnlpWithTitleAndUrlsWithOverwrite(urlY5),
-                ExecuteAppletAction.ALWAYS,
+                new SavedRememberAction(ExecuteAppletAction.ALWAYS, "YES"),
                 Boolean.FALSE,
-                0);
+                UnsignedAppletTrustWarningPanel.class);
         UnsignedAppletTrustConfirmation.updateAppletAction(
                 new DummyJnlpWithTitleAndUrlsWithOverwrite(urlY6),
-                ExecuteAppletAction.ALWAYS,
+                new SavedRememberAction(ExecuteAppletAction.ALWAYS, "YES"),
                 Boolean.FALSE,
-                0);
+                UnsignedAppletTrustWarningPanel.class);
         UnsignedAppletTrustConfirmation.updateAppletAction(
                 new DummyJnlpWithTitleAndUrlsWithOverwrite(urlY7),
-                ExecuteAppletAction.ALWAYS,
+                new SavedRememberAction(ExecuteAppletAction.ALWAYS, "YES"),
                 Boolean.FALSE,
-                0);
+                UnsignedAppletTrustWarningPanel.class);
         UnsignedAppletTrustConfirmation.updateAppletAction(
                 new DummyJnlpWithTitleAndUrlsWithOverwrite(urlY8),
-                ExecuteAppletAction.ALWAYS,
+                new SavedRememberAction(ExecuteAppletAction.ALWAYS, "YES"),
                 Boolean.FALSE,
-                0);
+                UnsignedAppletTrustWarningPanel.class);
         AppletStartupSecuritySettings securitySettings = AppletStartupSecuritySettings.getInstance();
         UnsignedAppletActionStorageImpl userActionStorage = (UnsignedAppletActionStorageImpl) securitySettings.getUnsignedAppletActionCustomStorage();
         List<UnsignedAppletActionEntry> ll = userActionStorage.getMatchingItems(null, null, null);
@@ -295,9 +295,9 @@ public class UnsignedAppletTrustConfirmationTest {
         try{
         UnsignedAppletTrustConfirmation.updateAppletAction(
                 new DummyJnlpWithTitleAndUrls(urlX3),
-                ExecuteAppletAction.ALWAYS,
+                new SavedRememberAction(ExecuteAppletAction.ALWAYS, "YES"),
                 Boolean.FALSE,
-                0);
+                UnsignedAppletTrustWarningPanel.class);
         //may throw  RuntimeExeption which is correct, however, wee need to check result
         } catch (Exception ex){
             ServerAccess.logException(ex);
@@ -312,9 +312,9 @@ public class UnsignedAppletTrustConfirmationTest {
         try{
         UnsignedAppletTrustConfirmation.updateAppletAction(
                 new DummyJnlpWithTitleAndUrls(urlX2),
-                ExecuteAppletAction.ALWAYS,
+                new SavedRememberAction(ExecuteAppletAction.ALWAYS, "YES"),
                 Boolean.FALSE,
-                0);
+                UnsignedAppletTrustWarningPanel.class);
         //may throw  RuntimeExeption which is correct, however, wee need to check result
         } catch (Exception ex){
             ServerAccess.logException(ex);
@@ -331,9 +331,9 @@ public class UnsignedAppletTrustConfirmationTest {
         try{
         UnsignedAppletTrustConfirmation.updateAppletAction(
                 new DummyJnlpWithTitleAndUrls(urlX1),
-                ExecuteAppletAction.ALWAYS,
+                new SavedRememberAction(ExecuteAppletAction.ALWAYS, "YES"),
                 Boolean.FALSE,
-                0);
+                UnsignedAppletTrustWarningPanel.class);
         //may throw  RuntimeExeption which is correct, however, wee need to check result
         } catch (Exception ex){
             eex = ex;

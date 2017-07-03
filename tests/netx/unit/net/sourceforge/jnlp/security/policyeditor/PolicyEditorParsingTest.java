@@ -36,21 +36,29 @@ exception statement from your version.
 package net.sourceforge.jnlp.security.policyeditor;
 
 import java.io.File;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Map;
-import net.sourceforge.jnlp.annotations.KnownToFail;
 import net.sourceforge.jnlp.util.FileUtils;
+import net.sourceforge.jnlp.util.docprovider.formatters.formatters.PlainTextFormatter;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import org.junit.Before;
 import org.junit.Test;
+import sun.security.provider.PolicyParser;
 
 public class PolicyEditorParsingTest {
+
+    private static final Collection<PolicyParser.PrincipalEntry> EMPTY_PRINCIPALS = Collections.emptyList();
+    private static final String EXAMPLE_CODEBASE = "http://example.com";
+    private static final PolicyIdentifier DEFAULT_IDENTIFIER = new PolicyIdentifier(null, EMPTY_PRINCIPALS, null);
+    private static final PolicyIdentifier EXAMPLE_IDENTIFIER = new PolicyIdentifier(null, EMPTY_PRINCIPALS, EXAMPLE_CODEBASE);
 
     private File file;
     private PolicyFileModel policyFileModel = new PolicyFileModel();
     private Map<PolicyEditorPermissions, Boolean> permissions;
 
-    private static final String LINEBREAK = System.getProperty("line.separator");
+    private static final String LINEBREAK = PlainTextFormatter.getLineSeparator();
 
     private static final String READ_PERMISSION = "permission java.io.FilePermission \"${user.home}\", \"read\";";
     private static final String WRITE_PERMISSION = "permission java.io.FilePermission \"${user.home}\", \"write\";";
@@ -109,18 +117,18 @@ public class PolicyEditorParsingTest {
         file.deleteOnExit();
     }
 
-    private void setupTest(final String policyContents, final String codebase) throws Exception {
+    private void setupTest(final String policyContents, final PolicyIdentifier identifier) throws Exception {
         FileUtils.saveFile(policyContents, file);
         policyFileModel = new PolicyFileModel(file.getCanonicalFile());
         policyFileModel.openAndParsePolicyFile();
-        policyFileModel.addCodebase("");
-        policyFileModel.addCodebase(codebase);
-        permissions = policyFileModel.getCopyOfPermissions().get(codebase);
+        policyFileModel.addIdentifier(DEFAULT_IDENTIFIER);
+        policyFileModel.addIdentifier(identifier);
+        permissions = policyFileModel.getCopyOfPermissions().get(identifier);
     }
 
     @Test
     public void testNormalPolicy() throws Exception {
-        setupTest(NORMAL_POLICY, "");
+        setupTest(NORMAL_POLICY, DEFAULT_IDENTIFIER);
         assertTrue("Permissions should include READ_LOCAL_FILES", permissions.get(PolicyEditorPermissions.READ_LOCAL_FILES));
         for (final PolicyEditorPermissions perm : permissions.keySet()) {
             if (!perm.equals(PolicyEditorPermissions.READ_LOCAL_FILES)) {
@@ -132,7 +140,7 @@ public class PolicyEditorParsingTest {
     @Test
     public void testNormalPolicyWithCRLFEndings() throws Exception {
         // This is the same test as testNormalPolicy on systems where the line separator is \r\n
-        setupTest(NORMAL_POLICY_CRLF, "");
+        setupTest(NORMAL_POLICY_CRLF, DEFAULT_IDENTIFIER);
         assertTrue("Permissions should include READ_LOCAL_FILES", permissions.get(PolicyEditorPermissions.READ_LOCAL_FILES));
         for (final PolicyEditorPermissions perm : permissions.keySet()) {
             if (!perm.equals(PolicyEditorPermissions.READ_LOCAL_FILES)) {
@@ -144,7 +152,7 @@ public class PolicyEditorParsingTest {
     @Test
     public void testNormalPolicyWithLFEndings() throws Exception {
         // This is the same test as testNormalPolicy on systems where the line separator is \n
-        setupTest(NORMAL_POLICY_LF, "");
+        setupTest(NORMAL_POLICY_LF, DEFAULT_IDENTIFIER);
         assertTrue("Permissions should include READ_LOCAL_FILES", permissions.get(PolicyEditorPermissions.READ_LOCAL_FILES));
         for (final PolicyEditorPermissions perm : permissions.keySet()) {
             if (!perm.equals(PolicyEditorPermissions.READ_LOCAL_FILES)) {
@@ -156,7 +164,7 @@ public class PolicyEditorParsingTest {
     @Test
     public void testNormalPolicyWithMixedEndings() throws Exception {
         // This is the same test as testNormalPolicy on systems where the line separator is \n
-        setupTest(NORMAL_POLICY_MIXED_ENDINGS, "");
+        setupTest(NORMAL_POLICY_MIXED_ENDINGS, DEFAULT_IDENTIFIER);
         assertTrue("Permissions should include READ_LOCAL_FILES", permissions.get(PolicyEditorPermissions.READ_LOCAL_FILES));
         for (final PolicyEditorPermissions perm : permissions.keySet()) {
             if (!perm.equals(PolicyEditorPermissions.READ_LOCAL_FILES)) {
@@ -167,7 +175,7 @@ public class PolicyEditorParsingTest {
 
     @Test
     public void testCommentHeaders() throws Exception {
-        setupTest(COMMENT_HEADER, "");
+        setupTest(COMMENT_HEADER, DEFAULT_IDENTIFIER);
         for (final PolicyEditorPermissions perm : permissions.keySet()) {
             assertFalse("Permission " + perm + " should not be granted", permissions.get(perm));
         }
@@ -175,7 +183,7 @@ public class PolicyEditorParsingTest {
 
     @Test
     public void testCommentBlockedPermission() throws Exception {
-        setupTest(COMMENT_BLOCKED_PERMISSION, "");
+        setupTest(COMMENT_BLOCKED_PERMISSION, DEFAULT_IDENTIFIER);
         for (final PolicyEditorPermissions perm : permissions.keySet()) {
             assertFalse("Permission " + perm + " should not be granted", permissions.get(perm));
         }
@@ -183,7 +191,7 @@ public class PolicyEditorParsingTest {
 
     @Test
     public void testCommentBlockedPolicy() throws Exception {
-        setupTest(COMMENT_BLOCKED_POLICY, "");
+        setupTest(COMMENT_BLOCKED_POLICY, DEFAULT_IDENTIFIER);
         for (final PolicyEditorPermissions perm : permissions.keySet()) {
             assertFalse("Permission " + perm + " should not be granted", permissions.get(perm));
         }
@@ -191,7 +199,7 @@ public class PolicyEditorParsingTest {
 
     @Test
     public void testCommentedLine() throws Exception {
-        setupTest(COMMENTED_PERMISSION, "");
+        setupTest(COMMENTED_PERMISSION, DEFAULT_IDENTIFIER);
         for (final PolicyEditorPermissions perm : permissions.keySet()) {
             assertFalse("Permission " + perm + " should not be granted", permissions.get(perm));
         }
@@ -199,7 +207,7 @@ public class PolicyEditorParsingTest {
 
     @Test
     public void testMultiplePermissions() throws Exception {
-        setupTest(MULTIPLE_PERMISSION_POLICY, "");
+        setupTest(MULTIPLE_PERMISSION_POLICY, DEFAULT_IDENTIFIER);
 
         assertTrue("Permissions should include READ_LOCAL_FILES", permissions.get(PolicyEditorPermissions.READ_LOCAL_FILES));
         assertTrue("Permissions should include WRITE_LOCAL_FILES", permissions.get(PolicyEditorPermissions.WRITE_LOCAL_FILES));
@@ -210,10 +218,9 @@ public class PolicyEditorParsingTest {
         }
     }
 
-    @KnownToFail
     @Test
     public void testMultiplePermissionsPerLine() throws Exception {
-        setupTest(MULTIPLE_PERMISSIONS_PER_LINE, "");
+        setupTest(MULTIPLE_PERMISSIONS_PER_LINE, DEFAULT_IDENTIFIER);
 
         assertTrue("Permissions should include READ_LOCAL_FILES", permissions.get(PolicyEditorPermissions.READ_LOCAL_FILES));
         assertTrue("Permissions should include WRITE_LOCAL_FILES", permissions.get(PolicyEditorPermissions.WRITE_LOCAL_FILES));
@@ -224,10 +231,9 @@ public class PolicyEditorParsingTest {
         }
     }
 
-    @KnownToFail
     @Test
     public void testMissingWhitespace() throws Exception {
-        setupTest(MISSING_WHITESPACE_POLICY, "");
+        setupTest(MISSING_WHITESPACE_POLICY, DEFAULT_IDENTIFIER);
 
         assertTrue("Permissions should include READ_LOCAL_FILES", permissions.get(PolicyEditorPermissions.READ_LOCAL_FILES));
         for (final PolicyEditorPermissions perm : permissions.keySet()) {
@@ -239,7 +245,7 @@ public class PolicyEditorParsingTest {
 
     @Test
     public void testPolicyWithCodebase() throws Exception {
-        setupTest(CODEBASE_POLICY, "http://example.com");
+        setupTest(CODEBASE_POLICY, EXAMPLE_IDENTIFIER);
 
         assertTrue("Permissions should include READ_LOCAL_FILES", permissions.get(PolicyEditorPermissions.READ_LOCAL_FILES));
         for (final PolicyEditorPermissions perm : permissions.keySet()) {
@@ -253,7 +259,7 @@ public class PolicyEditorParsingTest {
     public void testCodebaseTrailingSlashesDoNotMatch() throws Exception {
         // note the trailing '/' - looks like the same URL but is not. JDK PolicyTool considers these as
         // different codeBases, so so does PolicyEditor
-        setupTest(CODEBASE_POLICY, "http://example.com/");
+        setupTest(CODEBASE_POLICY, EXAMPLE_IDENTIFIER);
 
         for (final PolicyEditorPermissions perm : permissions.keySet()) {
             if (!perm.equals(PolicyEditorPermissions.READ_LOCAL_FILES)) {
@@ -264,7 +270,7 @@ public class PolicyEditorParsingTest {
 
     @Test
     public void testCommentAfterPermission() throws Exception {
-        setupTest(COMMENT_AFTER_PERMISSION, "");
+        setupTest(COMMENT_AFTER_PERMISSION, DEFAULT_IDENTIFIER);
 
         assertTrue("Permissions should include READ_LOCAL_FILES", permissions.get(PolicyEditorPermissions.READ_LOCAL_FILES));
         for (final PolicyEditorPermissions perm : permissions.keySet()) {
@@ -276,7 +282,7 @@ public class PolicyEditorParsingTest {
 
     @Test
     public void testNormalPolicyWithHeader() throws Exception {
-        setupTest(NORMAL_POLICY_WITH_HEADER, "");
+        setupTest(NORMAL_POLICY_WITH_HEADER, DEFAULT_IDENTIFIER);
         assertTrue("Permissions should include READ_LOCAL_FILES", permissions.get(PolicyEditorPermissions.READ_LOCAL_FILES));
         for (final PolicyEditorPermissions perm : permissions.keySet()) {
             if (!perm.equals(PolicyEditorPermissions.READ_LOCAL_FILES)) {

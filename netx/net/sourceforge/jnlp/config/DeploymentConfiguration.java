@@ -36,11 +36,13 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import javax.imageio.spi.IIORegistry;
 
 import javax.naming.ConfigurationException;
 import javax.swing.JOptionPane;
 
 import net.sourceforge.jnlp.runtime.JNLPRuntime;
+import net.sourceforge.jnlp.tools.ico.IcoSpi;
 import net.sourceforge.jnlp.util.FileUtils;
 import net.sourceforge.jnlp.util.logging.OutputController;
 
@@ -267,6 +269,18 @@ public final class DeploymentConfiguration {
         userDeploymentFileDescriptor = configFile;
         currentConfiguration = new HashMap<>();
         unchangeableConfiguration = new HashMap<>();
+        if (JNLPRuntime.isWindows()) {
+            boolean wh = JNLPRuntime.isHeadless();
+            OutputController.getLogger().log(OutputController.Level.MESSAGE_ALL, "On windows, answering headless at startup, to prevent race condition later - " + wh);
+         }
+         try {
+            IcoSpi spi = new IcoSpi();
+            IIORegistry.getDefaultInstance().registerServiceProvider(spi);
+            OutputController.getLogger().log("Ico provider registered correctly.");
+        } catch (Exception ex) {
+            OutputController.getLogger().log("Exception registering ico provider.");
+            OutputController.getLogger().log(ex);
+        }
     }
 
     /**
@@ -632,6 +646,12 @@ public final class DeploymentConfiguration {
 
         File backupPropertiesFile = new File(userPropertiesFile.toString() + ".old");
         if (userPropertiesFile.isFile()) {
+            if (backupPropertiesFile.exists()){
+                boolean result = backupPropertiesFile.delete();
+                if(!result){
+                    OutputController.getLogger().log("Failed to delete backup properties file " + backupPropertiesFile+ " silently continuing.");
+                }
+            }
             if (!userPropertiesFile.renameTo(backupPropertiesFile)) {
                 throw new IOException("Error saving backup copy of " + userPropertiesFile);
             }
@@ -834,8 +854,9 @@ public final class DeploymentConfiguration {
         }
         //this call should endure even if (ever) will migration code be removed
         DirectoryValidator.DirectoryCheckResults r = new DirectoryValidator().ensureDirs();
-        if (!JNLPRuntime.isHeadless()) {
-            if (r.getFailures() > 0) {
+        if (r.getFailures() > 0) {
+            OutputController.getLogger().log(OutputController.Level.MESSAGE_ALL, r.getMessage());
+            if (!JNLPRuntime.isHeadless()) {
                 JOptionPane.showMessageDialog(null, r.getMessage());
             }
         }

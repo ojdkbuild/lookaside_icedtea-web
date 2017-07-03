@@ -1,4 +1,4 @@
-/* 
+/*
    Copyright (C) 2008 Red Hat, Inc.
 
 This file is part of IcedTea.
@@ -36,11 +36,13 @@ exception statement from your version.
 */
 package net.sourceforge.jnlp;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 import static net.sourceforge.jnlp.runtime.Translator.R;
+import net.sourceforge.jnlp.util.docprovider.TextsProvider;
 
 public class OptionsDefinitions {
 
@@ -74,6 +76,7 @@ public class OptionsDefinitions {
         TRUSTNONE("-Xtrustnone","BOTrustnone"),
         JNLP("-jnlp","BOJnlp", NumberOfArguments.ONE),
         HTML("-html","BOHtml", NumberOfArguments.ONE_OR_MORE),
+        BROWSER("-browser", "BrowserArg", NumberOfArguments.ONE_OR_MORE),
         //itweb settings
         LIST("-list", "IBOList"),
         GET("-get", "name", "IBOGet", NumberOfArguments.ONE_OR_MORE),
@@ -87,8 +90,9 @@ public class OptionsDefinitions {
         //-help
         FILE("-file", "policy_file", "PBOFile", NumberOfArguments.ONE),
         DEFAULTFILE("-defaultfile", "PBODefaultFile"),
-        CODEBASE("-codebase", "url", "PBOCodebase", NumberOfArguments.ONE_OR_MORE),
-        ;
+        CODEBASE("-codebase", "url", "PBOCodebase", NumberOfArguments.ONE),
+        SIGNEDBY("-signedby", "certificate_alias", "PBOSignedBy", NumberOfArguments.ONE),
+        PRINCIPALS("-principals", "class_name principal_name", "PBOPrincipals", NumberOfArguments.EVEN_NUMBER_SUPPORTS_EQUALS_CHAR);
 
         public final String option;
 
@@ -175,9 +179,11 @@ public class OptionsDefinitions {
     public static List<OPTIONS> getPolicyEditorOptions() {
         return Arrays.asList(new OPTIONS[]{
             OPTIONS.HELP1,
-            OPTIONS.DEFAULTFILE,
             OPTIONS.FILE,
+            OPTIONS.DEFAULTFILE,
             OPTIONS.CODEBASE,
+            OPTIONS.SIGNEDBY,
+            OPTIONS.PRINCIPALS,
             OPTIONS.VERBOSE
             }
         );
@@ -212,7 +218,8 @@ public class OptionsDefinitions {
             OPTIONS.OFFLINE,
             OPTIONS.TRUSTNONE,
             OPTIONS.JNLP,
-            OPTIONS.HTML
+            OPTIONS.HTML,
+            OPTIONS.BROWSER
         });
     }
 
@@ -226,5 +233,22 @@ public class OptionsDefinitions {
         return l;
     }
 
-    
+    public static void main(String[] args) throws IOException {
+        if (args[0].equals(TextsProvider.JAVAWS)) {
+            printOptions(getJavaWsOptions());
+        } else if (args[0].equals(TextsProvider.ITWEB_SETTINGS)) {
+            printOptions(getItwsettingsCommands());
+        } else if (args[0].equals(TextsProvider.POLICY_EDITOR)) {
+            printOptions(getPolicyEditorOptions());
+        }
+    }
+
+    private static void printOptions(List<OPTIONS> options) {
+        StringBuilder sb = new StringBuilder();
+        for (OPTIONS option : options) {
+            sb.append(option.option).append(" ");
+        }
+        System.out.println(sb.toString().trim());
+    }
+
 }

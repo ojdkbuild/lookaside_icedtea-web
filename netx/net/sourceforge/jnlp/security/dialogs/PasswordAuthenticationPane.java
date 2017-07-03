@@ -37,6 +37,7 @@ exception statement from your version. */
 
 package net.sourceforge.jnlp.security.dialogs;
 
+import java.awt.BorderLayout;
 import static net.sourceforge.jnlp.runtime.Translator.R;
 
 import java.awt.Dimension;
@@ -47,10 +48,14 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 
 import javax.swing.JButton;
+import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPasswordField;
 import javax.swing.JTextField;
+import net.sourceforge.jnlp.runtime.Translator;
 import net.sourceforge.jnlp.security.SecurityDialog;
+import net.sourceforge.jnlp.security.dialogresults.DialogResult;
+import net.sourceforge.jnlp.security.dialogresults.NamePassword;
 
 /**
  * Modal non-minimizable dialog to request http authentication credentials
@@ -80,7 +85,7 @@ public class PasswordAuthenticationPane extends SecurityDialogPanel {
      * Initialized the dialog components
      */
 
-    public void addComponents() {
+    public final void addComponents() {
 
         JLabel jlInfo = new JLabel("");
         jlInfo.setText("<html>" + R("SAuthenticationPrompt", type, host, prompt)  + "</html>");
@@ -153,14 +158,16 @@ public class PasswordAuthenticationPane extends SecurityDialogPanel {
         setMaximumSize(new Dimension(1024, 150));
 
         setSize(400, 150);
-        parent.setLocationRelativeTo(null);
+        if (parent!=null){
+            parent.getViwableDialog().setLocationRelativeTo(null);
+        }
         initialFocusComponent = jtfUserName;
 
         ActionListener acceptActionListener = new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                parent.setValue(new Object[] { jtfUserName.getText(), jpfPassword.getPassword() });
-                parent.dispose();
+                parent.setValue(new NamePassword(jtfUserName.getText(), jpfPassword.getPassword()));
+                parent.getViwableDialog().dispose();
             }
         };
 
@@ -168,7 +175,7 @@ public class PasswordAuthenticationPane extends SecurityDialogPanel {
             @Override
             public void actionPerformed(ActionEvent e) {
                 parent.setValue(null);
-                parent.dispose();
+                parent.getViwableDialog().dispose();
             }
         };
 
@@ -182,4 +189,35 @@ public class PasswordAuthenticationPane extends SecurityDialogPanel {
         jtfUserName.addActionListener(acceptActionListener);
         jpfPassword.addActionListener(acceptActionListener);
     }
+
+    @Override
+    public DialogResult getDefaultNegativeAnswer() {
+        return null;
+    }
+
+    @Override
+    public DialogResult getDefaultPositiveAnswer() {
+        return null;
+    }
+
+    @Override
+    public DialogResult readFromStdIn(String what) {
+        return NamePassword.readValue(what);
+    }
+
+    @Override
+    public String helpToStdIn() {
+        return Translator.R("PAPstdinInfo");
+    }
+    
+    
+    public static void main(String[] args) {
+        PasswordAuthenticationPane w = new PasswordAuthenticationPane(null, new Object[]{"host",666,"prompt","type"});
+        JFrame f = new JFrame();
+        f.setSize(400, 200);
+        f.add(w, BorderLayout.CENTER);
+        f.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        f.setVisible(true);
+    }
+
 }

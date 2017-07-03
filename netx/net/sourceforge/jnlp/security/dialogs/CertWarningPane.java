@@ -73,8 +73,12 @@ import net.sourceforge.jnlp.security.KeyStores.Type;
 import net.sourceforge.jnlp.security.SecurityDialog;
 import net.sourceforge.jnlp.security.SecurityDialogs.AccessType;
 import net.sourceforge.jnlp.security.SecurityUtil;
+import net.sourceforge.jnlp.security.dialogresults.DialogResult;
+import net.sourceforge.jnlp.security.dialogresults.SetValueHandler;
+import net.sourceforge.jnlp.security.dialogresults.YesNoSandbox;
 import net.sourceforge.jnlp.util.FileUtils;
 import net.sourceforge.jnlp.util.logging.OutputController;
+import net.sourceforge.jnlp.jdk89acesses.SunMiscLauncher;
 
 /**
  * Provides the panel for using inside a SecurityDialog. These dialogs are
@@ -205,8 +209,7 @@ public class CertWarningPane extends SecurityDialogPanel {
     }
 
     private ImageIcon getImageIcon(final String imageLocation) {
-        return new ImageIcon((new sun.misc.Launcher())
-                .getClassLoader().getResource(imageLocation));
+        return SunMiscLauncher.getSecureImageIcon(imageLocation);
     }
 
     private void addButtons() {
@@ -261,12 +264,12 @@ public class CertWarningPane extends SecurityDialogPanel {
  
         sandbox.setEnabled(!alwaysTrust.isSelected());
 
-        run.addActionListener(createSetValueListener(parent, 0));
+        run.addActionListener(SetValueHandler.createSetValueListener(parent, YesNoSandbox.yes()));
         run.addActionListener(new CheckBoxListener());
 
-        sandbox.addActionListener(createSetValueListener(parent, 1));
+        sandbox.addActionListener(SetValueHandler.createSetValueListener(parent, YesNoSandbox.sandbox()));
 
-        cancel.addActionListener(createSetValueListener(parent, 2));
+        cancel.addActionListener(SetValueHandler.createSetValueListener(parent, YesNoSandbox.no()));
 
         initialFocusComponent = cancel;
         buttonPanel.add(run);
@@ -314,7 +317,7 @@ public class CertWarningPane extends SecurityDialogPanel {
      * Disable the Sandbox button when the AlwaysTrust checkbox is checked
      */
     private class ButtonDisableListener implements ActionListener {
-        private JButton button;
+        private final JButton button;
 
         public ButtonDisableListener(JButton button) {
             this.button = button;
@@ -333,23 +336,46 @@ public class CertWarningPane extends SecurityDialogPanel {
         @Override
         public void actionPerformed(ActionEvent e) {
             if (alwaysTrust != null && alwaysTrust.isSelected()) {
-                try {
-                    KeyStore ks = KeyStores.getKeyStore(Level.USER, Type.CERTS);
-                    X509Certificate c = (X509Certificate) parent.getCertVerifier().getPublisher(null);
-                    CertificateUtils.addToKeyStore(c, ks);
-                    File keyStoreFile = KeyStores.getKeyStoreLocation(Level.USER, Type.CERTS).getFile();
-                    if (!keyStoreFile.isFile()) {
-                        FileUtils.createRestrictedFile(keyStoreFile, true);
-                    }
-                    SecurityUtil.storeKeyStore(ks, keyStoreFile);
-                    OutputController.getLogger().log("certificate is now permanently trusted");
-                } catch (Exception ex) {
-                    // TODO: Let NetX show a dialog here notifying user
-                    // about being unable to add cert to keystore
-                    OutputController.getLogger().log(OutputController.Level.ERROR_ALL, ex);
-                }
+                saveCert();
             }
         }
+    }
+
+    public void saveCert() {
+        try {
+            KeyStore ks = KeyStores.getKeyStore(Level.USER, Type.CERTS);
+            X509Certificate c = (X509Certificate) parent.getCertVerifier().getPublisher(null);
+            CertificateUtils.addToKeyStore(c, ks);
+            File keyStoreFile = KeyStores.getKeyStoreLocation(Level.USER, Type.CERTS).getFile();
+            if (!keyStoreFile.isFile()) {
+                FileUtils.createRestrictedFile(keyStoreFile, true);
+            }
+            SecurityUtil.storeKeyStore(ks, keyStoreFile);
+            OutputController.getLogger().log("certificate is now permanently trusted");
+        } catch (Exception ex) {
+                    // TODO: Let NetX show a dialog here notifying user
+            // about being unable to add cert to keystore
+            OutputController.getLogger().log(OutputController.Level.ERROR_ALL, ex);
+        }
+    }
+
+    @Override
+    public DialogResult getDefaultNegativeAnswer() {
+        return YesNoSandbox.sandbox();
+    }
+
+    @Override
+    public DialogResult getDefaultPositiveAnswer() {
+        return YesNoSandbox.yes();
+    }
+    
+    @Override
+    public DialogResult readFromStdIn(String what) {
+        return YesNoSandbox.readValue(what);
+    }
+    @Override
+    public String helpToStdIn() {
+        return YesNoSandbox.sandbox().getAllowedValues().toString();
     }
 
 }
