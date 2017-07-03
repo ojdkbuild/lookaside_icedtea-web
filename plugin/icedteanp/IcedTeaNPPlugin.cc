@@ -241,13 +241,14 @@ static GPid appletviewer_pid = -1;
 static guint appletviewer_watch_id = -1;
 
 bool debug_initiated = false;
+bool file_logs_initiated = false;
 int plugin_debug = getenv ("ICEDTEAPLUGIN_DEBUG") != NULL;
 bool plugin_debug_headers = false;
 bool plugin_debug_to_file = false ;
 bool plugin_debug_to_streams = true ;
 bool plugin_debug_to_system = false;
 bool plugin_debug_to_console = true;
-FILE *  plugin_file_log;
+FILE *  plugin_file_log = NULL;
 std::string plugin_file_log_name;
 
 int plugin_debug_suspend = (getenv("ICEDTEAPLUGIN_DEBUG") != NULL) &&
@@ -1153,13 +1154,13 @@ void consume_plugin_message(gchar* message) {
   if (g_str_has_prefix(parts[1], "PluginProxyInfo"))
   {
     gchar* proxy = NULL;
-    uint32_t len;
+    uint32_t len = 0;
 
     gchar* decoded_url = (gchar*) calloc(strlen(parts[4]) + 1, sizeof(gchar));
     IcedTeaPluginUtilities::decodeURL(parts[4], &decoded_url);
     PLUGIN_DEBUG("parts[0]=%s, parts[1]=%s, reference, parts[3]=%s, parts[4]=%s -- decoded_url=%s\n", parts[0], parts[1], parts[3], parts[4], decoded_url);
 
-    gchar* proxy_info;
+    gchar* proxy_info = NULL;
 
     proxy_info = g_strconcat ("plugin PluginProxyInfo reference ", parts[3], " ", NULL);
     if (get_proxy_info(decoded_url, &proxy, &len) == NPERR_NO_ERROR)
@@ -1330,10 +1331,16 @@ get_proxy_info(const char* siteAddr, char** proxy, uint32_t* len)
   }
   if (browser_functions.getvalueforurl)
   {
-
+      NPError err;
       // As in get_cookie_info, we use the first active instance
       gpointer instance=getFirstInTableInstance(instance_to_id_map);
-      browser_functions.getvalueforurl((NPP) instance, NPNURLVProxy, siteAddr, proxy, len);
+      err = browser_functions.getvalueforurl((NPP) instance, NPNURLVProxy, siteAddr, proxy, len);
+
+      if (err != NPERR_NO_ERROR) 
+      {
+        *proxy = (char *) malloc(sizeof **proxy * 7);
+        *len = g_strlcpy(*proxy, "DIRECT", 7);
+      }
   } else
   {
       return NPERR_GENERIC_ERROR;

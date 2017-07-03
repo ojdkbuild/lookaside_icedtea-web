@@ -36,81 +36,74 @@
  exception statement from your version. */
 package net.sourceforge.jnlp.util.logging;
 
-import java.io.File;
-import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.logging.FileHandler;
-import java.util.logging.Formatter;
-import java.util.logging.Level;
-import java.util.logging.LogRecord;
-import java.util.logging.Logger;
-import net.sourceforge.jnlp.util.FileUtils;
+import net.sourceforge.jnlp.util.docprovider.TextsProvider;
+import net.sourceforge.jnlp.util.logging.filelogs.LogBasedFileLog;
+import net.sourceforge.jnlp.util.logging.filelogs.WriterBasedFileLog;
 import net.sourceforge.jnlp.util.logging.headers.Header;
 
 /**
- * This class writes log information to file.
+ * This class is utility and factory around file logs.
  */
-public final class FileLog implements SingleStreamLogger {
-    private static SimpleDateFormat fileLogNameFormatter = new SimpleDateFormat("yyyy-MM-dd_HH:mm:ss.S");
+public final class FileLog  {
+
+    public static Header getHeadlineHeader() {
+        return new Header(OutputController.Level.WARNING_ALL, Thread.currentThread().getStackTrace(), Thread.currentThread(), false);
+    }
+    
+    private static final class SingleStreamLoggerImpl implements SingleStreamLogger {
+
+        public SingleStreamLoggerImpl() {
+        }
+
+        @Override
+        public void log(String s) {
+            //dummy
+        }
+
+        @Override
+        public void close() {
+            //dummy
+        }
+    }
+
+    public static final SimpleDateFormat fileLogNameFormatter = new SimpleDateFormat("yyyy-MM-dd_HH:mm:ss.S");
     /**"Tue Nov 19 09:43:50 CET 2013"*/
-    private static SimpleDateFormat pluginSharedFormatter = new SimpleDateFormat("EEE MMM dd HH:mm:ss ZZZ yyyy");
+    public static final SimpleDateFormat pluginSharedFormatter = new SimpleDateFormat("EEE MMM dd HH:mm:ss ZZZ yyyy");
+    public static final String defaultloggerName = TextsProvider.ITW + " file-logger";
 
-    private final Logger impl;
-    private final FileHandler fh;
-    private static final String defaultloggerName = "IcedTea-Web file-logger";
 
-    public FileLog() {
-        this(false);
+    public static SingleStreamLogger createFileLog() {
+        return createFileLog("javantx");
     }
     
-     public FileLog(boolean append) {
-        this(defaultloggerName, LogConfig.getLogConfig().getIcedteaLogDir() + "itw-javantx-" + getStamp() + ".log", append);
-    }
-
-
-     
-    public FileLog(String fileName, boolean append) {
-        this(fileName, fileName, append);
-    }
-     
-    public FileLog(String loggerName, String fileName, boolean append) {
-       try {
-           File futureFile = new File(fileName);
-           if (!futureFile.exists()) {
-               FileUtils.createRestrictedFile(futureFile, true);
-           }
-           fh = new FileHandler(fileName, append);
-           fh.setFormatter(new Formatter() {
-               @Override
-               public String format(LogRecord record) {
-                   return record.getMessage() + "\n";
-               }
-           });
-           impl = Logger.getLogger(loggerName);
-           impl.setLevel(Level.ALL);
-           impl.addHandler(fh);
-           log(new Header(OutputController.Level.WARNING_ALL, Thread.currentThread().getStackTrace(), Thread.currentThread(), false).toString());
-       } catch (IOException e) {
-           throw new RuntimeException(e);
-       }
-    }
-
-    /**
-     * Log the String to file.
-     *
-     * @param s {@link Exception} that was thrown.
-     */
-    @Override
-    public synchronized void log(String s) {
-        impl.log(Level.FINE, s);
+    public static SingleStreamLogger createAppFileLog() {
+        return createFileLog("clienta");
     }
     
-    public void close() {
-        fh.close();
+    private static SingleStreamLogger createFileLog(String id) {
+        SingleStreamLogger s;
+        try {
+            if (LogConfig.getLogConfig().isLegacyLogBasedFileLog()) {
+                s = new LogBasedFileLog(defaultloggerName, getFileName(id), false);
+            } else {
+                s = new WriterBasedFileLog(defaultloggerName, getFileName(id), false);
+            }
+        } catch (Exception ex) {
+            //we do not wont to block whole logging just because initialization error in "new FileLog()"
+            OutputController.getLogger().log(ex);
+            s = new SingleStreamLoggerImpl();
+        }
+        return s;
     }
 
-    private static String getStamp() {
+    private static String getFileName(String id) {
+        return LogConfig.getLogConfig().getIcedteaLogDir() + "itw-"+id+"-" + getStamp() + ".log";
+    }
+    
+  
+    public static String getStamp() {
         return fileLogNameFormatter.format(new Date());
     }
 
@@ -121,4 +114,5 @@ public final class FileLog implements SingleStreamLogger {
     public static SimpleDateFormat getPluginSharedFormatter() {
         return pluginSharedFormatter;
     }
+
 }

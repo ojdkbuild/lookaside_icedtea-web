@@ -148,7 +148,7 @@ public class XDesktopEntry {
 
         }
         if (file.getInformation().getVendor() != null) {
-            fileContents += "Vendor=" + sanitize(file.getInformation().getVendor()) + "\n";
+            fileContents += "X-Vendor=" + sanitize(file.getInformation().getVendor()) + "\n";
         }
 
         if (JNLPRuntime.isWebstartApplication()) {
@@ -531,7 +531,7 @@ public class XDesktopEntry {
         return fPath;
     }
 
-    private static String findFreedesktopOrgDesktopPathCatch() {
+    public static String findFreedesktopOrgDesktopPathCatch() {
         try {
             return findFreedesktopOrgDesktopPath();
         } catch (Exception ex) {

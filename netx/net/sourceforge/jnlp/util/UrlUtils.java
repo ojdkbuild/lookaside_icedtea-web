@@ -52,6 +52,9 @@ public class UrlUtils {
     private static final String UTF8 = "utf-8";
 
     public static URL normalizeUrlAndStripParams(URL url, boolean encodeFileUrls) {
+        if (url == null) {
+            return null;
+        }
         try {
             String[] urlParts = url.toString().split("\\?");
             URL strippedUrl = new URL(urlParts[0]); 
@@ -165,6 +168,9 @@ public class UrlUtils {
      * @return  src without file
      */
     public static URL removeFileName(final URL src) {
+        if (src == null) {
+            return src;
+        }
         URL nsrc = normalizeUrlAndStripParams(src);
         String s = nsrc.getPath();
         int i1 = s.lastIndexOf("/");
@@ -332,7 +338,77 @@ public class UrlUtils {
         }
     }
     
+    public static int getSanitizedPort(final URL u) {
+        if (u.getPort() < 0) {
+            return u.getDefaultPort();
+        }
+        return u.getPort();
+    }
 
+    public static int getPort(final URL url) {
+        return getSanitizedPort(url);
+    }
 
+    public static String getHostAndPort(final URL url) {
+        return url.getHost() + ":" + getSanitizedPort(url);
+    }
+    
+    public static URL ensureSlashTail(URL u) {
+        if (u == null) {
+            return null;
+        }
+        String s = ensureSlashTail(u.toExternalForm());
+        try {
+            return new URL(s);
+        } catch (MalformedURLException ex) {
+            OutputController.getLogger().log(ex);
+            return u;
+        }
+
+    }
+
+    public static String ensureSlashTail(String s) {
+        if (s.endsWith("/")) {
+            return s;
+        }
+        if (s.endsWith("\\")) {
+            return s;
+        }
+        if (s.contains("/")) {
+            return s + "/";
+        }
+        if (s.contains("\\")) {
+            return s + "\\";
+        }
+        return s + "/";
+    }
+
+    public static String stripFile(URL documentbase) {
+        //whenused in generation of regec, the trailing slash is very important
+        //see the result between http:/some.url/path.* and http:/some.url/path/.*
+        return UrlUtils.ensureSlashTail(stripFileImp(documentbase));
+    }
+
+    private static String stripFileImp(URL documentbase) {
+        try {
+            String normalized = UrlUtils.normalizeUrlAndStripParams(documentbase).toExternalForm().trim();
+            if (normalized.endsWith("/") || normalized.endsWith("\\")) {
+                return normalized;
+            }
+            URL middleway = new URL(normalized);
+            String file = middleway.getFile();
+            int i = Math.max(file.lastIndexOf('/'), file.lastIndexOf('\\'));
+            if (i < 0) {
+                return normalized;
+            }
+            String parent = file.substring(0, i + 1);
+            String stripped = normalized.replace(file, parent);
+            return stripped;
+        } catch (Exception ex) {
+            OutputController.getLogger().log(ex);
+            return documentbase.toExternalForm();
+        }
+
+    }
 
 }

@@ -441,7 +441,7 @@ public class SecurityDialogs {
         }
     }
 
-     public static boolean showMissingPermissionsAttributeDialogue(String title, URL codeBase) {
+     public static boolean showMissingPermissionsAttributeDialogue(String title, String codeBase) {
 
          if (!shouldPromptUser()) {
              if (JNLPRuntime.isTrustAll()) {
@@ -453,7 +453,7 @@ public class SecurityDialogs {
 
          SecurityDialogMessage message = new SecurityDialogMessage();
          message.dialogType = DialogType.UNSIGNED_EAS_NO_PERMISSIONS_WARNING;
-         message.extras = new Object[]{title, codeBase.toExternalForm()};
+         message.extras = new Object[]{title, codeBase};
          Object selectedValue = getUserResponse(message);
          return SecurityDialogs.getIntegerResponseAsBoolean(selectedValue);
     }

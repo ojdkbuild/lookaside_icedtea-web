@@ -32,6 +32,7 @@ obligated to do so. If you do not wish to do so, delete this exception
 statement from your version.*/
 /**
  *<pre>
+{@code
         ITW-thread(s)               | dialogs-thread                                                                                                                                  X
                                     |                                                                                                                                                 X
    presteps in SecurtyDialogs       |                                                                                                                                                 X
@@ -75,7 +76,7 @@ statement from your version.*/
             |                       |                                                                                                                                                 X
    continue accordingly             |                                                                                                                                                 X
                                                                                                                                                                                       X
-
+}
  *</pre>
  */
 package net.sourceforge.jnlp.security;

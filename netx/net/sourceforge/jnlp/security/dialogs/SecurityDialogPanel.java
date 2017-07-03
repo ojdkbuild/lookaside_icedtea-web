@@ -71,7 +71,7 @@ public abstract class SecurityDialogPanel extends JPanel {
     /**
      * Needed to get word wrap working in JLabels.
      */
-    protected String htmlWrap(String s) {
+    public  static String htmlWrap(String s) {
         return "<html>" + s + "</html>";
     }
 

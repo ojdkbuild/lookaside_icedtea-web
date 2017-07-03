@@ -40,6 +40,7 @@ import net.sourceforge.jnlp.SecurityDesc.RequestedPermissionLevel;
 import net.sourceforge.jnlp.cache.UpdatePolicy;
 import net.sourceforge.jnlp.runtime.JNLPRuntime;
 import net.sourceforge.jnlp.util.StreamUtils;
+import net.sourceforge.jnlp.util.UrlUtils;
 import net.sourceforge.jnlp.util.logging.OutputController;
 import net.sourceforge.jnlp.util.replacements.BASE64Decoder;
 
@@ -130,7 +131,10 @@ public final class PluginBridge extends JNLPFile {
 
                     }.readStream();
                 } else {
-                    jnlpFile = jnlpCreator.create(jnlp, null, defaultSettings, JNLPRuntime.getDefaultUpdatePolicy(), codeBase);
+                    // see http://icedtea.classpath.org/bugzilla/show_bug.cgi?id=2746#c3
+                    URL codebaseRewriter=UrlUtils.ensureSlashTail(UrlUtils.removeFileName(jnlp));
+                    this.codeBase = codebaseRewriter;
+                    jnlpFile = jnlpCreator.create(jnlp, null, defaultSettings, JNLPRuntime.getDefaultUpdatePolicy(), codebaseRewriter);
                     debugJnlp = new StreamProvider() {
 
                         @Override
@@ -224,7 +228,7 @@ public final class PluginBridge extends JNLPFile {
 
         if (main.endsWith(".class")) //single class file only
             security = new SecurityDesc(this, SecurityDesc.SANDBOX_PERMISSIONS,
-                                        codebase.getHost());
+                                        codebase);
         else
             security = null;
 
@@ -471,7 +475,7 @@ public final class PluginBridge extends JNLPFile {
         } else {
             StringBuilder s = new StringBuilder();
             s.append("<?xml version='1.0' encoding='UTF-8'?>\n"
-                   + "<jnlp codebase='").append(getCodeBase().toString()).append("'>\n")
+                   + "<jnlp codebase='").append(getNotNullProbalbeCodeBase().toString()).append("'>\n")
                     .append("  <information>\n"
                           + "    <title>").append(createJnlpTitle()).append("</title>\n"
                           + "    <vendor>").append(createJnlpVendor()).append("</vendor>\n"
@@ -536,7 +540,7 @@ public final class PluginBridge extends JNLPFile {
     }
 
      private String fixCommonIsuses(boolean needSecurity, String orig) {
-        String codebase = getCodeBase().toString();
+        String codebase = getNotNullProbalbeCodeBase().toString();
         return fixCommonIsuses(needSecurity, orig, codebase, createJnlpTitle(), createJnlpVendor());
     }
      
@@ -594,7 +598,7 @@ public final class PluginBridge extends JNLPFile {
     private static String getAllPermissionsElement() {
         return "    <all-permissions/>\n";
     }
-    
+
     
     private abstract class StreamProvider {
 

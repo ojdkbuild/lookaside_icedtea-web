@@ -36,7 +36,6 @@
 
 package net.sourceforge.jnlp.security.appletextendedsecurity;
 
-import java.net.MalformedURLException;
 import static net.sourceforge.jnlp.runtime.Translator.R;
 
 import java.net.URL;
@@ -49,8 +48,8 @@ import net.sourceforge.jnlp.JARDesc;
 import net.sourceforge.jnlp.JNLPFile;
 import net.sourceforge.jnlp.LaunchException;
 import net.sourceforge.jnlp.PluginBridge;
-import net.sourceforge.jnlp.runtime.JNLPRuntime;
 import net.sourceforge.jnlp.runtime.JNLPClassLoader.SecurityDelegate;
+import net.sourceforge.jnlp.runtime.JNLPRuntime;
 import net.sourceforge.jnlp.security.dialogs.apptrustwarningpanel.AppTrustWarningPanel.AppSigningWarningAction;
 import net.sourceforge.jnlp.security.CertVerifier;
 import net.sourceforge.jnlp.security.SecurityDialogs;
@@ -111,8 +110,8 @@ public class UnsignedAppletTrustConfirmation {
     private static UnsignedAppletActionEntry getMatchingItem(UnsignedAppletActionStorage actionStorage, JNLPFile file, int id) {
         return actionStorage.getMatchingItem(
                 UrlUtils.normalizeUrlAndStripParams(file.getSourceLocation(), true /* encode local files */).toString(), 
-                UrlUtils.normalizeUrlAndStripParams(file.getCodeBase(), true /* encode local files */).toString(), 
-                toRelativePaths(getJars(file), file.getCodeBase().toString()), id);
+                UrlUtils.normalizeUrlAndStripParams(file.getNotNullProbalbeCodeBase(), true /* encode local files */).toString(), 
+                toRelativePaths(getJars(file), file.getNotNullProbalbeCodeBase().toExternalForm()), id);
     }
 
     /* Extract the archives as relative paths */
@@ -135,17 +134,17 @@ public class UnsignedAppletTrustConfirmation {
         try {
             UnsignedAppletActionEntry oldEntry = getMatchingItem(userActionStorage, file, id);
 
-            URL codebase = UrlUtils.normalizeUrlAndStripParams(file.getCodeBase(), true /* encode local files */);
+            URL codebase = UrlUtils.normalizeUrlAndStripParams(file.getNotNullProbalbeCodeBase(), true /* encode local files */);
             URL documentbase = UrlUtils.normalizeUrlAndStripParams(file.getSourceLocation(), true /* encode local files */);
 
             /* Else, create a new entry */
             UrlRegEx codebaseRegex = UrlRegEx.quote(codebase.toExternalForm());
-            UrlRegEx documentbaseRegex = UrlRegEx.quoteAndStar(stripFile(documentbase)); // Match any from codebase and sourceFile "base"
+            UrlRegEx documentbaseRegex = UrlRegEx.quoteAndStar(UrlUtils.stripFile(documentbase)); // Match any from codebase and sourceFile "base"
             List<String> archiveMatches = null; // Match any from codebase
 
             if (!rememberForCodeBase) { 
                 documentbaseRegex = UrlRegEx.quote(documentbase.toExternalForm()); // Match only this applet
-                archiveMatches = toRelativePaths(getJars(file), file.getCodeBase().toString()); // Match only this applet
+                archiveMatches = toRelativePaths(getJars(file), file.getNotNullProbalbeCodeBase().toString()); // Match only this applet
             }
             
             /* Update, if entry exists */
@@ -276,50 +275,6 @@ public class UnsignedAppletTrustConfirmation {
             throw new LaunchException(file, null, R("LSFatal"), R("LCClient"), R("LPartiallySignedApplet"), R("LPartiallySignedAppletUserDenied"));
         }
 
-    }
-
-    static String stripFile(URL documentbase) {
-        //whenused in generation of regec, the trailing slash is very important
-        //see the result between http:/some.url/path.* and http:/some.url/path/.*
-        return ensureSlashTail(stripFileImp(documentbase));
-    }
-    
-    private static String stripFileImp(URL documentbase) {
-        try {
-            String normalized = UrlUtils.normalizeUrlAndStripParams(documentbase).toExternalForm().trim();
-            if (normalized.endsWith("/") || normalized.endsWith("\\")) {
-                return normalized;
-            }
-            URL middleway = new URL(normalized);
-            String file = middleway.getFile();
-            int i = Math.max(file.lastIndexOf('/'), file.lastIndexOf('\\'));
-            if (i<0){
-                return normalized;
-            }
-            String parent = file.substring(0, i+1);
-            String stripped = normalized.replace(file, parent);
-            return stripped;
-        } catch (Exception ex) {
-            OutputController.getLogger().log(ex);
-            return documentbase.toExternalForm();
-        }
-
-    }
-
-    private static String ensureSlashTail(String s) {
-        if (s.endsWith("/")) {
-            return s;
-        }
-        if (s.endsWith("\\")) {
-            return s;
-        }
-        if (s.contains("/")) {
-            return s + "/";
-        }
-        if (s.contains("\\")) {
-            return s + "\\";
-        }
-        return s + "/";
     }
 
 }

@@ -446,6 +446,12 @@ AC_DEFUN_ONCE([IT_CHECK_FOR_TAGSOUP],
     done
   fi
   AC_MSG_RESULT(${TAGSOUP_JAR})
+  if test -z "${TAGSOUP_JAR}"; then
+    AC_MSG_RESULT(***********************************************)
+    AC_MSG_RESULT(*  Warning you are building without tagsoup   *)
+    AC_MSG_RESULT(* Some jnlps and most htmls will be malformed *)
+    AC_MSG_RESULT(***********************************************)
+  fi
   AC_SUBST(TAGSOUP_JAR)
   AM_CONDITIONAL([HAVE_TAGSOUP], [test x$TAGSOUP_JAR != xno -a x$TAGSOUP_JAR != x ])
 ])
@@ -498,6 +504,55 @@ if test x"${it_cv_$1}" = "xno"; then
    AC_MSG_ERROR([$2 not found.])
 fi
 AC_PROVIDE([$0])dnl
+])
+
+dnl Macro to check for a Java class HexDumpEncoder
+AC_DEFUN([IT_CHECK_FOR_HEXDUMPENCODER],[
+AC_REQUIRE([IT_FIND_JAVAC])
+AC_REQUIRE([IT_FIND_JAVA])
+AC_CACHE_CHECK([if HexDumpEncoder is available], it_cv_HEXDUMPENCODER, [
+CLASS=sun/applet/Test.java
+BYTECODE=$(echo $CLASS|sed 's#\.java##')
+mkdir -p tmp.$$/$(dirname $CLASS)
+cd tmp.$$
+cat << \EOF > $CLASS
+[/* [#]line __oline__ "configure" */
+package sun.applet;
+
+import sun.misc.*;
+import sun.security.util.*;
+
+public class Test
+{
+  public static void main(String[] args)
+    throws Exception
+  {
+    try {
+      System.out.println(Class.forName("sun.misc.HexDumpEncoder"));
+    } catch (ClassNotFoundException e) {
+      System.out.println(Class.forName("sun.security.util.HexDumpEncoder"));
+    }
+  }
+}
+]
+EOF
+if $JAVAC -cp . $JAVACFLAGS -nowarn $CLASS >&AS_MESSAGE_LOG_FD 2>&1; then
+  if $JAVA -classpath . $BYTECODE >&AS_MESSAGE_LOG_FD 2>&1; then
+      it_cv_HEXDUMPENCODER=yes;
+  else
+      it_cv_HEXDUMPENCODER=no;
+  fi
+else
+  it_cv_HEXDUMPENCODER=no;
+fi
+])
+rm -f $CLASS *.class
+cd ..
+# should be rmdir but has to be rm -rf due to sun.applet usage
+rm -rf tmp.$$
+if test x"${it_cv_HEXDUMPENCODER}" = "xno"; then
+   AC_MSG_ERROR([HexDumpEncoder not found.])
+fi
 ])
 
 AC_DEFUN_ONCE([IT_CHECK_FOR_MERCURIAL],

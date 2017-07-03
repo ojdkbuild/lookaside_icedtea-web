@@ -40,7 +40,7 @@ import net.sourceforge.jnlp.ClosingListener;
 
 public  class StringBasedClosingListener extends ClosingListener {
 
-    private  final String condition;
+    protected  final String condition;
 
     public StringBasedClosingListener(String condition) {
         this.condition = condition;

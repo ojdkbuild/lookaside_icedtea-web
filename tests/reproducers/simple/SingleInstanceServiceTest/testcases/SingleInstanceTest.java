@@ -168,6 +168,13 @@ public class SingleInstanceTest extends BrowserTest {
     @NeedsDisplay
     @TestInBrowsers(testIn = Browsers.one)
     public void htmlpAppletXhtmlpApplet() throws Exception {
+        //others really do
+        if ((server.getBrowserLocation().endsWith("midori") || server.getBrowserLocation().endsWith("epiphany"))) {
+            return;
+        }
+        if (server.getBrowserLocation().endsWith(ServerAccess.UNSET_BROWSER)) {
+            return;
+        }
         ProcessResult[] results = executeSingleInstanceCheck(htmlpApplet, htmlpApplet);
         String id = "htmlpAppletXhtmlpApplet";
         evaluateFirstInstance(results[0], id);
@@ -180,6 +187,13 @@ public class SingleInstanceTest extends BrowserTest {
     @NeedsDisplay
     @TestInBrowsers(testIn = Browsers.one)
     public void htmlJnlpHrefAppletXhtmlJnlpHrefApplet() throws Exception {
+        //others really do
+        if ((server.getBrowserLocation().endsWith("midori") || server.getBrowserLocation().endsWith("epiphany"))) {
+            return;
+        }
+        if (server.getBrowserLocation().endsWith(ServerAccess.UNSET_BROWSER)) {
+            return;
+        }
         ProcessResult[] results = executeSingleInstanceCheck(htmlJnlpHrefApplet, htmlJnlpHrefApplet);
         String id = "htmlJnlpHrefAppletXhtmlJnlpHrefApplet";
         evaluateFirstInstance(results[0], id);

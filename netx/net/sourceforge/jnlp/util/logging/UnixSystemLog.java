@@ -63,6 +63,11 @@ public class UnixSystemLog implements SingleStreamLogger{
             OutputController.getLogger().log(ex);
         }
     }
-    
+
+    @Override
+    public void close() {
+        //nope
+    }
+
 
 }

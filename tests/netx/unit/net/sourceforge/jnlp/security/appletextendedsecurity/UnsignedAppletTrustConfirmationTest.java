@@ -55,6 +55,7 @@ import net.sourceforge.jnlp.mock.DummyJNLPFileWithJar;
 import net.sourceforge.jnlp.security.appletextendedsecurity.impl.UnsignedAppletActionStorageImpl;
 import net.sourceforge.jnlp.security.dialogs.apptrustwarningpanel.UnsignedAppletTrustWarningPanel;
 import net.sourceforge.jnlp.util.FileUtils;
+import net.sourceforge.jnlp.util.UrlUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -168,28 +169,28 @@ public class UnsignedAppletTrustConfirmationTest {
     @Test
     public void testSripFile() throws Exception {
         String sample = "http://aa.bb/";
-        String result = UnsignedAppletTrustConfirmation.stripFile(new URL(sample));
+        String result = UrlUtils.stripFile(new URL(sample));
         assertEquals(sample, result);
         sample = "http://aa.bb";
-        result = UnsignedAppletTrustConfirmation.stripFile(new URL(sample));
+        result = UrlUtils.stripFile(new URL(sample));
         assertEquals(sample + "/", result);
         sample = "http://aa.bb/";
-        result = UnsignedAppletTrustConfirmation.stripFile(new URL(sample + "cc"));
+        result = UrlUtils.stripFile(new URL(sample + "cc"));
         assertEquals(sample, result);
         sample = "http://aa.bb/cc/";
-        result = UnsignedAppletTrustConfirmation.stripFile(new URL(sample));
+        result = UrlUtils.stripFile(new URL(sample));
         assertEquals(sample, result);
         sample = "http://aa.bb/some/complicated/";
-        result = UnsignedAppletTrustConfirmation.stripFile(new URL(sample + "some"));
+        result = UrlUtils.stripFile(new URL(sample + "some"));
         assertEquals(sample, result);
         sample = "http://aa.bb/some/complicated/some/";
-        result = UnsignedAppletTrustConfirmation.stripFile(new URL(sample));
+        result = UrlUtils.stripFile(new URL(sample));
         assertEquals(sample, result);
         sample = "http://aa.bb/some/";
-        result = UnsignedAppletTrustConfirmation.stripFile(new URL(sample + "strange?a=b"));
+        result = UrlUtils.stripFile(new URL(sample + "strange?a=b"));
         assertEquals(sample, result);
         sample = "http://aa.bb/some/strange/";
-        result = UnsignedAppletTrustConfirmation.stripFile(new URL(sample + "?a=b"));
+        result = UrlUtils.stripFile(new URL(sample + "?a=b"));
         assertEquals(sample, result);
         
     }

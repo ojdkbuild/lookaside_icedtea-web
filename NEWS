@@ -8,6 +8,21 @@ GX  - http://bugs.gentoo.org/show_bug.cgi?id=X
 
 CVE-XXXX-YYYY: http://www.cve.mitre.org/cgi-bin/cvename.cgi?name=XXXX-YYYY
 
+New in release 1.6.2 (2016-02-03):
+* all connection restrictions now consider also port
+* PR2779: html-gen.sh: Don't try to call hg if .hg directory isn't present
+* PR2591 - IcedTea-Web request resources twice for meta informations and causes ClientAbortException on tomcat in conjunction with JnlpDownloadServlet
+* PR2690 - Can't run BOM into JNLP file
+* PR2669 - remove bash-specific syntax from top level Makefile.am
+* PR2489 - various NPEs when codebase is null
+* NetX
+  - main-class attribute trimmed by default
+  - in strict mode, main-class attribute checked for invalid characters
+* Plugin
+  - RH1273691 - Escaped equals signs in deployment.properties not un-escaped when used
+  - PR2746 - IcedTea-Web Plugin 1.6.1: net.sourceforge.jnlp.LaunchException 
+  - PR2714 - IcedTea-Web plugin sends uninitialized memory garbage across a pipe when NPN_GetValueForURL call fails
+
 New in release 1.6.1 (2015-09-11):
 * Enabled Entry-Point attribute check
 * permissions sandbox and signed app and unsigned app with permissions all-permissions now run in sandbox instead of not at all.
@@ -20,6 +35,7 @@ New in release 1.6.1 (2015-09-11):
 * RH1231441 Unable to read the text of the buttons of the security dialogue
 * Fixed RH1233697 icedtea-web: applet origin spoofing
 * Fixed RH1233667 icedtea-web: unexpected permanent authorization of unsigned applets
+* fixed fatal impact of initialization error of FileLog
 * MissingALACAdialog made available also for unsigned applications (but ignoring actual manifest value) and fixed
 * NetX
   - fixed issues with -html shortcuts

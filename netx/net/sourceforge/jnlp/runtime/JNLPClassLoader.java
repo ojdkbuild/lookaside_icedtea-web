@@ -318,7 +318,7 @@ public class JNLPClassLoader extends URLClassLoader {
 
     private void setSecurity() throws LaunchException {
         URL codebase = UrlUtils.guessCodeBase(file);
-        this.security = securityDelegate.getClassLoaderSecurity(codebase.getHost());
+        this.security = securityDelegate.getClassLoaderSecurity(codebase);
     }
 
     /**
@@ -754,7 +754,7 @@ public class JNLPClassLoader extends URLClassLoader {
             validJars.add(jarDesc);
             final URL codebase = getJnlpFileCodebase();
 
-            final SecurityDesc jarSecurity = securityDelegate.getCodebaseSecurityDesc(jarDesc, codebase.getHost());
+            final SecurityDesc jarSecurity = securityDelegate.getCodebaseSecurityDesc(jarDesc, codebase);
             if (jarSecurity.getSecurityType().equals(SecurityDesc.SANDBOX_PERMISSIONS)) {
                 containsUnsignedJar = true;
             } else {
@@ -778,7 +778,7 @@ public class JNLPClassLoader extends URLClassLoader {
 
         for (JARDesc jarDesc : validJars) {
             final URL codebase = getJnlpFileCodebase();
-            final SecurityDesc jarSecurity = securityDelegate.getCodebaseSecurityDesc(jarDesc, codebase.getHost());
+            final SecurityDesc jarSecurity = securityDelegate.getCodebaseSecurityDesc(jarDesc, codebase);
             jarLocationSecurityMap.put(jarDesc.getLocation(), jarSecurity);
         }
 
@@ -1188,7 +1188,7 @@ public class JNLPClassLoader extends URLClassLoader {
 
             // Class from host X should be allowed to connect to host X
             if (cs.getLocation() != null && cs.getLocation().getHost().length() > 0)
-                result.add(new SocketPermission(cs.getLocation().getHost(),
+                result.add(new SocketPermission(UrlUtils.getHostAndPort(cs.getLocation()),
                         "connect, accept"));
 
             return result;
@@ -1302,7 +1302,7 @@ public class JNLPClassLoader extends URLClassLoader {
                                             codebase = file.getResources().getMainJAR().getLocation();
                                         }
                                         
-                                        final SecurityDesc jarSecurity = securityDelegate.getJarPermissions(codebase.getHost());
+                                        final SecurityDesc jarSecurity = securityDelegate.getJarPermissions(codebase);
                                         
                                         try {
                                             URL fileURL = new URL("file://" + extractedJarLocation);
@@ -1630,7 +1630,7 @@ public class JNLPClassLoader extends URLClassLoader {
 
                     checkTrustWithUser();
 
-                    final SecurityDesc security = securityDelegate.getJarPermissions(file.getCodeBase().getHost());
+                    final SecurityDesc security = securityDelegate.getJarPermissions(file.getCodeBase());
 
                     jarLocationSecurityMap.put(remoteURL, security);
 
@@ -2162,7 +2162,7 @@ public class JNLPClassLoader extends URLClassLoader {
         if (foundLoader != null)
             approved = true;
 
-        else if (ref.toString().startsWith(file.getCodeBase().toString()))
+        else if (ref.toString().startsWith(file.getNotNullProbalbeCodeBase().toString()))
             approved = true;
         else if (SecurityDesc.ALL_PERMISSIONS.equals(security.getSecurityType()))
             approved = true;
@@ -2249,7 +2249,7 @@ public class JNLPClassLoader extends URLClassLoader {
         // Permissions for all remote hosting urls
         synchronized (jarLocationSecurityMap) {
             for (URL u : jarLocationSecurityMap.keySet()) {
-                permissions.add(new SocketPermission(u.getHost(),
+                    permissions.add(new SocketPermission(UrlUtils.getHostAndPort(u),
                         "connect, accept"));
             }
         }
@@ -2257,7 +2257,7 @@ public class JNLPClassLoader extends URLClassLoader {
         // Permissions for codebase urls (if there is a loader)
         if (codeBaseLoader != null) {
             for (URL u : codeBaseLoader.getURLs()) {
-                permissions.add(new SocketPermission(u.getHost(),
+                permissions.add(new SocketPermission(UrlUtils.getHostAndPort(u),
                         "connect, accept"));
             }
         }
@@ -2290,11 +2290,11 @@ public class JNLPClassLoader extends URLClassLoader {
 
         public boolean userPromptedForSandbox();
 
-        public SecurityDesc getCodebaseSecurityDesc(final JARDesc jarDesc, final String codebaseHost);
+        public SecurityDesc getCodebaseSecurityDesc(final JARDesc jarDesc, final URL codebaseHost);
 
-        public SecurityDesc getClassLoaderSecurity(final String codebaseHost) throws LaunchException;
+        public SecurityDesc getClassLoaderSecurity(final URL codebaseHost) throws LaunchException;
 
-        public SecurityDesc getJarPermissions(final String codebaseHost);
+        public SecurityDesc getJarPermissions(final URL codebaseHost);
 
         public void promptUserOnPartialSigning() throws LaunchException;
 
@@ -2331,7 +2331,7 @@ public class JNLPClassLoader extends URLClassLoader {
         }
 
         @Override
-        public SecurityDesc getCodebaseSecurityDesc(final JARDesc jarDesc, final String codebaseHost) {
+        public SecurityDesc getCodebaseSecurityDesc(final JARDesc jarDesc, final URL codebaseHost) {
             if (runInSandbox) {
                 return new SecurityDesc(classLoader.file,
                         SecurityDesc.SANDBOX_PERMISSIONS,
@@ -2361,7 +2361,7 @@ public class JNLPClassLoader extends URLClassLoader {
         }
 
         @Override
-        public SecurityDesc getClassLoaderSecurity(final String codebaseHost) throws LaunchException {
+        public SecurityDesc getClassLoaderSecurity(final URL codebaseHost) throws LaunchException {
             if (isPluginApplet()) {
                 if (!runInSandbox && classLoader.getSigning()) {
                     return new SecurityDesc(classLoader.file,
@@ -2403,7 +2403,7 @@ public class JNLPClassLoader extends URLClassLoader {
         }
 
         @Override
-        public SecurityDesc getJarPermissions(final String codebaseHost) {
+        public SecurityDesc getJarPermissions(final URL codebaseHost) {
             if (!runInSandbox && classLoader.jcv.isFullySigned()) {
                 // Already trust application, nested jar should be given
                 return new SecurityDesc(classLoader.file,

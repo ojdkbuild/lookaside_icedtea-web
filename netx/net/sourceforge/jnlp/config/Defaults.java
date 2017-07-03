@@ -340,6 +340,16 @@ public class Defaults {
                         String.valueOf(false)
                 },
                 {
+                        DeploymentConfiguration.KEY_ENABLE_APPLICATION_LOGGING_TOFILE,
+                        BasicValueValidators.getBooleanValidator(),
+                        String.valueOf(false)
+                },
+                 {
+                        DeploymentConfiguration.KEY_ENABLE_LEGACY_LOGBASEDFILELOG,
+                        BasicValueValidators.getBooleanValidator(),
+                        String.valueOf(true)
+                },
+                {
                         DeploymentConfiguration.KEY_ENABLE_LOGGING_TOSTREAMS,
                         BasicValueValidators.getBooleanValidator(),
                         String.valueOf(true)
