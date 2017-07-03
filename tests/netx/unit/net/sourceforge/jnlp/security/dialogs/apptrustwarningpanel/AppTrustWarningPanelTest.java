@@ -1,5 +1,7 @@
 package net.sourceforge.jnlp.security.dialogs.apptrustwarningpanel;
 
+import java.io.File;
+import java.io.IOException;
 import net.sourceforge.jnlp.security.dialogs.apptrustwarningpanel.UnsignedAppletTrustWarningPanel;
 import net.sourceforge.jnlp.security.dialogs.apptrustwarningpanel.AppTrustWarningPanel;
 import java.net.URL;
@@ -10,6 +12,9 @@ import java.util.Map;
 import javax.swing.JButton;
 import net.sourceforge.jnlp.PluginBridge;
 import net.sourceforge.jnlp.PluginParameters;
+import net.sourceforge.jnlp.browsertesting.browsers.firefox.FirefoxProfilesOperator;
+import net.sourceforge.jnlp.config.PathsAndFiles;
+import org.junit.AfterClass;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -31,9 +36,33 @@ public class AppTrustWarningPanelTest {
 
     /* Should contain an instance of each AppTrustWarningPanel subclass */
     private static List<AppTrustWarningPanel> panelList = new ArrayList<AppTrustWarningPanel>();
+    private static File appletSecurityBackup;
 
+    
+    public static void backupAppletSecurity() throws IOException {
+        appletSecurityBackup = File.createTempFile("appletSecurity", "itwTestBAckup");
+        FirefoxProfilesOperator.copyFile(PathsAndFiles.APPLET_TRUST_SETTINGS_USER.getFile(), appletSecurityBackup);
+    }
+
+    public static void removeAppletSecurityImpl() throws IOException {
+        if (appletSecurityBackup.exists()) {
+            PathsAndFiles.APPLET_TRUST_SETTINGS_USER.getFile().delete();
+        }
+    }
+
+    @AfterClass
+    public static void restoreAppletSecurity() throws IOException {
+        if (appletSecurityBackup.exists()) {
+            removeAppletSecurityImpl();
+            FirefoxProfilesOperator.copyFile(appletSecurityBackup, PathsAndFiles.APPLET_TRUST_SETTINGS_USER.getFile());
+            appletSecurityBackup.delete();
+        }
+    }
     @BeforeClass
     public static void setup() throws Exception {
+        backupAppletSecurity();
+        //emptying  .appletTrustSettings to not affect run of this test
+        removeAppletSecurityImpl();
         mockCodebase = new URL("http://www.example.com");
         mockDocumentBase = new URL("http://www.example.com");
         mockJar = "ApplicationName.jar";
@@ -48,7 +77,7 @@ public class AppTrustWarningPanelTest {
         mockPluginBridge = new PluginBridge(mockCodebase, mockDocumentBase, mockJar,
                 mockMainClass, mockWidth, mockHeight, mockParameters);
 
-        panelList.add(new UnsignedAppletTrustWarningPanel(mockPluginBridge, null));
+        panelList.add(new UnsignedAppletTrustWarningPanel(null, mockPluginBridge, null));
     }
 
     @Test

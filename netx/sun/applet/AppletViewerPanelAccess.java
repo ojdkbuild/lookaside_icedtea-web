@@ -33,16 +33,21 @@
 package sun.applet;
 
 import java.applet.Applet;
+import java.applet.AppletContext;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.util.Hashtable;
+import java.util.Map;
+import net.sourceforge.jnlp.NetxPanel;
 
 public abstract class AppletViewerPanelAccess extends AppletViewerPanel {
 
-    public AppletViewerPanelAccess(URL documentURL, Hashtable<String, String> atts) {
-        super(documentURL, atts);
+    public AppletViewerPanelAccess(URL documentURL, Map<String, String> atts) {
+        // note, this is copy.
+        // But th eonly usecasein applet outside ITW is get on parameters
+        super(documentURL, new Hashtable<>(atts));
     }
 
     protected URL getDocumentURL() {
@@ -50,14 +55,8 @@ public abstract class AppletViewerPanelAccess extends AppletViewerPanel {
             Field field = AppletViewerPanel.class.getDeclaredField("documentURL");
             field.setAccessible(true);
             return (URL) field.get(this);
-        } catch (IllegalAccessException ex1) {
-            throw new RuntimeException(ex1);
-        } catch (IllegalArgumentException ex2) {
-            throw new RuntimeException(ex2);
-        } catch (NoSuchFieldException ex3) {
-            throw new RuntimeException(ex3);
-        } catch (SecurityException ex4) {
-            throw new RuntimeException(ex4);
+        } catch (IllegalAccessException | IllegalArgumentException | NoSuchFieldException | SecurityException ex) {
+            throw new RuntimeException(ex);
         }
     }
 
@@ -66,14 +65,8 @@ public abstract class AppletViewerPanelAccess extends AppletViewerPanel {
             Field field = AppletPanel.class.getDeclaredField("applet");
             field.setAccessible(true);
             field.set(this, iapplet);
-        } catch (IllegalAccessException ex1) {
-            throw new RuntimeException(ex1);
-        } catch (IllegalArgumentException ex2) {
-            throw new RuntimeException(ex2);
-        } catch (NoSuchFieldException ex3) {
-            throw new RuntimeException(ex3);
-        } catch (SecurityException ex4) {
-            throw new RuntimeException(ex4);
+        } catch (IllegalAccessException | IllegalArgumentException | NoSuchFieldException | SecurityException ex) {
+            throw new RuntimeException(ex);
         }
     }
 
@@ -90,6 +83,14 @@ public abstract class AppletViewerPanelAccess extends AppletViewerPanel {
         super.run();
     }
 
+    @Override
+    public AppletContext getAppletContext() {
+        if (getParent() instanceof AppletContext) {
+            return super.getAppletContext();
+        }
+        return ((NetxPanel)this).getAppInst().getAppletEnvironment();
+    }
+    
     /**
      * NOTE. We cannot override private method, and this call is unused and useless.
      * But kept for record of troubles to run on any openjdk.
@@ -101,16 +102,8 @@ public abstract class AppletViewerPanelAccess extends AppletViewerPanel {
             Method runLoaderMethod = klazz.getDeclaredMethod("runLoader");
             runLoaderMethod.setAccessible(true);
             runLoaderMethod.invoke(getApplet());
-               } catch (IllegalAccessException ex1) {
-            throw new RuntimeException(ex1);
-        } catch (IllegalArgumentException ex2) {
-            throw new RuntimeException(ex2);
-        } catch (NoSuchMethodException ex3) {
-            throw new RuntimeException(ex3);
-        } catch (SecurityException ex4) {
-            throw new RuntimeException(ex4);
-        } catch (InvocationTargetException ex5) {
-            throw new RuntimeException(ex5);
+        } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException | NoSuchMethodException | SecurityException ex) {
+            throw new RuntimeException(ex);
         }
     }
 
@@ -123,19 +116,12 @@ public abstract class AppletViewerPanelAccess extends AppletViewerPanel {
                     true);
             return (URL) field.get(
                     this);
-        } catch (IllegalAccessException ex1) {
-            throw new RuntimeException(ex1);
-        } catch (IllegalArgumentException ex2) {
-            throw new RuntimeException(ex2);
-        } catch (NoSuchFieldException ex3) {
-            throw new RuntimeException(ex3);
-        } catch (SecurityException ex4) {
-            throw new RuntimeException(ex4);
+        } catch (IllegalAccessException | IllegalArgumentException | NoSuchFieldException | SecurityException ex) {
+            throw new RuntimeException(ex);
         }
 
     }
     
-
     @Override
     //remaining stub of unpatched jdk
     protected synchronized void createAppletThread() {

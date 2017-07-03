@@ -1,6 +1,7 @@
-AC_INIT([icedtea-web],[1.5.2],[distro-pkg-dev@openjdk.java.net], [icedtea-web], [http://icedtea.classpath.org/wiki/IcedTea-Web])
+AC_INIT([icedtea-web],[1.6.1],[distro-pkg-dev@openjdk.java.net], [icedtea-web], [http://icedtea.classpath.org/wiki/IcedTea-Web])
 AM_INIT_AUTOMAKE([1.9 tar-pax foreign])
 AC_CONFIG_FILES([Makefile netx.manifest])
+AM_MAINTAINER_MODE([enable])
 
 # Older automake doesn't generate these correctly
 abs_top_builddir=`pwd -P`
@@ -27,6 +28,14 @@ AC_ARG_ENABLE([docs],
 AM_CONDITIONAL([ENABLE_DOCS], [test x$ENABLE_DOCS = xyes])
 AC_MSG_RESULT(${ENABLE_DOCS})
 
+AC_MSG_CHECKING([whether to filter by whitelisting on directory name when processing, compiling and running reproducers])
+AC_ARG_ENABLE([whitelist-processing],
+	      [AS_HELP_STRING([--enable-whitelist-processing],
+	      		      [Enable whitelist filter on directory name when processing, compiling and running reproducers. Otherwise filter on testcase name when running reproducers])],
+	      [ENABLE_WHITELIST="${enableval}"], [ENABLE_WHITELIST='no'])
+AM_CONDITIONAL([ENABLE_WHITELIST], [test x$ENABLE_WHITELIST = xyes])
+AC_MSG_RESULT(${ENABLE_WHITELIST})
+
 AC_PATH_PROG([BIN_BASH], [bash],, [/bin])
 if test x"$BIN_BASH" = x ; then
     AC_MSG_ERROR([/bin/bash is used in runtime and for about generation. Dying sooner rather then later])
@@ -37,10 +46,11 @@ FIND_TOOL([ZIP], [zip])
 FIND_JAVAC
 FIND_JAR
 FIND_ECJ_JAR
+IT_CHECK_JAVA_VERSION
 IT_FIND_JAVADOC
 IT_FIND_KEYTOOL
 IT_FIND_JARSIGNER
-AC_CONFIG_FILES([javac], [chmod +x javac])
+IT_FIND_PACK200
 
 IT_SET_VERSION
 IT_CHECK_XULRUNNER_VERSION
@@ -107,8 +117,8 @@ IT_FIND_OPTIONAL_JAR([rhino], RHINO,
     [/usr/share/java/js.jar /usr/share/rhino-1.6/lib/js.jar])
 IT_FIND_OPTIONAL_JAR([junit], JUNIT,
     [/usr/share/java/junit4.jar /usr/share/junit-4/lib/junit.jar])
-IT_FIND_OPTIONAL_JAR([emma], EMMA,
-    [/usr/share/java/emma.jar])
+IT_FIND_OPTIONAL_JAR([hamcrest], HAMCREST,
+    [/usr/share/java/hamcrest/all.jar /usr/share/java/hamcrest-core.jar])
 IT_FIND_OPTIONAL_JAR([jacoco], JACOCO,
     [/usr/share/java/jacoco/org.jacoco.core.jar])
 IT_FIND_OPTIONAL_JAR([asm], ASM,

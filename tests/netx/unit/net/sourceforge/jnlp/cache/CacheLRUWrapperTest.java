@@ -37,79 +37,119 @@ exception statement from your version.
 
 package net.sourceforge.jnlp.cache;
 
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
-import net.sourceforge.jnlp.ServerAccess;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.util.concurrent.CountDownLatch;
 
-import net.sourceforge.jnlp.util.PropertiesFile;
-import org.junit.AfterClass;
-
-import org.junit.BeforeClass;
+import org.junit.Before;
 import org.junit.Test;
+
+import net.sourceforge.jnlp.ServerAccess;
+import net.sourceforge.jnlp.config.InfrastructureFileDescriptor;
+import net.sourceforge.jnlp.config.PathsAndFiles;
+import net.sourceforge.jnlp.util.CacheTestUtils;
 
 public class CacheLRUWrapperTest {
 
-    private static final CacheLRUWrapper clw = CacheLRUWrapper.getInstance();
-    private static String cacheDirBackup;
-    private static PropertiesFile cacheOrderBackup;
     // does no DeploymentConfiguration exist for this file name? 
-    private static  final String cacheIndexFileName = CacheLRUWrapper.CACHE_INDEX_FILE_NAME + "_testing";
+    private static final String cacheIndexFileName = PathsAndFiles.CACHE_INDEX_FILE_NAME + "_testing";
+    private static final File javaTmp = new File(System.getProperty("java.io.tmpdir"));
+    private static final File tmpCache;
+    private static final File tmpIndexFile;
+
+    static {
+        try {
+            tmpCache = File.createTempFile("itw", "CacheLRUWrapperTest", javaTmp);
+            tmpCache.delete();
+            tmpCache.mkdir();
+            tmpCache.deleteOnExit();
+            if (!tmpCache.isDirectory()) {
+                throw new IOException("Unsuccess to create tmpfile, remove it and createsame directory");
+            }
+            tmpIndexFile = new File(tmpCache, cacheIndexFileName);
+        } catch (IOException ex) {
+            throw new RuntimeException(ex);
+        }
+
+    }
+    
+    private static class DummyInfrastructureFileDescriptor extends InfrastructureFileDescriptor{
+        private final File backend;
+
+        
+        private DummyInfrastructureFileDescriptor(File backend) {
+            super();
+            this.backend=backend;
+        }
+
+        @Override
+        public File getFile() {
+            return backend;
+        }
+
+        @Override
+        public String getFullPath() {
+            return backend.getAbsolutePath();
+        }
+        
+    }
+    
+    private static final CacheLRUWrapper clw = new CacheLRUWrapper(
+            new DummyInfrastructureFileDescriptor(tmpIndexFile),
+            new DummyInfrastructureFileDescriptor(tmpCache));
 
     private final int noEntriesCacheFile = 1000;
 
-    @BeforeClass
-    static public void setupJNLPRuntimeConfig() {
-        cacheDirBackup = clw.cacheDir;
-        cacheOrderBackup = clw.cacheOrder;
-        clw.cacheDir=System.getProperty("java.io.tmpdir");
-        clw.cacheOrder = new PropertiesFile( new File(clw.cacheDir + File.separator + cacheIndexFileName));
-        
+    private ByteArrayOutputStream baos;
+    private PrintStream out;
+
+
+
+    @Before
+    public void setup() {
+        baos = new ByteArrayOutputStream();
+        out = new PrintStream(baos);
     }
-    
-    @AfterClass
-    static public void restoreJNLPRuntimeConfig() {
-        clw.cacheDir = cacheDirBackup;
-        clw.cacheOrder = cacheOrderBackup;
-    }
-    
+
     @Test
     public void testLoadStoreTiming() throws InterruptedException {
 
-        final File cacheIndexFile = new File(clw.cacheDir + File.separator + cacheIndexFileName);
+        final File cacheIndexFile = clw.getRecentlyUsedFile().getFile();
         cacheIndexFile.delete();
-        //ensure it exists, so we can lock
-        clw.store();
-        try{
-        
-        int noLoops = 1000;
+        try {
+            int noLoops = 1000;
 
-        long time[] = new long[noLoops];
+            long time[] = new long[noLoops];
 
-        clw.lock();
-        clearCacheIndexFile();
+            clw.lock();
+            clearCacheIndexFile();
 
-        fillCacheIndexFile(noEntriesCacheFile);
-        clw.store();
+            fillCacheIndexFile(noEntriesCacheFile);
+            clw.store();
 
-        // FIXME: wait a second, because of file modification timestamp only provides accuracy on seconds.
-        Thread.sleep(1000);
+            // FIXME: wait a second, because of file modification timestamp only provides accuracy on seconds.
+            Thread.sleep(1000);
 
-        long sum = 0;
-        for(int i=0; i < noLoops - 1; i++) {
-            time[i]= System.nanoTime();
-            clw.load();
-            time[i+1]= System.nanoTime();
-            if(i==0)
-                continue;
-            sum = sum + time[i] - time[i-1];
-        }
-        
-        double avg = sum / time.length;
-        ServerAccess.logErrorReprint("Average = " + avg + "ns");
+            long sum = 0;
+            for(int i=0; i < noLoops - 1; i++) {
+                time[i]= System.nanoTime();
+                clw.load();
+                time[i+1]= System.nanoTime();
+                if(i==0)
+                    continue;
+                sum = sum + time[i] - time[i-1];
+            }
 
-        // wait more than 100 microseconds for noLoops = 1000 and noEntries=1000 is bad
-        assertTrue("load() must not take longer than 100 µs, but took in avg " + avg/1000 + "µs", avg < 100 * 1000);
+            double avg = sum / time.length;
+            ServerAccess.logErrorReprint("Average = " + avg + "ns");
+
+            // wait more than 100 microseconds for noLoops = 1000 and noEntries=1000 is bad
+            assertTrue("load() must not take longer than 100 µs, but took in avg " + avg/1000 + "µs", avg < 100 * 1000);
         } finally {
             clw.unlock();
             cacheIndexFile.delete();
@@ -120,7 +160,7 @@ public class CacheLRUWrapperTest {
 
         // fill cache index file
         for(int i = 0; i < noEntries; i++) {
-            String path = clw.cacheDir + File.separatorChar + i + File.separatorChar + "test" + i + ".jar";
+            String path = clw.getRecentlyUsedFile().getFullPath() + File.separatorChar + i + File.separatorChar + "test" + i + ".jar";
             String key = clw.generateKey(path);
             clw.addEntry(key, path);
         }
@@ -129,10 +169,8 @@ public class CacheLRUWrapperTest {
     @Test
     public void testModTimestampAfterStore() throws InterruptedException {
 
-        final File cacheIndexFile = new File(clw.cacheDir + File.separator + cacheIndexFileName);
+        final File cacheIndexFile = clw.getRecentlyUsedFile().getFile();
         cacheIndexFile.delete();
-        //ensure it exists, so we can lock
-        clw.store();
         try{
         clw.lock();
         
@@ -171,10 +209,119 @@ public class CacheLRUWrapperTest {
 
         clw.lock();
 
-        // clear cache + store file
-        clw.clearLRUSortedEntries();
-        clw.store();
+        try {
+            // clear cache + store file
+            clw.clearLRUSortedEntries();
+            clw.store();
+        } finally {
+            clw.unlock();
+        }
+    }
 
-        clw.unlock();
+    @Test
+    public void testAddEntry() {
+        String key = "key";
+        String value = "value";
+
+        clw.addEntry(key, value);
+        assertTrue(clw.containsKey(key) && clw.containsValue(value));
+    }
+
+    @Test
+    public void testRemoveEntry() {
+        String key = "key";
+        String value = "value";
+
+        clw.addEntry(key, value);
+        clw.removeEntry(key);
+        assertFalse(clw.containsKey(key) && clw.containsValue(value));
+    }
+
+    @Test(timeout = 2000l)
+    public void testLock() throws IOException {
+        try {
+            clw.lock();
+            assertTrue(clw.getRecentlyUsedPropertiesFile().isHeldByCurrentThread());
+        } finally {
+            clw.unlock();
+        }
+    }
+
+    @Test(timeout = 2000l)
+    public void testUnlock() throws IOException {
+        try {
+            clw.lock();
+        } finally {
+            clw.unlock();
+        }
+        assertTrue(!clw.getRecentlyUsedPropertiesFile().isHeldByCurrentThread());
+    }
+
+    @Test(timeout = 2000l)
+    public void testStoreFailsWithoutLock() throws IOException {
+        assertTrue(!clw.store());
+    }
+
+    @Test(timeout = 2000l)
+    public void testStoreWorksWithLocK() throws IOException {
+        try {
+            clw.lock();
+            assertTrue(clw.store());
+        } finally {
+            clw.unlock();
+        }
+    }
+
+    @Test(timeout = 2000l)
+    public void testMultithreadLockPreventsStore() throws IOException, InterruptedException {
+        int numThreads = 100;
+        CountDownLatch doneSignal = new CountDownLatch(numThreads);
+
+        Thread[] list = new Thread[numThreads];
+
+        for (int i = 0; i < numThreads; i++) {
+            list[i] = new Thread(new StoreWorker(doneSignal));
+        }
+
+        for (int i = 0; i < numThreads; i++) {
+            list[i].start();
+        }
+
+        //Wait for all children to finish
+        for (int i = 0; i < numThreads; i++) {
+            list[i].join();
+        }
+
+        String out = baos.toString();
+
+        assertTrue(CacheTestUtils.stringContainsOnlySingleInstance(out, "true") && out.contains("false"));
+    }
+
+    private class StoreWorker implements Runnable {
+
+        private final CountDownLatch doneSignal;
+
+        public StoreWorker(CountDownLatch doneSignal) {
+            this.doneSignal = doneSignal;
+        }
+        @Override
+        public void run() {
+            try {
+                clw.getRecentlyUsedPropertiesFile().tryLock();
+                boolean result = clw.store();
+                synchronized (out) {
+                    out.println(String.valueOf(result));
+                    out.flush();
+                }
+                //Let parent know outputting is done
+                doneSignal.countDown();
+                //Wait until able to continue to clw.unlock()
+                doneSignal.await();
+            } catch (Exception e) {
+                e.printStackTrace();
+            } finally {
+                clw.unlock();
+            }
+        }
     }
 }

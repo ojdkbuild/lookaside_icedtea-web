@@ -58,6 +58,9 @@ public class DummyJNLPFile extends JNLPFile {
         }
     }
 
+    {
+        this.security = new SecurityDesc(this, SecurityDesc.SANDBOX_PERMISSIONS, null);
+    }
 
     @Override
     public ResourcesDesc getResources() {
@@ -67,11 +70,6 @@ public class DummyJNLPFile extends JNLPFile {
     @Override
     public URL getCodeBase() {
         return CODEBASE_URL;
-    }
-
-    @Override
-    public SecurityDesc getSecurity() {
-        return new SecurityDesc(this, SecurityDesc.SANDBOX_PERMISSIONS, null);
     }
     
 }

@@ -74,9 +74,10 @@ import java.net.ProxySelector;
 import java.net.URL;
 import java.net.URLStreamHandler;
 import java.util.Enumeration;
-import java.util.Hashtable;
 import java.util.Map;
 import java.util.Properties;
+import javax.swing.JFrame;
+import net.sourceforge.jnlp.PluginBridge;
 import sun.awt.AppContext;
 import sun.awt.SunToolkit;
 
@@ -84,7 +85,6 @@ import net.sourceforge.jnlp.config.DeploymentConfiguration;
 import net.sourceforge.jnlp.runtime.JNLPRuntime;
 import net.sourceforge.jnlp.security.JNLPAuthenticator;
 import net.sourceforge.jnlp.util.logging.JavaConsole;
-import net.sourceforge.jnlp.util.logging.LogConfig;
 import net.sourceforge.jnlp.util.logging.OutputController;
 
 /**
@@ -104,8 +104,9 @@ public class PluginMain {
             Field handlersField = URL.class.getDeclaredField("handlers");
             handlersField.setAccessible(true);
 
+            //hashtable implements map
             @SuppressWarnings("unchecked")
-            Hashtable<String, URLStreamHandler> handlers = (Hashtable<String,URLStreamHandler>)handlersField.get(null);
+            Map<String, URLStreamHandler> handlers = (Map<String,URLStreamHandler>)handlersField.get(null);
 
             // Place an arbitrary handler, we only need the URL construction to not error-out
             handlers.put("javascript", new sun.net.www.protocol.http.Handler());
@@ -117,6 +118,8 @@ public class PluginMain {
 
     /**
      * The main entry point into AppletViewer.
+     * @param args regular command-line arguments to be passed from native part
+     * @throws java.io.IOException if IO issues occur
      */
     public static void main(String args[])
             throws IOException {
@@ -147,10 +150,7 @@ public class PluginMain {
         try {
             PluginStreamHandler streamHandler = connect(args[0], args[1]);
 
-            PluginAppletSecurityContext sc = new PluginAppletSecurityContext(0);
-            sc.prePopulateLCClasses();
-            PluginAppletSecurityContext.setStreamhandler(streamHandler);
-            AppletSecurityContextManager.addContext(0, sc);
+            initSecurityContext(streamHandler);
 
             PluginAppletViewer.setStreamhandler(streamHandler);
             PluginAppletViewer.setPluginCallRequestFactory(new PluginCallRequestFactory());
@@ -174,6 +174,13 @@ public class PluginMain {
             OutputController.getLogger().log(OutputController.Level.ERROR_ALL, "Something very bad happened. I don't know what to do, so I am going to exit :(");
             JNLPRuntime.exit(1);
         }
+    }
+
+    public static void initSecurityContext(PluginStreamHandler streamHandler) {
+            PluginAppletSecurityContext sc = new PluginAppletSecurityContext(0);
+            sc.prePopulateLCClasses();
+            PluginAppletSecurityContext.setStreamhandler(streamHandler);
+            AppletSecurityContextManager.addContext(0, sc);
     }
 
     private PluginMain() {
@@ -255,5 +262,15 @@ public class PluginMain {
     private static void setCookieHandler(PluginStreamHandler streamHandler) {
         CookieManager ckManager = new PluginCookieManager(streamHandler);
         CookieHandler.setDefault(ckManager);
+    }
+
+    public static JFrame javawsHtmlMain(PluginBridge pb, URL html) {
+        PluginAppletViewer.setStreamhandler(PluginStreamHandler.DummyHandler);
+        PluginMain.initSecurityContext(PluginStreamHandler.DummyHandler);
+        AppletPanel p = PluginAppletViewer.initialize(pb.getParams(), 0, html, 0, pb);
+        JFrame f = new JFrame();
+        f.setSize(p.getAppletWidth(), p.getAppletHeight());
+        f.add(p);
+        return f;
     }
 }

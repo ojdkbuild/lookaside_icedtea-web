@@ -36,35 +36,109 @@
  */
 package net.sourceforge.jnlp.cache;
 
+import static net.sourceforge.jnlp.cache.Resource.Status.CONNECTED;
+import static net.sourceforge.jnlp.cache.Resource.Status.DOWNLOADING;
+import static net.sourceforge.jnlp.cache.Resource.Status.ERROR;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
-import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.util.HashMap;
-import net.sourceforge.jnlp.ServerAccess;
-import net.sourceforge.jnlp.ServerLauncher;
-import net.sourceforge.jnlp.Version;
-import net.sourceforge.jnlp.runtime.JNLPRuntime;
-import net.sourceforge.jnlp.util.logging.OutputController;
-import net.sourceforge.jnlp.util.UrlUtils;
+import java.nio.file.Files;
+import java.util.Arrays;
+import java.util.EnumSet;
+import java.util.List;
+
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-public class ResourceTrackerTest {
+import net.sourceforge.jnlp.ServerAccess;
+import net.sourceforge.jnlp.ServerLauncher;
+import net.sourceforge.jnlp.Version;
+import net.sourceforge.jnlp.config.DeploymentConfiguration;
+import net.sourceforge.jnlp.config.PathsAndFiles;
+import net.sourceforge.jnlp.runtime.JNLPRuntime;
+import net.sourceforge.jnlp.util.UrlUtils;
+import net.sourceforge.jnlp.util.logging.NoStdOutErrTest;
+import net.sourceforge.jnlp.util.logging.OutputController;
 
-    public static ServerLauncher testServer;
-    public static ServerLauncher testServerWithBrokenHead;
-    private static PrintStream[] backedUpStream = new PrintStream[4];
+public class ResourceTrackerTest extends NoStdOutErrTest{
+
+    public static ServerLauncher downloadServer;
+    private static final PrintStream[] backedUpStream = new PrintStream[4];
     private static ByteArrayOutputStream currentErrorStream;
-    private static final String nameStub1 = "itw-server";
-    private static final String nameStub2 = "test-file";
+
+
+    private static Resource createResource(final String name) throws MalformedURLException {
+        return Resource.getResource(new URL("http://example.com/" + name + ".jar"), new Version("1.0"), UpdatePolicy.ALWAYS);
+    }
+
+    @Test
+    public void testSelectByStatusOneMatchingResource() throws Exception {
+        Resource resource = createResource("oneMatchingResource");
+        Assert.assertNotNull(resource);
+        resource.setStatusFlag(DOWNLOADING);
+        List<Resource> resources = Arrays.asList(resource);
+        Resource result = ResourceTracker.selectByStatus(resources, DOWNLOADING, ERROR);
+        Assert.assertEquals(resource, result);
+    }
+
+    @Test
+    public void testSelectByStatusNoMatchingResource() throws Exception {
+        Resource resource = createResource("noMatchingResource");
+        Assert.assertNotNull(resource);
+        List<Resource> resources = Arrays.asList(resource);
+        Resource result = ResourceTracker.selectByStatus(resources, DOWNLOADING, ERROR);
+        Assert.assertNull(result);
+    }
+
+    @Test
+    public void testSelectByStatusExcludedResources() throws Exception {
+        Resource resource = createResource("excludedResources");
+        Assert.assertNotNull(resource);
+        resource.setStatusFlag(ERROR);
+        List<Resource> resources = Arrays.asList(resource);
+        Resource result = ResourceTracker.selectByStatus(resources, DOWNLOADING, ERROR);
+        Assert.assertNull(result);
+    }
+
+    @Test
+    public void testSelectByStatusMixedResources() throws Exception {
+        Resource r1 = createResource("mixedResources1");
+        Assert.assertNotNull(r1);
+        r1.setStatusFlag(CONNECTED);
+        r1.setStatusFlag(DOWNLOADING);
+        Resource r2 = createResource("mixedResources2");
+        Assert.assertNotNull(r2);
+        r2.setStatusFlag(CONNECTED);
+        r2.setStatusFlag(DOWNLOADING);
+        r2.setStatusFlag(ERROR);
+        List<Resource> resources = Arrays.asList(r1, r2);
+        Resource result = ResourceTracker.selectByStatus(resources, EnumSet.of(CONNECTED, DOWNLOADING), EnumSet.of(ERROR));
+        Assert.assertEquals(r1, result);
+    }
+
+    @Test
+    public void testSelectByFilterUninitialized() throws Exception {
+        Resource resource = createResource("filterUninitialized");
+        Assert.assertNotNull(resource);
+        List<Resource> resources = Arrays.asList(resource);
+        Resource result = ResourceTracker.selectByFilter(resources, new ResourceTracker.Filter<Resource>() {
+            @Override
+            public boolean test(Resource t) {
+                return !t.isInitialized();
+            }
+        });
+        Assert.assertEquals(resource, result);
+    }
 
     @Test
     public void testNormalizeUrl() throws Exception {
@@ -153,8 +227,6 @@ public class ResourceTrackerTest {
         System.setErr(backedUpStream[1]);
         OutputController.getLogger().setOut(backedUpStream[2]);
         OutputController.getLogger().setErr(backedUpStream[3]);
-
-
     }
 
     @BeforeClass
@@ -167,205 +239,47 @@ public class ResourceTrackerTest {
         JNLPRuntime.setDebug(false);
     }
 
-    @BeforeClass
-    public static void startServer() throws Exception {
-        redirectErr();
-        testServer = ServerAccess.getIndependentInstance(System.getProperty("java.io.tmpdir"), ServerAccess.findFreePort());
-        redirectErrBack();
-    }
+    private static String cacheDir;
 
     @BeforeClass
-    public static void startServer2() throws Exception {
+    public static void setupDownloadServer() throws IOException {
+        File dir = new File(System.getProperty("java.io.tmpdir"), "itw-down");
+        dir.mkdirs();
+        dir.deleteOnExit();
         redirectErr();
-        testServerWithBrokenHead = ServerAccess.getIndependentInstance(System.getProperty("java.io.tmpdir"), ServerAccess.findFreePort());
-        testServerWithBrokenHead.setSupportingHeadRequest(false);
+        downloadServer = ServerAccess.getIndependentInstance(dir.getAbsolutePath(), ServerAccess.findFreePort());
         redirectErrBack();
+
+        cacheDir = PathsAndFiles.CACHE_DIR.getFullPath();
+        PathsAndFiles.CACHE_DIR.setValue(System.getProperty("java.io.tmpdir") + File.separator + "tempcache");
     }
 
     @AfterClass
-    public static void stopServer() {
-        testServer.stop();
-    }
+    public static void teardownDownloadServer() {
+        downloadServer.stop();
 
-    @AfterClass
-    public static void stopServer2() {
-        testServerWithBrokenHead.stop();
-    }
-
-    @Test
-    public void getUrlResponseCodeTestWorkingHeadRequest() throws Exception {
-        redirectErr();
-        try {
-            File f = File.createTempFile(nameStub1, nameStub2);
-            int i = ResourceTracker.getUrlResponseCode(testServer.getUrl(f.getName()), new HashMap<String, String>(), "HEAD");
-            Assert.assertEquals(HttpURLConnection.HTTP_OK, i);
-            f.delete();
-            i = ResourceTracker.getUrlResponseCode(testServer.getUrl(f.getName()), new HashMap<String, String>(), "HEAD");
-            Assert.assertEquals(HttpURLConnection.HTTP_NOT_FOUND, i);
-        } finally {
-            redirectErrBack();
-        }
+        CacheUtil.clearCache();
+        PathsAndFiles.CACHE_DIR.setValue(cacheDir);
     }
 
     @Test
-    public void getUrlResponseCodeTestNotWorkingHeadRequest() throws Exception {
-        redirectErr();
-        try {
-            File f = File.createTempFile(nameStub1, nameStub2);
-            int i = ResourceTracker.getUrlResponseCode(testServerWithBrokenHead.getUrl(f.getName()), new HashMap<String, String>(), "HEAD");
-            Assert.assertEquals(HttpURLConnection.HTTP_NOT_IMPLEMENTED, i);
-            f.delete();
-            i = ResourceTracker.getUrlResponseCode(testServerWithBrokenHead.getUrl(f.getName()), new HashMap<String, String>(), "HEAD");
-            Assert.assertEquals(HttpURLConnection.HTTP_NOT_IMPLEMENTED, i);
-        } finally {
-            redirectErrBack();
-        }
-    }
+    public void testDownloadResource() throws IOException {
+        String s = "hello";
+        File f = downloadServer.getDir();
+        File temp = new File(f, "resource");
+        temp.createNewFile();
+        Files.write(temp.toPath(), s.getBytes());
+        temp.deleteOnExit();
 
-    @Test
-    public void getUrlResponseCodeTestGetRequestOnNotWorkingHeadRequest() throws Exception {
-        redirectErr();
-        try {
-            File f = File.createTempFile(nameStub1, nameStub2);
-            int i = ResourceTracker.getUrlResponseCode(testServerWithBrokenHead.getUrl(f.getName()), new HashMap<String, String>(), "GET");
-            Assert.assertEquals(HttpURLConnection.HTTP_OK, i);
-            f.delete();
-            i = ResourceTracker.getUrlResponseCode(testServerWithBrokenHead.getUrl(f.getName()), new HashMap<String, String>(), "GET");
-            Assert.assertEquals(HttpURLConnection.HTTP_NOT_FOUND, i);
-        } finally {
-            redirectErrBack();
-        }
-    }
+        URL url = downloadServer.getUrl("resource");
 
-    @Test
-    public void getUrlResponseCodeTestGetRequest() throws Exception {
-        redirectErr();
-        try {
-            File f = File.createTempFile(nameStub1, nameStub2);
-            int i = ResourceTracker.getUrlResponseCode(testServer.getUrl(f.getName()), new HashMap<String, String>(), "GET");
-            Assert.assertEquals(HttpURLConnection.HTTP_OK, i);
-            f.delete();
-            i = ResourceTracker.getUrlResponseCode(testServer.getUrl(f.getName()), new HashMap<String, String>(), "GET");
-            Assert.assertEquals(HttpURLConnection.HTTP_NOT_FOUND, i);
-        } finally {
-            redirectErrBack();
-        }
-    }
+        ResourceTracker rt = new ResourceTracker();
+        rt.addResource(url, null, null, UpdatePolicy.FORCE);
+        File downloadFile = rt.getCacheFile(url);
 
-    @Test
-    public void getUrlResponseCodeTestWrongRequest() throws Exception {
-        redirectErr();
-        try {
-            File f = File.createTempFile(nameStub1, nameStub2);
-            Exception exception = null;
-            try {
-                ResourceTracker.getUrlResponseCode(testServer.getUrl(f.getName()), new HashMap<String, String>(), "SomethingWrong");
-            } catch (Exception ex) {
-                exception = ex;
-            }
-            Assert.assertNotNull(exception);
-            exception = null;
-            f.delete();
-            try {
-                ResourceTracker.getUrlResponseCode(testServer.getUrl(f.getName()), new HashMap<String, String>(), "SomethingWrong");
-            } catch (Exception ex) {
-                exception = ex;
-            }
-            Assert.assertNotNull(exception);;
-        } finally {
-            redirectErrBack();
-        }
+        assertTrue(downloadFile.exists() && downloadFile.isFile());
 
-    }
-
-    @Test
-    public void findBestUrltest() throws Exception {
-        redirectErr();
-        try {
-            File fileForServerWithHeader = File.createTempFile(nameStub1, nameStub2);
-            File versionedFileForServerWithHeader = new File(fileForServerWithHeader.getParentFile(), fileForServerWithHeader.getName() + "-2.0");
-            versionedFileForServerWithHeader.createNewFile();
-
-            File fileForServerWithoutHeader = File.createTempFile(nameStub1, nameStub2);
-            File versionedFileForServerWithoutHeader = new File(fileForServerWithoutHeader.getParentFile(), fileForServerWithoutHeader.getName() + "-2.0");
-            versionedFileForServerWithoutHeader.createNewFile();
-
-            ResourceTracker rt = new ResourceTracker();
-            Resource r1 = Resource.getResource(testServer.getUrl(fileForServerWithHeader.getName()), null, UpdatePolicy.NEVER);
-            Resource r2 = Resource.getResource(testServerWithBrokenHead.getUrl(fileForServerWithoutHeader.getName()), null, UpdatePolicy.NEVER);
-            Resource r3 = Resource.getResource(testServer.getUrl(versionedFileForServerWithHeader.getName()), new Version("1.0"), UpdatePolicy.NEVER);
-            Resource r4 = Resource.getResource(testServerWithBrokenHead.getUrl(versionedFileForServerWithoutHeader.getName()), new Version("1.0"), UpdatePolicy.NEVER);
-            assertOnServerWithHeader(rt.findBestUrl(r1));
-            assertVersionedOneOnServerWithHeader(rt.findBestUrl(r3));
-            assertOnServerWithoutHeader(rt.findBestUrl(r2));
-            assertVersionedOneOnServerWithoutHeader(rt.findBestUrl(r4));
-
-            fileForServerWithHeader.delete();
-            Assert.assertNull(rt.findBestUrl(r1));
-            assertVersionedOneOnServerWithHeader(rt.findBestUrl(r3));
-            assertOnServerWithoutHeader(rt.findBestUrl(r2));
-            assertVersionedOneOnServerWithoutHeader(rt.findBestUrl(r4));
-
-            versionedFileForServerWithHeader.delete();
-            Assert.assertNull(rt.findBestUrl(r1));
-            Assert.assertNull(rt.findBestUrl(r3));
-            assertOnServerWithoutHeader(rt.findBestUrl(r2));
-            assertVersionedOneOnServerWithoutHeader(rt.findBestUrl(r4));
-
-            versionedFileForServerWithoutHeader.delete();
-            Assert.assertNull(rt.findBestUrl(r1));
-            Assert.assertNull(rt.findBestUrl(r3));
-            assertOnServerWithoutHeader(rt.findBestUrl(r2));
-            Assert.assertNull(rt.findBestUrl(r4));
-
-
-            fileForServerWithoutHeader.delete();
-            Assert.assertNull(rt.findBestUrl(r1));
-            Assert.assertNull(rt.findBestUrl(r3));
-            Assert.assertNull(rt.findBestUrl(r2));
-            Assert.assertNull(rt.findBestUrl(r4));
-        } finally {
-            redirectErrBack();
-        }
-
-    }
-
-    private void assertOnServerWithHeader(URL u) {
-        assertCommonComponentsOfUrl(u);
-        assertPort(u, testServer.getPort());
-    }
-
-    private void assertVersionedOneOnServerWithHeader(URL u) {
-        assertCommonComponentsOfUrl(u);
-        assertPort(u, testServer.getPort());
-        assertVersion(u);
-    }
-
-    private void assertOnServerWithoutHeader(URL u) {
-        assertCommonComponentsOfUrl(u);
-        assertPort(u, testServerWithBrokenHead.getPort());
-    }
-
-    private void assertVersionedOneOnServerWithoutHeader(URL u) {
-        assertCommonComponentsOfUrl(u);
-        assertPort(u, testServerWithBrokenHead.getPort());
-        assertVersion(u);
-    }
-
-    private void assertCommonComponentsOfUrl(URL u) {
-        Assert.assertTrue(u.getProtocol().equals("http"));
-        Assert.assertTrue(u.getHost().equals("localhost"));
-        Assert.assertTrue(u.getPath().contains(nameStub1));
-        Assert.assertTrue(u.getPath().contains(nameStub2));
-        ServerAccess.logOutputReprint(u.toExternalForm());
-    }
-
-    private void assertPort(URL u, int port) {
-        Assert.assertTrue(u.getPort() == port);
-    }
-
-    private void assertVersion(URL u) {
-        Assert.assertTrue(u.getPath().contains("-2.0"));
-        Assert.assertTrue(u.getQuery().contains("version-id=1.0"));
+        String output = new String(Files.readAllBytes(downloadFile.toPath()));
+        assertEquals(s, output);
     }
 }

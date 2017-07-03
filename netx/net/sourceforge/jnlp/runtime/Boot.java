@@ -16,22 +16,17 @@
 
 package net.sourceforge.jnlp.runtime;
 
-import static net.sourceforge.jnlp.runtime.Translator.R;
-
 import java.io.File;
 import java.net.URL;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import javax.swing.UIManager;
-
 import net.sourceforge.jnlp.LaunchException;
-import net.sourceforge.jnlp.Launcher;
+import net.sourceforge.jnlp.OptionsDefinitions;
 import net.sourceforge.jnlp.ParserSettings;
 import net.sourceforge.jnlp.PropertyDesc;
 import net.sourceforge.jnlp.about.AboutDialog;
@@ -40,9 +35,18 @@ import net.sourceforge.jnlp.cache.UpdatePolicy;
 import net.sourceforge.jnlp.config.DeploymentConfiguration;
 import net.sourceforge.jnlp.security.viewer.CertificateViewer;
 import net.sourceforge.jnlp.services.ServiceUtil;
+import net.sourceforge.jnlp.util.docprovider.IcedTeaWebTextsProvider;
+import net.sourceforge.jnlp.util.docprovider.JavaWsTextsProvider;
+import net.sourceforge.jnlp.util.docprovider.TextsProvider;
+import net.sourceforge.jnlp.util.docprovider.formatters.formatters.PlainTextFormatter;
 import net.sourceforge.jnlp.util.logging.OutputController;
+import net.sourceforge.jnlp.util.optionparser.InvalidArgumentException;
+import net.sourceforge.jnlp.util.optionparser.OptionParser;
+import net.sourceforge.jnlp.util.optionparser.UnevenParameterException;
 import sun.awt.AppContext;
 import sun.awt.SunToolkit;
+
+import static net.sourceforge.jnlp.runtime.Translator.R;
 
 /**
  * This is the main entry point for the JNLP client. The main
@@ -85,75 +89,29 @@ public final class Boot implements PrivilegedAction<Void> {
             + "   Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.\n"
             + "\n";
 
-    private static final String itwInfoMessage = ""
-            + nameAndVersion
-            + "\n\n*  "
-            + R("BAboutITW")
-            + "\n*  "
-            + R("BFileInfoAuthors")
-            + "\n*  "
-            + R("BFileInfoNews")
-            + "\n*  "
-            + R("BFileInfoCopying");
-
-    private static final String helpMessage = "\n"
-            + "Usage:   " + R("BOUsage") + "\n"
-            + "         " + R("BOUsage2") + "\n"
-            + "\n"
-            + "control-options:" + "\n"
-            + "  -about                " + R("BOAbout") + "\n"
-            + "  -viewer               " + R("BOViewer") + "\n"
-            + "\n"
-            + "run-options:" + "\n"
-            + "  -version              " + R("BOVersion") + "\n"
-            + "  -arg arg              " + R("BOArg") + "\n"
-            + "  -param name=value     " + R("BOParam") + "\n"
-            + "  -property name=value  " + R("BOProperty") + "\n"
-            + "  -update seconds       " + R("BOUpdate") + "\n"
-            + "  -license              " + R("BOLicense") + "\n"
-            + "  -verbose              " + R("BOVerbose") + "\n"
-            + "  -nosecurity           " + R("BONosecurity") + "\n"
-            + "  -noupdate             " + R("BONoupdate") + "\n"
-            + "  -headless             " + R("BOHeadless") + "\n"
-            + "  -strict               " + R("BOStrict") + "\n"
-            + "  -xml                  " + R("BOXml") + "\n"
-            + "  -allowredirect        " + R("BOredirect") + "\n"
-            + "  -Xnofork              " + R("BXnofork") + "\n"
-            + "  -Xclearcache          " + R("BXclearcache") + "\n"
-            + "  -Xignoreheaders       " + R("BXignoreheaders") + "\n"
-            + "  -help                 " + R("BOHelp") + "\n";
-
-    private static final String doubleArgs = "-basedir -jnlp -arg -param -property -update";
-
-    private static String args[]; // avoid the hot potato
+    private static OptionParser optionParser;
 
     /**
      * Launch the JNLP file specified by the command-line arguments.
+     * @param argsIn launching arguments
      */
-    public static void main(String[] argsIn) {
-        args = argsIn;
+    public static void main(String[] argsIn) throws UnevenParameterException {
+        optionParser = new OptionParser(argsIn, OptionsDefinitions.getJavaWsOptions());
+
+        if (optionParser.hasOption(OptionsDefinitions.OPTIONS.VERBOSE)) {
+            JNLPRuntime.setDebug(true);
+        }
 
         if (AppContext.getAppContext() == null) {
             SunToolkit.createNewAppContext();
         }
-        if (null != getOption("-headless")) {
+        if (optionParser.hasOption(OptionsDefinitions.OPTIONS.HEADLESS)) {
             JNLPRuntime.setHeadless(true);
         }
-        String[] properties = getOptions("-property");
-        if (properties != null) {
-            for (String prop : properties) {
-                try {
-                    PropertyDesc propDesc = PropertyDesc.fromString(prop, "Unlocalised error for parsing the property. It must be in fomrat key=value. It is: " + prop);
-                    JNLPRuntime.getConfiguration().setProperty(propDesc.getKey(), propDesc.getValue());
-                } catch (LaunchException ex) {
-                    OutputController.getLogger().log(ex);
-                }
-            }
-        }
-
+        
         DeploymentConfiguration.move14AndOlderFilesTo15StructureCatched();
 
-        if (null != getOption("-viewer")) {
+        if (optionParser.hasOption(OptionsDefinitions.OPTIONS.VIEWER)) {
             try {
                 CertificateViewer.main(null);
                 JNLPRuntime.exit(0);
@@ -161,25 +119,36 @@ public final class Boot implements PrivilegedAction<Void> {
                 OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e);
             }
         }
-
-        if (null != getOption("-version")) {
+        
+        if (optionParser.hasOption(OptionsDefinitions.OPTIONS.VERSION)) {
             OutputController.getLogger().printOutLn(nameAndVersion);
             JNLPRuntime.exit(0);
         }
 
-        if (null != getOption("-license")) {
+        if (optionParser.hasOption(OptionsDefinitions.OPTIONS.LICENSE)) {
             OutputController.getLogger().printOutLn(miniLicense);
             JNLPRuntime.exit(0);
         }
 
-        if (null != getOption("-help")) {
-            OutputController.getLogger().printOutLn(helpMessage);
+        if (optionParser.hasOption(OptionsDefinitions.OPTIONS.HELP1)) {
+            handleMessage();
             JNLPRuntime.exit(0);
         }
+        List<String> properties = optionParser.getParams(OptionsDefinitions.OPTIONS.PROPERTY);
+        if (properties != null) {
+            for (String prop : properties) {
+                try {
+                    PropertyDesc propDesc = PropertyDesc.fromString(prop);
+                    JNLPRuntime.getConfiguration().setProperty(propDesc.getKey(), propDesc.getValue());
+                } catch (LaunchException ex) {
+                    OutputController.getLogger().log(ex);
+                }
+            }
+        }
 
-        if (null != getOption("-about")) {
-                OutputController.getLogger().printOutLn(itwInfoMessage);
-            if (null != getOption("-headless")) {
+        if (optionParser.hasOption(OptionsDefinitions.OPTIONS.ABOUT)) {
+                handleAbout();
+            if (optionParser.hasOption(OptionsDefinitions.OPTIONS.HEADLESS)) {
                 JNLPRuntime.exit(0);
             } else {
                 try {
@@ -188,35 +157,36 @@ public final class Boot implements PrivilegedAction<Void> {
                     OutputController.getLogger().log("Unable to set system look and feel");
                 }
                 OutputController.getLogger().printOutLn(R("BLaunchAbout"));
-                AboutDialog.display();
+                AboutDialog.display(TextsProvider.JAVAWS);
                 return;
             }
         }
 
-        if (null != getOption("-verbose"))
-            JNLPRuntime.setDebug(true);
 
-        if (null != getOption("-update")) {
-            int value = Integer.parseInt(getOption("-update"));
+        if (optionParser.hasOption(OptionsDefinitions.OPTIONS.UPDATE)) {
+            int value = Integer.parseInt(optionParser.getParam(OptionsDefinitions.OPTIONS.UPDATE));
             JNLPRuntime.setDefaultUpdatePolicy(new UpdatePolicy(value * 1000l));
         }
 
-        if (null != getOption("-noupdate"))
+        if (optionParser.hasOption(OptionsDefinitions.OPTIONS.NOUPDATE))
             JNLPRuntime.setDefaultUpdatePolicy(UpdatePolicy.NEVER);
 
-        if (null != getOption("-Xnofork")) {
+        if (optionParser.hasOption(OptionsDefinitions.OPTIONS.NOFORK)) {
             JNLPRuntime.setForksAllowed(false);
         }
-        if (null != getOption("-Xtrustall")) {
+        if (optionParser.hasOption(OptionsDefinitions.OPTIONS.TRUSTALL)) {
             JNLPRuntime.setTrustAll(true);
         }
-        if (null != getOption("-Xtrustnone")) {
+        if (optionParser.hasOption(OptionsDefinitions.OPTIONS.HTML)) {
+            JNLPRuntime.setHtml(true);
+        }
+        if (optionParser.hasOption(OptionsDefinitions.OPTIONS.TRUSTNONE)) {
             JNLPRuntime.setTrustNone(true);
         }
-        if (null != getOption("-Xignoreheaders")) {
+        if (optionParser.hasOption(OptionsDefinitions.OPTIONS.NOHEADERS)) {
             JNLPRuntime.setIgnoreHeaders(true);
         }
-        if (null != getOption("-allowredirect")) {
+        if (optionParser.hasOption(OptionsDefinitions.OPTIONS.REDIRECT)) {
             JNLPRuntime.setAllowRedirect(true);
         }
 
@@ -226,47 +196,61 @@ public final class Boot implements PrivilegedAction<Void> {
 
     }
 
+    private static void handleMessage() {
+        final TextsProvider helpMessagesProvider = new JavaWsTextsProvider("utf-8", new PlainTextFormatter(), true, true);
+
+        String helpMessage = "\n";
+        if (JNLPRuntime.isDebug()){
+            helpMessage += helpMessagesProvider.writeToString();
+        } else {
+            helpMessage = helpMessage
+                + helpMessagesProvider.prepare().getSynopsis()
+                + helpMessagesProvider.getFormatter().getNewLine()
+                + helpMessagesProvider.prepare().getOptions()
+                + helpMessagesProvider.getFormatter().getNewLine();
+        }
+        
+        OutputController.getLogger().printOut(helpMessage);
+    }
+
+    private static void handleAbout() {
+        final TextsProvider aboutMessagesProvider = new IcedTeaWebTextsProvider("utf-8", new PlainTextFormatter(), false, true);
+        String itwInfoMessage = ""
+                + nameAndVersion
+                + "\n\n";
+
+        if (JNLPRuntime.isDebug()) {
+            itwInfoMessage += aboutMessagesProvider.writeToString();
+        } else {
+            itwInfoMessage = itwInfoMessage
+                    + aboutMessagesProvider.prepare().getIntroduction();
+        }
+        OutputController.getLogger().printOut(itwInfoMessage);
+    }
+
     /**
      * The privileged part (jdk1.3 compatibility).
      */
+    @Override
     public Void run() {
-        JNLPRuntime.setSecurityEnabled(null == getOption("-nosecurity"));
-        JNLPRuntime.initialize(true);
 
-        /*
-         * FIXME
-         * This should have been done with the rest of the argument parsing
-         * code. But we need to know what the cache and base directories are,
-         * and baseDir is initialized here
-         */
-        if (null != getOption("-Xclearcache")) {
-            CacheUtil.clearCache();
-            return null;
+        Map<String, List<String>> extra = new HashMap<>();
+
+        if (optionParser.hasOption(OptionsDefinitions.OPTIONS.HTML)) {
+            boolean run = new HtmlBoot(optionParser).run(extra);
+            if (!run) {
+                return null;
+            }
+        } else {
+            boolean run = new JnlpBoot(optionParser).run(extra);
+            if (!run) {
+                return null;
+            }
         }
-
-        Map<String, String[]> extra = new HashMap<String, String[]>();
-        extra.put("arguments", getOptions("-arg"));
-        extra.put("parameters", getOptions("-param"));
-        extra.put("properties", getOptions("-property"));
-
-        ParserSettings settings = ParserSettings.setGlobalParserSettingsFromArgs(args);
-
-        try {
-            Launcher launcher = new Launcher(false);
-            launcher.setParserSettings(settings);
-            launcher.setInformationToMerge(extra);
-            launcher.launch(getFileLocation());
-        } catch (LaunchException ex) {
-            // default handler prints this
-        } catch (Exception ex) {
-            OutputController.getLogger().log(ex);
-            fatalError(R("RUnexpected", ex.toString(), ex.getStackTrace()[0]));
-        }
-
         return null;
     }
 
-    private static void fatalError(String message) {
+    static void fatalError(String message) {
         OutputController.getLogger().log(OutputController.Level.ERROR_ALL, "netx: " + message);
         JNLPRuntime.exit(1);
     }
@@ -275,12 +259,18 @@ public final class Boot implements PrivilegedAction<Void> {
      * Returns the url of file to open; does not return if no file was
      * specified, or if the file location was invalid.
      */
-    private static URL getFileLocation() {
+    static URL getFileLocation() {
 
-        String location = getJNLPFile();
+        String location = null;
+        try {
+            location = getMainFile();
+        } catch (InvalidArgumentException e) {
+            OutputController.getLogger().log(e);
+            fatalError("Invalid argument: "+e);
+        }
 
         if (location == null) {
-            OutputController.getLogger().printOutLn(helpMessage);
+            handleMessage();
             JNLPRuntime.exit(1);
         }
 
@@ -293,7 +283,12 @@ public final class Boot implements PrivilegedAction<Void> {
                 // TODO: Should be toURI().toURL()
                 url = new File(location).toURL(); // Why use file.getCanonicalFile?
             else
-                url = new URL(ServiceUtil.getBasicService().getCodeBase(), location);
+                if (ServiceUtil.getBasicService() != null){
+                    OutputController.getLogger().log("Warning, null basicService");
+                    url = new URL(ServiceUtil.getBasicService().getCodeBase(), location);
+                } else {
+                    url = new URL(location);
+                }
         } catch (Exception e) {
             OutputController.getLogger().log(e);
             fatalError("Invalid jnlp file " + location);
@@ -305,64 +300,47 @@ public final class Boot implements PrivilegedAction<Void> {
     /**
      * Gets the JNLP file from the command line arguments, or exits upon error.
      */
-    private static String getJNLPFile() {
-
-        if (args.length == 0) {
-            OutputController.getLogger().printOutLn(helpMessage);
-            JNLPRuntime.exit(0);
-        } else if (args.length == 1) {
-            return args[args.length - 1];
-        } else {
-            String lastArg = args[args.length - 1];
-            String secondLastArg = args[args.length - 2];
-
-            if (doubleArgs.indexOf(secondLastArg) == -1) {
-                return lastArg;
-            } else {
-                OutputController.getLogger().printOutLn(helpMessage);
-                JNLPRuntime.exit(0);
-            }
+    private static String getMainFile() throws InvalidArgumentException {
+        if (optionParser.getMainArgs().size() > 1 
+                || (optionParser.mainArgExists() && optionParser.hasOption(OptionsDefinitions.OPTIONS.JNLP))
+                || (optionParser.mainArgExists() && optionParser.hasOption(OptionsDefinitions.OPTIONS.HTML))
+                || (optionParser.hasOption(OptionsDefinitions.OPTIONS.JNLP) && optionParser.hasOption(OptionsDefinitions.OPTIONS.HTML))
+                ) {
+              throw new InvalidArgumentException(optionParser.getMainArgs().toString());
+        } else if (optionParser.hasOption(OptionsDefinitions.OPTIONS.JNLP)) {
+            return optionParser.getParam(OptionsDefinitions.OPTIONS.JNLP);
+        } else if (optionParser.hasOption(OptionsDefinitions.OPTIONS.HTML)) {
+            return optionParser.getParam(OptionsDefinitions.OPTIONS.HTML);
+        } else if (optionParser.mainArgExists()) {
+            return optionParser.getMainArg();
         }
+
+        handleMessage();
+        JNLPRuntime.exit(0);
         return null;
     }
 
-    /**
-     * Return value of the first occurence of the specified
-     * option, or null if the option is not present.  If the
-     * option is a flag (0-parameter) and is present then the
-     * option name is returned.
-     */
-    private static String getOption(String option) {
-        String result[] = getOptions(option);
+    static ParserSettings init(Map<String, List<String>> extra) {
+        JNLPRuntime.setSecurityEnabled(!optionParser.hasOption(OptionsDefinitions.OPTIONS.NOSEC));
+        JNLPRuntime.setOfflineForced(optionParser.hasOption(OptionsDefinitions.OPTIONS.OFFLINE));
+        JNLPRuntime.initialize(true);
 
-        if (result.length == 0)
+        /*
+         * FIXME
+         * This should have been done with the rest of the argument parsing
+         * code. But we need to know what the cache and base directories are,
+         * and baseDir is initialized here
+         */
+        if (optionParser.hasOption(OptionsDefinitions.OPTIONS.CLEARCACHE)) {
+            CacheUtil.clearCache();
             return null;
-        else
-            return result[0];
-    }
-
-    /**
-     * Return all the values of the specified option, or an empty
-     * array if the option is not present.  If the option is a
-     * flag (0-parameter) and is present then the option name is
-     * returned once for each occurrence.
-     */
-    private static String[] getOptions(String option) {
-        List<String> result = new ArrayList<String>();
-
-        for (int i = 0; i < args.length; i++) {
-            if (option.equals(args[i])) {
-                if (-1 == doubleArgs.indexOf(option))
-                    result.add(option);
-                else if (i + 1 < args.length)
-                    result.add(args[i + 1]);
-            }
-
-            if (args[i].startsWith("-") && -1 != doubleArgs.indexOf(args[i]))
-                i++;
         }
 
-        return result.toArray(new String[result.size()]);
-    }
+        extra.put("arguments", optionParser.getParams(OptionsDefinitions.OPTIONS.ARG));
+        extra.put("parameters", optionParser.getParams(OptionsDefinitions.OPTIONS.PARAM));
+        extra.put("properties", optionParser.getParams(OptionsDefinitions.OPTIONS.PROPERTY));
 
+        return ParserSettings.setGlobalParserSettingsFromOptionParser(optionParser);
+    }
+    
 }

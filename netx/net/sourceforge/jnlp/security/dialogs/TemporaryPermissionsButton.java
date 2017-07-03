@@ -50,16 +50,18 @@ import java.security.Permission;
 import java.util.Collection;
 import java.util.HashSet;
 
+import javax.swing.AbstractButton;
 import javax.swing.JButton;
+import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JMenuItem;
 import javax.swing.JPopupMenu;
 
 import net.sourceforge.jnlp.JNLPFile;
-import net.sourceforge.jnlp.config.DeploymentConfiguration;
+import net.sourceforge.jnlp.config.PathsAndFiles;
 import net.sourceforge.jnlp.runtime.JNLPClassLoader.SecurityDelegate;
-import net.sourceforge.jnlp.runtime.JNLPRuntime;
 import net.sourceforge.jnlp.security.policyeditor.PolicyEditor;
 import net.sourceforge.jnlp.security.policyeditor.PolicyEditor.PolicyEditorWindow;
+import net.sourceforge.jnlp.security.policyeditor.PolicyEditorPermissions;
 import net.sourceforge.jnlp.util.logging.OutputController;
 
 public class TemporaryPermissionsButton extends JButton {
@@ -69,7 +71,7 @@ public class TemporaryPermissionsButton extends JButton {
     private PolicyEditorWindow policyEditorWindow = null;
     private final JNLPFile file;
     private final SecurityDelegate securityDelegate;
-    private final Collection<Permission> temporaryPermissions = new HashSet<Permission>();
+    private final Collection<Permission> temporaryPermissions = new HashSet<>();
 
     public TemporaryPermissionsButton(final JNLPFile file, final SecurityDelegate securityDelegate, final JButton linkedButton) {
         /* If any of the above parameters are null, then the button cannot function - in particular, a null SecurityDelegate
@@ -92,7 +94,7 @@ public class TemporaryPermissionsButton extends JButton {
         } else {
             linkedButton.addActionListener(new ActionListener() {
                 @Override
-                public void actionPerformed(final ActionEvent e) {
+                public void actionPerformed(ActionEvent e) {
                     securityDelegate.addPermissions(temporaryPermissions);
                 }
             });
@@ -109,50 +111,25 @@ public class TemporaryPermissionsButton extends JButton {
 
         policyMenu.addSeparator();
 
+        final JCheckBoxMenuItem networkAccess = new JCheckBoxMenuItem(R("STempNetwork"));
+        networkAccess.addActionListener(new TemporaryPermissionsListener(TemporaryPermissions.getPermissions(PolicyEditorPermissions.NETWORK)));
+        policyMenu.add(networkAccess);
 
-        final JMenuItem noFileAccess = new JMenuItem(R("STempPermNoFile"));
-        noFileAccess.addActionListener(new TemporaryPermissionsListener(TemporaryPermissions.noFileAccess()));
-        policyMenu.add(noFileAccess);
-
-        final JMenuItem noNetworkAccess = new JMenuItem(R("STempPermNoNetwork"));
-        noNetworkAccess.addActionListener(new TemporaryPermissionsListener(TemporaryPermissions.noNetworkAccess()));
-        policyMenu.add(noNetworkAccess);
-
-        final JMenuItem noFileOrNetwork = new JMenuItem(R("STempNoFileOrNetwork"));
-        noFileOrNetwork.addActionListener(new TemporaryPermissionsListener(TemporaryPermissions.noFileOrNetworkAccess()));
-        policyMenu.add(noFileOrNetwork);
-
-        policyMenu.addSeparator();
-
-        final JMenuItem allFileAccessOnly = new JMenuItem(R("STempAllFileAndPropertyAccess"));
-        allFileAccessOnly.addActionListener(new TemporaryPermissionsListener(TemporaryPermissions.allFileAccessAndProperties()));
-        policyMenu.add(allFileAccessOnly);
-
-        final JMenuItem readLocalFilesAndProperties = new JMenuItem(R("STempReadLocalFilesAndProperties"));
-        readLocalFilesAndProperties.addActionListener(new TemporaryPermissionsListener(TemporaryPermissions.readLocalFilesAndProperties()));
+        final JCheckBoxMenuItem readLocalFilesAndProperties = new JCheckBoxMenuItem(R("STempReadFilesAndProperties"));
+        readLocalFilesAndProperties.addActionListener(new TemporaryPermissionsListener(TemporaryPermissions.getPermissions(PolicyEditorPermissions.Group.ReadFileSystem)));
         policyMenu.add(readLocalFilesAndProperties);
 
-        final JMenuItem reflectionOnly = new JMenuItem(R("STempReflectionOnly"));
-        reflectionOnly.addActionListener(new TemporaryPermissionsListener(TemporaryPermissions.reflectionOnly()));
+        final JCheckBoxMenuItem writeLocalFilesAndProperties = new JCheckBoxMenuItem(R("STempWriteFilesAndProperties"));
+        writeLocalFilesAndProperties.addActionListener(new TemporaryPermissionsListener(TemporaryPermissions.getPermissions(PolicyEditorPermissions.Group.WriteFileSystem)));
+        policyMenu.add(writeLocalFilesAndProperties);
+
+        final JCheckBoxMenuItem reflectionOnly = new JCheckBoxMenuItem(R("STempReflectionAndExternal"));
+        reflectionOnly.addActionListener(new TemporaryPermissionsListener(TemporaryPermissions.getPermissions(PolicyEditorPermissions.Group.AccessUnownedCode)));
         policyMenu.add(reflectionOnly);
 
-        policyMenu.addSeparator();
-
-        final JMenuItem allMedia = new JMenuItem(R("STempAllMedia"));
-        allMedia.addActionListener(new TemporaryPermissionsListener(TemporaryPermissions.allMedia()));
+        final JCheckBoxMenuItem allMedia = new JCheckBoxMenuItem(R("STempAllMedia"));
+        allMedia.addActionListener(new TemporaryPermissionsListener(TemporaryPermissions.getPermissions(PolicyEditorPermissions.Group.MediaAccess)));
         policyMenu.add(allMedia);
-
-        final JMenuItem soundOnly = new JMenuItem(R("STempSoundOnly"));
-        soundOnly.addActionListener(new TemporaryPermissionsListener(TemporaryPermissions.audioOnly()));
-        policyMenu.add(soundOnly);
-
-        final JMenuItem clipboardOnly = new JMenuItem(R("STempClipboardOnly"));
-        clipboardOnly.addActionListener(new TemporaryPermissionsListener(TemporaryPermissions.clipboardOnly()));
-        policyMenu.add(clipboardOnly);
-
-        final JMenuItem printOnly = new JMenuItem(R("STempPrintOnly"));
-        printOnly.addActionListener(new TemporaryPermissionsListener(TemporaryPermissions.printOnly()));
-        policyMenu.add(printOnly);
 
         return policyMenu;
     }
@@ -166,19 +143,23 @@ public class TemporaryPermissionsButton extends JButton {
 
         @Override
         public void actionPerformed(final ActionEvent e) {
-            temporaryPermissions.clear();
-            temporaryPermissions.addAll(permissions);
-            menu.setVisible(false);
-            if (linkedButton != null) {
-                linkedButton.doClick();
+            if (!linkedButton.isEnabled()) {
+                return;
             }
+            AbstractButton checkBox = (AbstractButton) e.getSource();
+            if (checkBox.isSelected()) {
+                temporaryPermissions.addAll(permissions);
+            } else {
+                temporaryPermissions.removeAll(permissions);
+            }
+            menu.setVisible(true);
         }
     }
 
     private class PolicyEditorLaunchListener implements ActionListener {
         @Override
         public void actionPerformed(final ActionEvent e) {
-            final String rawFilepath = JNLPRuntime.getConfiguration().getProperty(DeploymentConfiguration.KEY_USER_SECURITY_POLICY);
+            final String rawFilepath = PathsAndFiles.JAVA_POLICY.getFullPath();
             String filepath;
             try {
                 filepath = new URL(rawFilepath).getPath();

@@ -39,7 +39,6 @@ package net.sourceforge.jnlp.security;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.security.AllPermission;
 import java.security.KeyStore;
@@ -52,7 +51,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.StringTokenizer;
 
-import net.sourceforge.jnlp.config.DeploymentConfiguration;
+import net.sourceforge.jnlp.config.InfrastructureFileDescriptor;
+
+import net.sourceforge.jnlp.config.PathsAndFiles;
 import net.sourceforge.jnlp.runtime.Translator;
 import net.sourceforge.jnlp.util.FileUtils;
 import net.sourceforge.jnlp.util.logging.OutputController;
@@ -78,28 +79,10 @@ public final class KeyStores {
         CLIENT_CERTS,
     }
 
-    public static final Map<Integer,String> keystoresPaths=new HashMap<Integer, String>();
-
-    private static DeploymentConfiguration config = null;
+    public static final Map<Integer,String> keystoresPaths=new HashMap<>();
 
     private static final String KEYSTORE_TYPE = "JKS";
-    /** the default password used to protect the KeyStores */
-    private static final String DEFAULT_PASSWORD = "changeit";
-
-    public static char[] getPassword() {
-        return DEFAULT_PASSWORD.toCharArray();
-    }
-
-    /** Set the configuration object to use for getting KeyStore paths */
-    public static void setConfiguration(DeploymentConfiguration newConfig) {
-        SecurityManager sm = System.getSecurityManager();
-        if (sm != null) {
-            sm.checkPermission(new AllPermission());
-        }
-
-        config = newConfig;
-    }
-
+  
     /**
      * Returns a KeyStore corresponding to the appropriate level level (user or
      * system) and type.
@@ -110,7 +93,7 @@ public final class KeyStores {
      * @return a KeyStore containing certificates from the appropriate
      */
     public static final KeyStore getKeyStore(Level level, Type type) {
-        boolean create = false;
+        boolean create;
         if (level == Level.USER) {
             create = true;
         } else {
@@ -126,6 +109,7 @@ public final class KeyStores {
      * @param level whether the KeyStore desired is a user-level or system-level
      * KeyStore
      * @param type the type of KeyStore desired
+     * @param create true if keystore can be created
      * @return a KeyStore containing certificates from the appropriate
      */
     public static final KeyStore getKeyStore(Level level, Type type, boolean create) {
@@ -134,10 +118,10 @@ public final class KeyStores {
             sm.checkPermission(new AllPermission());
         }
 
-        String location = getKeyStoreLocation(level, type);
+        String location = getKeyStoreLocation(level, type).getFullPath();
         KeyStore ks = null;
         try {
-            ks = createKeyStoreFromFile(new File(location), create, DEFAULT_PASSWORD);
+            ks = createKeyStoreFromFile(new File(location), create);
             //hashcode is used instead of instance so when no references are left
             //to keystore, then this will not be blocker for garbage collection
             keystoresPaths.put(ks.hashCode(),location);
@@ -162,11 +146,9 @@ public final class KeyStores {
      * @return an array of KeyStore containing trusted Certificates
      */
     public static final KeyStore[] getCertKeyStores() {
-        List<KeyStore> result = new ArrayList<KeyStore>(10);
-        KeyStore ks = null;
-
+        List<KeyStore> result = new ArrayList<>(10);
         /* System-level JSSE certificates */
-        ks = getKeyStore(Level.SYSTEM, Type.JSSE_CERTS);
+        KeyStore ks = getKeyStore(Level.SYSTEM, Type.JSSE_CERTS);
         if (ks != null) {
             result.add(ks);
         }
@@ -195,11 +177,9 @@ public final class KeyStores {
      * @return an array of KeyStore containing trusted CA certificates
      */
     public static final KeyStore[] getCAKeyStores() {
-        List<KeyStore> result = new ArrayList<KeyStore>(10);
-        KeyStore ks = null;
-
+        List<KeyStore> result = new ArrayList<>(10);
         /* System-level JSSE CA certificates */
-        ks = getKeyStore(Level.SYSTEM, Type.JSSE_CA_CERTS);
+        KeyStore ks = getKeyStore(Level.SYSTEM, Type.JSSE_CA_CERTS);
         if (ks != null) {
             result.add(ks);
         }
@@ -229,10 +209,9 @@ public final class KeyStores {
      * authentication certificates
      */
     public static KeyStore[] getClientKeyStores() {
-        List<KeyStore> result = new ArrayList<KeyStore>();
-        KeyStore ks = null;
+        List<KeyStore> result = new ArrayList<>();
 
-        ks = getKeyStore(Level.SYSTEM, Type.CLIENT_CERTS);
+        KeyStore ks = getKeyStore(Level.SYSTEM, Type.CLIENT_CERTS);
         if (ks != null) {
             result.add(ks);
         }
@@ -252,54 +231,40 @@ public final class KeyStores {
      * @param type the specified type of the key store to be returned.
      * @return the location of the key store.
      */
-    public static final String getKeyStoreLocation(Level level, Type type) {
-        String configKey = null;
+    public static final InfrastructureFileDescriptor getKeyStoreLocation(Level level, Type type) {
         switch (level) {
             case SYSTEM:
                 switch (type) {
                     case JSSE_CA_CERTS:
-                        configKey = DeploymentConfiguration.KEY_SYSTEM_TRUSTED_JSSE_CA_CERTS;
-                        break;
+                        return PathsAndFiles.SYS_JSSECAC;
                     case CA_CERTS:
-                        configKey = DeploymentConfiguration.KEY_SYSTEM_TRUSTED_CA_CERTS;
-                        break;
+                        return PathsAndFiles.SYS_CACERT;
                     case JSSE_CERTS:
-                        configKey = DeploymentConfiguration.KEY_SYSTEM_TRUSTED_JSSE_CERTS;
-                        break;
+                        return PathsAndFiles.SYS_JSSECERT;
                     case CERTS:
-                        configKey = DeploymentConfiguration.KEY_SYSTEM_TRUSTED_CERTS;
-                        break;
+                         return PathsAndFiles.SYS_CERT;
                     case CLIENT_CERTS:
-                        configKey = DeploymentConfiguration.KEY_SYSTEM_TRUSTED_CLIENT_CERTS;
-                        break;
+                        return PathsAndFiles.SYS_CLIENTCERT;
                 }
                 break;
             case USER:
                 switch (type) {
                     case JSSE_CA_CERTS:
-                        configKey = DeploymentConfiguration.KEY_USER_TRUSTED_JSSE_CA_CERTS;
-                        break;
+                        return PathsAndFiles.USER_JSSECAC;
                     case CA_CERTS:
-                        configKey = DeploymentConfiguration.KEY_USER_TRUSTED_CA_CERTS;
-                        break;
+                        return PathsAndFiles.USER_CACERTS;
                     case JSSE_CERTS:
-                        configKey = DeploymentConfiguration.KEY_USER_TRUSTED_JSSE_CERTS;
-                        break;
+                        return PathsAndFiles.USER_JSSECER;
                     case CERTS:
-                        configKey = DeploymentConfiguration.KEY_USER_TRUSTED_CERTS;
-                        break;
+                        return PathsAndFiles.USER_CERTS;
                     case CLIENT_CERTS:
-                        configKey = DeploymentConfiguration.KEY_USER_TRUSTED_CLIENT_CERTS;
-                        break;
+                        return PathsAndFiles.USER_CLIENTCERT;
                 }
                 break;
         }
 
-        if (configKey == null) {
-            throw new RuntimeException("Unspported");
-        }
+        throw new RuntimeException("Unspported");
 
-        return config.getProperty(configKey);
     }
 
     /**
@@ -353,11 +318,9 @@ public final class KeyStores {
      * it returns an empty but initialized KeyStore
      *
      * @param file the file to load information from
-     * @param password the password to unlock the KeyStore file.
      * @return a KeyStore containing data from the file
      */
-    private static final KeyStore createKeyStoreFromFile(File file, boolean createIfNotFound,
-            String password) throws IOException, KeyStoreException, NoSuchAlgorithmException,
+    private static final KeyStore createKeyStoreFromFile(File file, boolean createIfNotFound) throws IOException, KeyStoreException, NoSuchAlgorithmException,
             CertificateException {
         FileInputStream fis = null;
         KeyStore ks = null;
@@ -371,21 +334,16 @@ public final class KeyStores {
                 FileUtils.createRestrictedFile(file, true);
 
                 ks = KeyStore.getInstance(KEYSTORE_TYPE);
-                ks.load(null, password.toCharArray());
-                FileOutputStream fos = new FileOutputStream(file);
-                ks.store(fos, password.toCharArray());
-                fos.close();
+                SecurityUtil.loadKeyStore(ks, null);
+                SecurityUtil.storeKeyStore(ks, file);
             }
 
-            // TODO catch exception when password is incorrect and prompt user
-
             if (file.exists()) {
-                fis = new FileInputStream(file);
                 ks = KeyStore.getInstance(KEYSTORE_TYPE);
-                ks.load(fis, password.toCharArray());
+                SecurityUtil.loadKeyStore(ks, file);
             } else {
                 ks = KeyStore.getInstance(KEYSTORE_TYPE);
-                ks.load(null, password.toCharArray());
+                SecurityUtil.loadKeyStore(ks, null);
             }
         } finally {
             if (fis != null) {

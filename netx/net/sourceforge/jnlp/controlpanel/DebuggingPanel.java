@@ -27,6 +27,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
+
 import javax.swing.Box;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
@@ -36,8 +37,9 @@ import javax.swing.JPanel;
 import javax.swing.JTextField;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
-import net.sourceforge.jnlp.config.Defaults;
+
 import net.sourceforge.jnlp.config.DeploymentConfiguration;
+import net.sourceforge.jnlp.config.PathsAndFiles;
 import net.sourceforge.jnlp.runtime.Translator;
 import net.sourceforge.jnlp.util.logging.LogConfig;
 
@@ -59,7 +61,7 @@ public class DebuggingPanel extends NamedBorderPanel implements ItemListener {
             
     };
     
-     private DeploymentConfiguration config;
+     private final DeploymentConfiguration config;
 
     /**
      * Create a new instance of the debugging panel.
@@ -84,7 +86,7 @@ public class DebuggingPanel extends NamedBorderPanel implements ItemListener {
 
         final JLabel debuggingDescription = new JLabel("<html>" + Translator.R("CPDebuggingDescription") + "<hr /><br /></html>");
         final JLabel logsDestinationTitle = new JLabel(Translator.R("CPFilesLogsDestDir")+": ");
-        final JTextField logsDestination = new JTextField(config.getProperty(DeploymentConfiguration.KEY_USER_LOG_DIR));
+        final JTextField logsDestination = new JTextField(PathsAndFiles.LOG_DIR.getFullPath(config));
         logsDestination.getDocument().addDocumentListener(new DocumentListener() {
 
 
@@ -105,7 +107,7 @@ public class DebuggingPanel extends NamedBorderPanel implements ItemListener {
             }
 
             private void save() {
-                config.setProperty(DeploymentConfiguration.KEY_USER_LOG_DIR, logsDestination.getText());
+                PathsAndFiles.LOG_DIR.setValue(logsDestination.getText(), config);
             }
         });
         final JButton logsDestinationReset = new JButton(Translator.R("CPFilesLogsDestDirResert"));
@@ -113,7 +115,7 @@ public class DebuggingPanel extends NamedBorderPanel implements ItemListener {
 
             @Override
             public void actionPerformed(ActionEvent e) {
-                logsDestination.setText(Defaults.getDefaults().get(DeploymentConfiguration.KEY_USER_LOG_DIR).getDefaultValue());
+                logsDestination.setText(PathsAndFiles.LOG_DIR.getDefaultFullPath());
             }
         });
 
@@ -139,7 +141,7 @@ public class DebuggingPanel extends NamedBorderPanel implements ItemListener {
                 new ComboItem(Translator.R("DPShowJavawsOnly"), DeploymentConfiguration.CONSOLE_SHOW_JAVAWS) };
 
         JLabel consoleLabel = new JLabel(Translator.R("DPJavaConsole"));
-        JComboBox consoleComboBox = new JComboBox();
+        JComboBox<ComboItem> consoleComboBox = new JComboBox<>();
         consoleComboBox.setActionCommand(DeploymentConfiguration.KEY_CONSOLE_STARTUP_MODE); // The property this comboBox affects.
 
         JPanel consolePanel = new JPanel();
@@ -201,7 +203,6 @@ public class DebuggingPanel extends NamedBorderPanel implements ItemListener {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public void itemStateChanged(ItemEvent e) {
 
         Object o = e.getSource();
@@ -210,7 +211,8 @@ public class DebuggingPanel extends NamedBorderPanel implements ItemListener {
             JCheckBox jcb = (JCheckBox) o;
             config.setProperty(jcb.getActionCommand(), String.valueOf(jcb.isSelected()));
         } else if (o instanceof JComboBox) {
-            JComboBox jcb = (JComboBox) o;
+            @SuppressWarnings("unchecked")
+            JComboBox<ComboItem> jcb = (JComboBox<ComboItem>) o;
             ComboItem c = (ComboItem) e.getItem();
             config.setProperty(jcb.getActionCommand(), c.getValue());
         }

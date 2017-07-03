@@ -134,7 +134,7 @@ public class JNLPFile {
     /**
      * List of acceptable properties (not-special)
      */
-    private String[] generalProperties = SecurityDesc.getJnlpRIAPermissions();
+    final private String[] generalProperties = SecurityDesc.getJnlpRIAPermissions();
     
     /** important manifests' attributes */
     private final ManifestsAttributes manifestsAttributes = new ManifestsAttributes();
@@ -269,7 +269,8 @@ public class JNLPFile {
     /**
      * Create a JNLPFile from an input stream.
      *
-     * @throws IOException if an IO exception occurred
+     * @param input input stream from which create jnlp file
+     * @param settings settings of parser
      * @throws ParseException if the JNLP file was invalid
      */
     public JNLPFile(InputStream input, ParserSettings settings) throws ParseException {
@@ -283,7 +284,6 @@ public class JNLPFile {
      * @param input input stream of JNLP file.
      * @param codebase codebase to use if not specified in JNLP file..
      * @param settings the {@link ParserSettings} to use when parsing
-     * @throws IOException if an IO exception occurred
      * @throws ParseException if the JNLP file was invalid
      */
     public JNLPFile(InputStream input, URL codebase, ParserSettings settings) throws ParseException {
@@ -294,9 +294,16 @@ public class JNLPFile {
 
     /**
      * Open the jnlp file URL from the cache if there, otherwise
-     * download to the cache.  Called from constructor.
+     * download to the cache. 
+     * Unless file is find in cache, this method blocks until it is downloaded.
+     * This is the best way in itw how to download and cache file
+     * @param location of resource to open
+     * @param version of resource
+     * @param policy update policy of resource
+     * @return  opened streamfrom given url
+     * @throws java.io.IOException  if something goes wrong
      */
-    private static InputStream openURL(URL location, Version version, UpdatePolicy policy) throws IOException {
+    public static InputStream openURL(URL location, Version version, UpdatePolicy policy) throws IOException {
         if (location == null || policy == null)
             throw new IllegalArgumentException(R("NullParameter"));
 
@@ -306,12 +313,12 @@ public class JNLPFile {
             File f = tracker.getCacheFile(location);
             return new FileInputStream(f);
         } catch (Exception ex) {
-            throw new IOException(ex.getMessage());
+            throw new IOException(ex);
         }
     }
 
     /**
-     * Returns the JNLP file's best localized title. This method returns the same
+     * @return the JNLP file's best localized title. This method returns the same
      * value as InformationDesc.getTitle().
      * 
      * Since jdk7 u45, also manifest title, and mainclass are taken to consideration;
@@ -337,7 +344,7 @@ public class JNLPFile {
     }
     
     /**
-     * Returns the JNLP file's best localized title. This method returns the same
+     * @return the JNLP file's best localized title. This method returns the same
      * value as InformationDesc.getTitle().
      */
     public String getTitleFromJnlp() {
@@ -355,7 +362,7 @@ public class JNLPFile {
     
 
     /**
-     * Returns the JNLP file's best localized vendor. This method returns the same
+     * @return the JNLP file's best localized vendor. This method returns the same
      * value as InformationDesc.getVendor().
      */
     public String getVendor() {
@@ -363,7 +370,7 @@ public class JNLPFile {
     }
 
     /**
-     * Returns the JNLP file's network location as specified in the
+     * @return the JNLP file's network location as specified in the
      * JNLP file.
      */
     public URL getSourceLocation() {
@@ -371,7 +378,7 @@ public class JNLPFile {
     }
 
     /**
-     * Returns the location of the file parsed to create the JNLP
+     * @return the location of the file parsed to create the JNLP
      * file, or null if it was not created from a URL.
      */
     public URL getFileLocation() {
@@ -379,42 +386,42 @@ public class JNLPFile {
     }
 
     /**
-     * Returns the location of the parent file if it exists, null otherwise
+     * @return the location of the parent file if it exists, null otherwise
      */
     public String getUniqueKey() {
         return uniqueKey;
     }
 
     /**
-     * Returns the ParserSettings that was used to parse this file
+     * @return the ParserSettings that was used to parse this file
      */
     public ParserSettings getParserSettings() {
         return parserSettings;
     }
 
     /**
-     * Returns the JNLP file's version.
+     * @return the JNLP file's version.
      */
     public Version getFileVersion() {
         return fileVersion;
     }
 
     /**
-     * Returns the specification version required by the file.
+     * @return the specification version required by the file.
      */
     public Version getSpecVersion() {
         return specVersion;
     }
 
     /**
-     * Returns the codebase URL for the JNLP file.
+     * @return the codebase URL for the JNLP file.
      */
     public URL getCodeBase() {
         return codeBase;
     }
 
     /**
-     * Returns the information section of the JNLP file as viewed
+     * @return the information section of the JNLP file as viewed
      * through the default locale.
      */
     public InformationDesc getInformation() {
@@ -422,14 +429,24 @@ public class JNLPFile {
     }
 
     /**
-     * Returns the information section of the JNLP file as viewed
+     * @param locale preferred locale of informations
+     * @return the information section of the JNLP file as viewed
      * through the specified locale.
      */
     public InformationDesc getInformation(final Locale locale) {
-        return new InformationDesc(new Locale[] { locale }) {
+        boolean strict = false;
+        if (this.info != null) {
+            for (InformationDesc infoDesc : this.info) {
+                if (infoDesc.strict) {
+                    strict = true;
+                    break;
+                }
+            }
+        }
+        return new InformationDesc(new Locale[] { locale }, strict) {
             @Override
             protected List<Object> getItems(Object key) {
-                List<Object> result = new ArrayList<Object>();
+                List<Object> result = new ArrayList<>();
 
                 for (Match precision : Match.values()) {
                     for (InformationDesc infoDesc : JNLPFile.this.info) {
@@ -478,14 +495,14 @@ public class JNLPFile {
     }
 
     /**
-     * Returns the update section of the JNLP file.
+     * @return the update section of the JNLP file.
      */
     public UpdateDesc getUpdate() {
         return update;
     }
 
     /**
-     * Returns the security section of the JNLP file.
+     * @return the security section of the JNLP file.
      */
     public SecurityDesc getSecurity() {
         return security;
@@ -496,7 +513,7 @@ public class JNLPFile {
     }
 
     /**
-     * Returns the resources section of the JNLP file as viewed
+     * @return the resources section of the JNLP file as viewed
      * through the default locale and the os.name and os.arch
      * properties.
      */
@@ -505,7 +522,10 @@ public class JNLPFile {
     }
 
     /**
-     * Returns the resources section of the JNLP file for the
+     * @param locale preferred locale of resource
+     * @param os preferred os of resource
+     * @param arch preferred arch of resource
+     * @return the resources section of the JNLP file for the
      * specified locale, os, and arch.
      */
     public ResourcesDesc getResources(final Locale locale, final String os, final String arch) {
@@ -513,7 +533,7 @@ public class JNLPFile {
 
             @Override
             public <T> List<T> getResources(Class<T> launchType) {
-                List<T> result = new ArrayList<T>();
+                List<T> result = new ArrayList<>();
 
                 for (ResourcesDesc rescDesc : resources) {
                     boolean hasUsableLocale = false;
@@ -540,7 +560,7 @@ public class JNLPFile {
     }
 
     /**
-     * Returns the resources section of the JNLP file as viewed
+     * @return the resources section of the JNLP file as viewed
      * through the default locale and the os.name and os.arch
      * properties.
      * XXX: Before overriding this method or changing its implementation,
@@ -551,11 +571,14 @@ public class JNLPFile {
     }
 
     /**
-     * Returns the resources section of the JNLP file for the
+     * @param locale preferred locale of resource
+     * @param os preferred os of resource
+     * @param arch preferred arch of resource
+     * @return the resources section of the JNLP file for the
      * specified locale, os, and arch.
      */
     public ResourcesDesc[] getResourcesDescs(final Locale locale, final String os, final String arch) {
-        List<ResourcesDesc> matchingResources = new ArrayList<ResourcesDesc>();
+        List<ResourcesDesc> matchingResources = new ArrayList<>();
         for (ResourcesDesc rescDesc: resources) {
             boolean hasUsableLocale = false;
             for (Match match : Match.values()) {
@@ -571,7 +594,7 @@ public class JNLPFile {
     }
 
     /**
-     * Returns an object of one of the following types: AppletDesc,
+     * @return an object of one of the following types: AppletDesc,
      * ApplicationDesc and InstallerDesc
      */
     public LaunchDesc getLaunchInfo() {
@@ -579,7 +602,7 @@ public class JNLPFile {
     }
 
     /**
-     * Returns the launch information for an applet.
+     * @return the launch information for an applet.
      *
      * @throws UnsupportedOperationException if there is no applet information
      */
@@ -591,7 +614,7 @@ public class JNLPFile {
     }
 
     /**
-     * Returns the launch information for an application.
+     * @return the launch information for an application.
      *
      * @throws UnsupportedOperationException if there is no application information
      */
@@ -603,7 +626,7 @@ public class JNLPFile {
     }
 
     /**
-     * Returns the launch information for a component.
+     * @return the launch information for a component.
      *
      * @throws UnsupportedOperationException if there is no component information
      */
@@ -615,7 +638,7 @@ public class JNLPFile {
     }
 
     /**
-     * Returns the launch information for an installer.
+     * @return the launch information for an installer.
      *
      * @throws UnsupportedOperationException if there is no installer information
      */
@@ -627,28 +650,28 @@ public class JNLPFile {
     }
 
     /**
-     * Returns whether the lauch descriptor describes an Applet.
+     * @return whether the lauch descriptor describes an Applet.
      */
     public boolean isApplet() {
         return launchType instanceof AppletDesc;
     }
 
     /**
-     * Returns whether the lauch descriptor describes an Application.
+     * @return whether the lauch descriptor describes an Application.
      */
     public boolean isApplication() {
         return launchType instanceof ApplicationDesc;
     }
 
     /**
-     * Returns whether the lauch descriptor describes a Component.
+     * @return whether the lauch descriptor describes a Component.
      */
     public boolean isComponent() {
         return component != null;
     }
 
     /**
-     * Returns whether the lauch descriptor describes an Installer.
+     * @return whether the lauch descriptor describes an Installer.
      */
     public boolean isInstaller() {
         return launchType instanceof InstallerDesc;
@@ -659,6 +682,9 @@ public class JNLPFile {
      * getInformation, getResources, etc.  If unset, the defaults
      * are the properties os.name, os.arch, and the locale returned
      * by Locale.getDefault().
+     * @param os preferred os of resource      
+     * @param arch preferred arch of resource
+     * @param locale preferred locale of resource
      */
     public void setDefaults(String os, String arch, Locale locale) {
         defaultOS = os;
@@ -720,7 +746,7 @@ public class JNLPFile {
     }
 
     /**
-     * Returns whether the string is a prefix for any of the strings
+     * @return whether the string is a prefix for any of the strings
      * in the specified array.
      *
      * @param prefixStr the prefix string
@@ -732,9 +758,11 @@ public class JNLPFile {
         if (available == null || available.length == 0)
             return true;
 
-        for (int i = 0; i < available.length; i++)
-            if (available[i] != null && available[i].startsWith(prefixStr))
+        for (String available1 : available) {
+            if (available1 != null && available1.startsWith(prefixStr)) {
                 return true;
+            }
+        }
 
         return false;
     }
@@ -807,11 +835,7 @@ public class JNLPFile {
      */
     public boolean needsNewVM() {
 
-        if (getNewVMArgs().size() == 0) {
-            return false;
-        } else {
-            return true;
-        }
+        return !getNewVMArgs().isEmpty();
     }
 
     /**
@@ -820,21 +844,19 @@ public class JNLPFile {
      */
     public List<String> getNewVMArgs() {
 
-        List<String> newVMArgs = new LinkedList<String>();
+        List<String> newVMArgs = new LinkedList<>();
 
         JREDesc[] jres = getResources().getJREs();
-        for (int jreIndex = 0; jreIndex < jres.length; jreIndex++) {
-            String initialHeapSize = jres[jreIndex].getInitialHeapSize();
+        for (JREDesc jre : jres) {
+            String initialHeapSize = jre.getInitialHeapSize();
             if (initialHeapSize != null) {
                 newVMArgs.add("-Xms" + initialHeapSize);
             }
-
-            String maxHeapSize = jres[jreIndex].getMaximumHeapSize();
+            String maxHeapSize = jre.getMaximumHeapSize();
             if (maxHeapSize != null) {
                 newVMArgs.add("-Xmx" + maxHeapSize);
             }
-
-            String vmArgsFromJre = jres[jreIndex].getVMArgs();
+            String vmArgsFromJre = jre.getVMArgs();
             if (vmArgsFromJre != null) {
                 String[] args = vmArgsFromJre.split(" ");
                 newVMArgs.addAll(Arrays.asList(args));
@@ -891,6 +913,8 @@ public class JNLPFile {
         public static final String CODEBASE = "Codebase";
         public static final String TRUSTED_ONLY = "Trusted-Only";
         public static final String TRUSTED_LIBRARY = "Trusted-Library";
+        public static final String ENTRY_POINT="Entry-Point";
+        
         private JNLPClassLoader loader;
 
 
@@ -907,6 +931,7 @@ public class JNLPFile {
         /**
          * main class can be defined outside of manifest.
          * This method is mostly for completeness
+         * @return main-class as it is specified in application
          */
         public String getMainClass(){
             if (loader == null) {
@@ -916,8 +941,22 @@ public class JNLPFile {
             return loader.getMainClass();
         }
         
+         /**
+         *
+         * http://docs.oracle.com/javase/7/docs/technotes/guides/jweb/security/manifest.html#entry_pt
+         * @return values of Entry-Points attribute
+         */
+        public String[] getEntryPoints() {
+            return splitEntryPoints(getEntryPointString());
+        }
+        
+        public String getEntryPointString() {
+            return getAttribute(ENTRY_POINT);
+        }
+
         /**
          * http://docs.oracle.com/javase/7/docs/technotes/guides/jweb/manifest.html#app_name
+         * @return value of Application-Name manifest attribute
          */
         public String getApplicationName(){
             return getAttribute(APP_NAME);
@@ -925,6 +964,7 @@ public class JNLPFile {
         
         /**
          * http://docs.oracle.com/javase/7/docs/technotes/guides/jweb/manifest.html#caller_allowable
+         * @return values of Caller-Allowable-Codebase manifest attribute
          */
         public ClasspathMatcher.ClasspathMatchers getCallerAllowableCodebase() {
             return getCodeBaseMatchersAttribute(CALLER_ALLOWABLE, false);
@@ -932,6 +972,7 @@ public class JNLPFile {
 
         /**
          * http://docs.oracle.com/javase/7/docs/technotes/guides/jweb/manifest.html#app_library
+         * @return values of Application-Library-Allowable-Codebase manifest attribute
          */
         public ClasspathMatcher.ClasspathMatchers getApplicationLibraryAllowableCodebase() {
             return getCodeBaseMatchersAttribute(APP_LIBRARY_ALLOWABLE, true);
@@ -939,6 +980,7 @@ public class JNLPFile {
 
         /**
          * http://docs.oracle.com/javase/7/docs/technotes/guides/jweb/manifest.html#codebase
+         * @return values of Codebase manifest attribute
          */
         public ClasspathMatcher.ClasspathMatchers getCodebase() {
             return getCodeBaseMatchersAttribute(CODEBASE, false);
@@ -946,6 +988,7 @@ public class JNLPFile {
 
         /**
          * http://docs.oracle.com/javase/7/docs/technotes/guides/jweb/manifest.html#trusted_only
+         * @return value of Trusted-Only manifest attribute
          */
         public ManifestBoolean isTrustedOnly() {
             return processBooleanAttribute(TRUSTED_ONLY);
@@ -954,6 +997,7 @@ public class JNLPFile {
 
         /**
          * http://docs.oracle.com/javase/7/docs/technotes/guides/jweb/manifest.html#trusted_library
+         * @return value of Trusted-Library manifest attribute
          */
         public ManifestBoolean isTrustedLibrary() {
             return processBooleanAttribute(TRUSTED_LIBRARY);
@@ -962,6 +1006,7 @@ public class JNLPFile {
 
         /**
          * http://docs.oracle.com/javase/7/docs/technotes/guides/jweb/manifest.html#permissions
+         * @return value of Permissions manifest attribute
          */
         public ManifestBoolean isSandboxForced() {
             String s = getAttribute(PERMISSIONS);
@@ -979,6 +1024,7 @@ public class JNLPFile {
         }
         /**
          * http://docs.oracle.com/javase/7/docs/technotes/guides/jweb/manifest.html#permissions
+         * @return plain string values of Permissions manifest attribute
          */
         public String permissionsToString() {
             String s = getAttribute(PERMISSIONS);
@@ -996,12 +1042,14 @@ public class JNLPFile {
         /**
          * get custom attribute.
          */
-        public String getAttribute(String name) {
+        String getAttribute(String name) {
             return getAttribute(new Attributes.Name(name));
         }
 
         /**
          * get standard attribute
+         * @param name name of the manifest attribute to find in application
+         * @return  plain attribute value
          */
         public String getAttribute(Attributes.Name name) {
             if (loader == null) {
@@ -1029,15 +1077,69 @@ public class JNLPFile {
                 return ManifestBoolean.UNDEFINED;
             } else {
                 s = s.toLowerCase().trim();
-                if (s.equals("true")) {
-                    return  ManifestBoolean.TRUE;
-                } else if (s.equals("false")) {
-                    return ManifestBoolean.FALSE;
-                } else {
-                    throw new IllegalArgumentException("Unknown value of " + id + " attribute " + s + ". Expected true or false");
+                switch (s) {
+                    case "true":
+                        return  ManifestBoolean.TRUE;
+                    case "false":
+                        return ManifestBoolean.FALSE;
+                    default:
+                        throw new IllegalArgumentException("Unknown value of " + id + " attribute " + s + ". Expected true or false");
                 }
             }
         }
+    }
+
+    public String createJnlpVendorValue() {
+        final String location;
+        if (getSourceLocation() != null) {
+            location = getSourceLocation().toString();
+        } else if (getCodeBase() != null) {
+            location = getCodeBase().toString();
+        } else {
+            location = "unknown";
+        }
+        return location;
+    }
+
+    public String createJnlpVendor() {
+        return "Generated from applet from " + createJnlpVendorValue();
+    }
+
+    public String createJnlpTitleValue() {
+        final String location;
+        if (getSourceLocation() != null) {
+            location = new File(getSourceLocation().getFile()).getName();
+        } else if (getCodeBase() != null) {
+            location = new File(getCodeBase().getFile()).getName();
+        } else {
+            location = "unknown";
+        }
+        return location;
+    }
+
+    public String createJnlpTitle() {
+        //case when creating name from already created name
+        String shortenedTitle = getTitle();
+        int i = shortenedTitle.lastIndexOf("(");
+        if (i >= 2) { // not cutting immidiately...
+            shortenedTitle = shortenedTitle.substring(0, i - 1);
+        }
+        if (createJnlpTitleValue().startsWith(shortenedTitle)) {
+            return createJnlpTitleValue();
+        }
+        return getTitle() + " from " + createJnlpTitleValue();
+    }
+    
+    //not private for testing purposes
+    static String[] splitEntryPoints(String entryPointString) {
+        if (entryPointString == null || entryPointString.trim().isEmpty()) {
+            return null;
+        }
+        String[] result = entryPointString.trim().split("\\s+");
+        if (result.length == 0) {
+            return null;
+        }
+        return result;
     }
 }
 

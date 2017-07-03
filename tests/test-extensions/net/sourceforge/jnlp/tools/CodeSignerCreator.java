@@ -167,20 +167,9 @@ public class CodeSignerCreator {
                 // keyPair.generate(keySize);
                 Method generate = certAndKeyGenClass.getMethod("generate", int.class);
                 generate.invoke(keyPair, keySize);
-            } catch (ClassNotFoundException e) {
-                throw (AssertionError) new AssertionError("Unable to use CertAndKeyGen class").initCause(e);
-            } catch (NoSuchMethodException e) {
-                throw (AssertionError) new AssertionError("Unable to use CertAndKeyGen class").initCause(e);
-            } catch (SecurityException e) {
-                throw (AssertionError) new AssertionError("Unable to use CertAndKeyGen class").initCause(e);
-            } catch (InstantiationException e) {
-                throw (AssertionError) new AssertionError("Unable to use CertAndKeyGen class").initCause(e);
-            } catch (IllegalAccessException e) {
-                throw (AssertionError) new AssertionError("Unable to use CertAndKeyGen class").initCause(e);
-            } catch (IllegalArgumentException e) {
-                throw (AssertionError) new AssertionError("Unable to use CertAndKeyGen class").initCause(e);
-            } catch (InvocationTargetException e) {
-                throw (AssertionError) new AssertionError("Unable to use CertAndKeyGen class").initCause(e);
+            } catch (ClassNotFoundException | NoSuchMethodException | SecurityException | InstantiationException |
+                    IllegalAccessException | IllegalArgumentException | InvocationTargetException certAndKeyGenClassError) {
+                throw new AssertionError("Unable to use CertAndKeyGen class", certAndKeyGenClassError);
             }
         }
 
@@ -190,13 +179,7 @@ public class CodeSignerCreator {
                 Class<?> klass = keyPair.getClass();
                 Method method = klass.getMethod("getPrivateKey");
                 return (PrivateKey) method.invoke(keyPair);
-            } catch (NoSuchMethodException error) {
-                throw new AssertionError(error);
-            } catch (IllegalAccessException error) {
-                throw new AssertionError(error);
-            } catch (IllegalArgumentException error) {
-                throw new AssertionError(error);
-            } catch (InvocationTargetException error) {
+            } catch (NoSuchMethodException | IllegalAccessException | IllegalArgumentException | InvocationTargetException error) {
                 throw new AssertionError(error);
             }
         }
@@ -211,11 +194,7 @@ public class CodeSignerCreator {
                 return (X509Certificate) method.invoke(keyPair, name, notBefore, validityInDays * 24L * 60L * 60L);
             } catch (InvocationTargetException ite) {
                 throw new RuntimeException(ite.getCause());
-            } catch (NoSuchMethodException error) {
-                throw new AssertionError(error);
-            } catch (IllegalAccessException error) {
-                throw new AssertionError(error);
-            } catch (IllegalArgumentException error) {
+            } catch (NoSuchMethodException | IllegalAccessException | IllegalArgumentException error) {
                 throw new AssertionError(error);
             }
         }
@@ -225,7 +204,7 @@ public class CodeSignerCreator {
             String className = null;
             if (javaVersion.startsWith("1.7")) {
                 className = "sun.security.x509.CertAndKeyGen";
-            } else if (javaVersion.startsWith("1.8")) {
+            } else if (javaVersion.startsWith("1.8") || javaVersion.startsWith("1.9")) {
                 className = "sun.security.tools.keytool.CertAndKeyGen";
             } else {
                 throw new AssertionError("Unrecognized Java Version");

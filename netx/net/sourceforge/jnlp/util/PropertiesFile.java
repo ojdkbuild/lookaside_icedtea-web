@@ -16,9 +16,15 @@
 
 package net.sourceforge.jnlp.util;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Properties;
+
+import net.sourceforge.jnlp.util.lockingfile.LockedFile;
 import net.sourceforge.jnlp.util.logging.OutputController;
-import java.io.*;
-import java.util.*;
 
 /**
  * A properties object backed by a specified file without throwing
@@ -32,7 +38,7 @@ import java.util.*;
 public class PropertiesFile extends Properties {
 
     /** the file to save to */
-    File file;
+    LockedFile lockedFile;
 
     /** the header string */
     String header = "netx file";
@@ -46,7 +52,7 @@ public class PropertiesFile extends Properties {
      * @param file the file to save and load to
      */
     public PropertiesFile(File file) {
-        this.file = file;
+        this.lockedFile = LockedFile.getInstance(file);
     }
 
     /**
@@ -56,14 +62,15 @@ public class PropertiesFile extends Properties {
      * @param header the file header
      */
     public PropertiesFile(File file, String header) {
-        this.file = file;
+        this.lockedFile = LockedFile.getInstance(file);
         this.header = header;
     }
 
     /**
-     * Returns the value of the specified key, or null if the key
+     * @return the value of the specified key, or null if the key
      * does not exist.
      */
+    @Override
     public String getProperty(String key) {
         if (lastStore == 0)
             load();
@@ -72,9 +79,10 @@ public class PropertiesFile extends Properties {
     }
 
     /**
-     * Returns the value of the specified key, or the default value
+     * @return the value of the specified key, or the default value
      * if the key does not exist.
      */
+    @Override
     public String getProperty(String key, String defaultValue) {
         if (lastStore == 0)
             load();
@@ -87,6 +95,7 @@ public class PropertiesFile extends Properties {
      *
      * @return the previous value
      */
+    @Override
     public Object setProperty(String key, String value) {
         if (lastStore == 0)
             load();
@@ -95,10 +104,10 @@ public class PropertiesFile extends Properties {
     }
 
     /**
-     * Returns the file backing this properties object.
+     * @return the file backing this properties object.
      */
     public File getStoreFile() {
-        return file;
+        return lockedFile.getFile();
     }
 
     /**
@@ -110,7 +119,7 @@ public class PropertiesFile extends Properties {
      *         false, if file was still current
      */
     public boolean load() {
-
+        File file = lockedFile.getFile();
         if (!file.exists()) {
             return false;
         }
@@ -150,7 +159,7 @@ public class PropertiesFile extends Properties {
      * Saves the properties to the file.
      */
     public void store() {
-
+        File file = lockedFile.getFile();
         FileOutputStream s = null;
         try {
             try {
@@ -167,6 +176,39 @@ public class PropertiesFile extends Properties {
         } catch (IOException ex) {
             OutputController.getLogger().log(OutputController.Level.ERROR_ALL, ex);
         }
+    }
+
+    public void lock() {
+        try {
+            lockedFile.lock();
+        } catch (IOException e) {
+            OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e);
+        }
+    }
+
+    public boolean tryLock() {
+        try {
+            return lockedFile.tryLock();
+        } catch (IOException e) {
+            OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e);
+        }
+        return false;
+    }
+
+    /**
+     * Unlocks the file. Does not do anything if not holding the lock.
+     */
+
+    public void unlock() {
+        try {
+            lockedFile.unlock();
+        } catch (IOException e) {
+            OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e);
+        }
+    }
+
+    public boolean isHeldByCurrentThread() {
+        return lockedFile.isHeldByCurrentThread();
     }
 
 }

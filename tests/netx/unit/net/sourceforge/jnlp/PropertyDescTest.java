@@ -45,66 +45,66 @@ public class PropertyDescTest {
     
     @Test
     public void regularValue() throws LaunchException{
-        PropertyDesc p = PropertyDesc.fromString("key=value", "none");
+        PropertyDesc p = PropertyDesc.fromString("key=value");
         Assert.assertEquals("key", p.getKey());
         Assert.assertEquals("value", p.getValue());
     }
     
     @Test
     public void correctEmptyValue() throws LaunchException{
-        PropertyDesc p = PropertyDesc.fromString("key=", "none");
+        PropertyDesc p = PropertyDesc.fromString("key=");
         Assert.assertEquals("key", p.getKey());
         Assert.assertEquals("", p.getValue());
     }
     
     @Test
     public void strangeEmptyValue() throws LaunchException{
-        PropertyDesc p = PropertyDesc.fromString("key=   ", "none");
+        PropertyDesc p = PropertyDesc.fromString("key=   ");
         Assert.assertEquals("key", p.getKey());
         Assert.assertEquals("   ", p.getValue());
     }
     
     @Test
     public void emptyKey() throws LaunchException{
-        PropertyDesc p = PropertyDesc.fromString("=value", "none");
+        PropertyDesc p = PropertyDesc.fromString("=value");
         Assert.assertEquals("", p.getKey());
         Assert.assertEquals("value", p.getValue());
     }
     
     @Test
     public void strangeEmptyKey() throws LaunchException{
-        PropertyDesc p = PropertyDesc.fromString("   =value", "none");
+        PropertyDesc p = PropertyDesc.fromString("   =value");
         Assert.assertEquals("   ", p.getKey());
         Assert.assertEquals("value", p.getValue());
     }
     
     @Test
     public void allEmpty() throws LaunchException{
-        PropertyDesc p = PropertyDesc.fromString("=", "none");
+        PropertyDesc p = PropertyDesc.fromString("=");
         Assert.assertEquals("", p.getKey());
         Assert.assertEquals("", p.getValue());
     }
     
     @Test
     public void allStarngeEmpty() throws LaunchException{
-        PropertyDesc p = PropertyDesc.fromString("  =    ", "none");
+        PropertyDesc p = PropertyDesc.fromString("  =    ");
         Assert.assertEquals("  ", p.getKey());
         Assert.assertEquals("    ", p.getValue());
     }
     
     @Test(expected = LaunchException.class)
     public void irregularValue() throws LaunchException{
-        PropertyDesc p = PropertyDesc.fromString("key", "none");
+        PropertyDesc p = PropertyDesc.fromString("key");
     }
     
     @Test(expected = LaunchException.class)
     public void empty() throws LaunchException{
-        PropertyDesc p = PropertyDesc.fromString("", "none");
+        PropertyDesc p = PropertyDesc.fromString("");
     }
     
     @Test(expected = NullPointerException.class)
     public void nullValue() throws LaunchException{
-        PropertyDesc p = PropertyDesc.fromString(null, "none");
+        PropertyDesc p = PropertyDesc.fromString(null);
     }
     
 }

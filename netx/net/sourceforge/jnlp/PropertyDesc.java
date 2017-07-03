@@ -16,6 +16,8 @@
 
 package net.sourceforge.jnlp;
 
+import static net.sourceforge.jnlp.runtime.Translator.R;
+
 /**
  * The property element.
  *
@@ -27,14 +29,14 @@ public class PropertyDesc {
     /**
      * 
      * @param prop - the property to be parsed from format key=value
-     * @param errorMEssage - the message for error. We do not wont to bother PropertyDesc with localization overhead
      * @return new PropertyDesc based on parsed key=value, though composed from key and value
+     * @throws net.sourceforge.jnlp.LaunchException if creations fails
      */
-    public static PropertyDesc fromString(String prop, String errorMEssage) throws LaunchException {
+    public static PropertyDesc fromString(String prop) throws LaunchException {
         // allows empty property, not sure about validity of that.
         int equals = prop.indexOf("=");
         if (equals == -1) {
-            throw new LaunchException(errorMEssage);
+            throw new LaunchException(R("BBadProp", prop));
         }
         String key = prop.substring(0, equals);
         String value = prop.substring(equals + 1, prop.length());
@@ -61,14 +63,14 @@ public class PropertyDesc {
     }
 
     /**
-     * Returns the property's key
+     * @return the property's key
      */
     public String getKey() {
         return key;
     }
 
     /**
-     * Returns the property's value
+     * @return the property's value
      */
     public String getValue() {
         return value;

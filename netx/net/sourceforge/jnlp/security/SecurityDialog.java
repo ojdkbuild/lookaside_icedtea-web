@@ -55,7 +55,6 @@ import net.sourceforge.jnlp.security.dialogs.AccessWarningPane;
 import net.sourceforge.jnlp.security.dialogs.AppletWarningPane;
 import net.sourceforge.jnlp.security.dialogs.CertWarningPane;
 import net.sourceforge.jnlp.security.dialogs.CertsInfoPane;
-import net.sourceforge.jnlp.security.dialogs.MatchingALACAttributePanel;
 import net.sourceforge.jnlp.security.dialogs.MissingALACAttributePanel;
 import net.sourceforge.jnlp.security.dialogs.MissingPermissionsAttributePanel;
 import net.sourceforge.jnlp.security.dialogs.MoreInfoPane;
@@ -325,7 +324,7 @@ public class SecurityDialog extends JDialog {
         else if (dialogType == DialogType.MISSING_ALACA)
             panel = new MissingALACAttributePanel(this, (String) extras[0], (String) extras[1], (String) extras[2]);
         else if (dialogType == DialogType.MATCHING_ALACA)
-            panel = new MatchingALACAttributePanel(this, (String) extras[0], (String) extras[1], (String) extras[2]);
+            panel = AppTrustWarningDialog.matchingAlaca(this, (JNLPFile) extras[0], (String) extras[1], (String) extras[2]);
 
         add(panel, BorderLayout.CENTER);
     }
@@ -361,7 +360,7 @@ public class SecurityDialog extends JDialog {
         super.dispose();
     }
 
-    private final List<ActionListener> listeners = new CopyOnWriteArrayList<ActionListener>();
+    private final List<ActionListener> listeners = new CopyOnWriteArrayList<>();
 
     /**
      * Notify all the listeners that the user has made a decision using this
@@ -377,6 +376,7 @@ public class SecurityDialog extends JDialog {
      * Adds an {@link ActionListener} which will be notified if the user makes a
      * choice using this SecurityDialog. The listener should use {@link #getValue()}
      * to actually get the user's response.
+     * @param listener another action listener to be listen to
      */
     public void addActionListener(ActionListener listener) {
         listeners.add(listener);

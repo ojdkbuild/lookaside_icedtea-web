@@ -19,7 +19,6 @@ package net.sourceforge.jnlp.util;
 import java.awt.Component;
 import static net.sourceforge.jnlp.runtime.Translator.R;
 
-import java.awt.Window;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -31,6 +30,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.RandomAccessFile;
+import java.io.Reader;
 import java.io.Writer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
@@ -77,7 +77,7 @@ public final class FileUtils {
     /**
      * list of characters not allowed in filenames
      */
-    private static final char INVALID_CHARS[] = { '\\', '/', ':', '*', '?', '"', '<', '>', '|' };
+    public static final char INVALID_CHARS[] = {'\\', '/', ':', '*', '?', '"', '<', '>', '|', '[', ']', '\'', ';', '=', ','};
 
     private static final char SANITIZED_CHAR = '_';
 
@@ -91,11 +91,18 @@ public final class FileUtils {
      *         file path
      */
     public static String sanitizePath(String path) {
+        return sanitizePath(path, SANITIZED_CHAR);
+    }
 
-        for (int i = 0; i < INVALID_CHARS.length; i++)
-            if (INVALID_CHARS[i] != File.separatorChar)
-                if (-1 != path.indexOf(INVALID_CHARS[i]))
-                    path = path.replace(INVALID_CHARS[i], SANITIZED_CHAR);
+    public static String sanitizePath(String path, char substitute) {
+
+        for (int i = 0; i < INVALID_CHARS.length; i++) {
+            if (INVALID_CHARS[i] != File.separatorChar) {
+                if (-1 != path.indexOf(INVALID_CHARS[i])) {
+                    path = path.replace(INVALID_CHARS[i], substitute);
+                }
+            }
+        }
 
         return path;
     }
@@ -108,10 +115,16 @@ public final class FileUtils {
      * @return a sanitized version of the input
      */
     public static String sanitizeFileName(String filename) {
+        return sanitizeFileName(filename, SANITIZED_CHAR);
+    }
 
-        for (int i = 0; i < INVALID_CHARS.length; i++)
-            if (-1 != filename.indexOf(INVALID_CHARS[i]))
-                filename = filename.replace(INVALID_CHARS[i], SANITIZED_CHAR);
+    public static String sanitizeFileName(String filename, char substitute) {
+
+        for (int i = 0; i < INVALID_CHARS.length; i++) {
+            if (-1 != filename.indexOf(INVALID_CHARS[i])) {
+                filename = filename.replace(INVALID_CHARS[i], substitute);
+            }
+        }
 
         return filename;
     }
@@ -121,7 +134,8 @@ public final class FileUtils {
      * readable or writable by anyone other than the owner. The parent
      * directories are not created; they must exist before this is called.
      *
-     * @throws IOException
+     * @param directory directory to be created
+     * @throws IOException if IO fails
      */
     public static void createRestrictedDirectory(File directory) throws IOException {
         createRestrictedFile(directory, true, true);
@@ -132,7 +146,9 @@ public final class FileUtils {
      * writable by anyone other than the owner. If writeableByOnwer is false,
      * even the owner can not write to it.
      *
-     * @throws IOException
+     * @param file path to file
+     * @param writableByOwner true if can be writable by owner
+     * @throws IOException if IO fails
      */
     public static void createRestrictedFile(File file, boolean writableByOwner) throws IOException {
         createRestrictedFile(file, false, writableByOwner);
@@ -142,7 +158,7 @@ public final class FileUtils {
      * Tries to create the ancestor directories of file f. Throws
      * an IOException if it can't be created (but not if it was
      * already there).
-     * @param f
+     * @param f file to provide parent directory
      * @param eMsg - the message to use for the exception. null
      * if the file name is to be used.
      * @throws IOException if the directory can't be created and doesn't exist.
@@ -159,7 +175,7 @@ public final class FileUtils {
      * Tries to create the ancestor directories of file f. Throws
      * an IOException if it can't be created (but not if it was
      * already there).
-     * @param f
+     * @param f file which parent will be created
      * @throws IOException if the directory can't be created and doesn't exist.
      */
     public static void createParentDir(File f) throws IOException {
@@ -201,9 +217,7 @@ public final class FileUtils {
      */
     private static void createRestrictedFile(File file, boolean isDir, boolean writableByOwner) throws IOException {
 
-        File tempFile = null;
-
-        tempFile = new File(file.getCanonicalPath() + ".temp");
+        File tempFile = new File(file.getCanonicalPath() + ".temp");
 
         if (isDir) {
             if (!tempFile.mkdir()) {
@@ -300,7 +314,7 @@ public final class FileUtils {
         if (file == null || file.getParentFile() == null || !file.getParentFile().exists()) {
             return null;
         }
-        final List<File> policyDirectory = new ArrayList<File>();
+        final List<File> policyDirectory = new ArrayList<>();
         policyDirectory.add(file.getParentFile());
         final DirectoryValidator validator = new DirectoryValidator(policyDirectory);
         final DirectoryCheckResults result = validator.ensureDirs();
@@ -394,7 +408,6 @@ public final class FileUtils {
     /**
      * Show a dialog informing the user that the file could not be opened
      * @param frame a {@link JFrame} to act as parent to this dialog
-     * @param filePath a {@link String} representing the path to the file we failed to open
      * @param message a {@link String} giving the specific reason the file could not be opened
      */
     public static void showCouldNotOpenDialog(final Component frame, final String message) {
@@ -479,8 +492,8 @@ public final class FileUtils {
 
         if (file.isDirectory()) {
             File[] children = file.listFiles();
-            for (int i = 0; i < children.length; i++) {
-                recursiveDelete(children[i], base);
+            for (File children1 : children) {
+                recursiveDelete(children1, base);
             }
         }
         if (!file.delete()) {
@@ -528,22 +541,30 @@ public final class FileUtils {
         return lock;
     }
 
-    /**
-     * helping dummy  method to save String as file
+/**
+     * Method to save String as file in UTF-8 encoding.
      * 
-     * @param content
-     * @param f
-     * @throws IOException
+     * @param content which will be saved as it is saved in this String
+     * @param f file to be saved. No warnings provided
+     * @throws IOException if save fails
      */
     public static void saveFile(String content, File f) throws IOException {
         saveFile(content, f, "utf-8");
     }
 
+    /**
+     * Method to save String as file in specified encoding/.
+     *
+     * @param content which will be saved as it is saved in this String
+     * @param f file to be saved. No warnings provided
+     * @param encoding of output byte representation
+     * @throws IOException if save fails
+     */
     public static void saveFile(String content, File f, String encoding) throws IOException {
-        Writer output = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(f), encoding));
-        output.write(content);
-        output.flush();
-        output.close();
+        try (Writer output = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(f), encoding))) {
+            output.write(content);
+            output.flush();
+        }
     }
 
     /**
@@ -555,8 +576,15 @@ public final class FileUtils {
      * @throws IOException if connection can't be established or resource does not exist
      */
     public static String getContentOfStream(InputStream is, String encoding) throws IOException {
+         try {
+            return getContentOfReader(new InputStreamReader(is, encoding));
+        } finally {
+            is.close();
+        }
+    }
+     public static String getContentOfReader(Reader r) throws IOException {
         try {
-            BufferedReader br = new BufferedReader(new InputStreamReader(is, encoding));
+            BufferedReader br = new BufferedReader(r);
             StringBuilder sb = new StringBuilder();
             while (true) {
                 String s = br.readLine();
@@ -568,7 +596,7 @@ public final class FileUtils {
             }
             return sb.toString();
         } finally {
-            is.close();
+            r.close();
         }
 
     }

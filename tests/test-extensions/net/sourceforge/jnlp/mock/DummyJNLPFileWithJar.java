@@ -23,37 +23,47 @@ public class DummyJNLPFileWithJar extends JNLPFile {
     }
 
     private final JARDesc[] jarDescs;
-    private final File[] jarFiles;
+    private final URL[] jarFiles;
 
     public DummyJNLPFileWithJar(File... jarFiles) throws MalformedURLException {
         this(-1, jarFiles);
     }
+    
+    public DummyJNLPFileWithJar(URL codebaseRewritter, URL... jarFiles) throws MalformedURLException {
+        this(-1, codebaseRewritter, jarFiles);
+    }
     public DummyJNLPFileWithJar(int main, File... jarFiles) throws MalformedURLException {
-        codeBase = jarFiles[0].getParentFile().toURI().toURL();
+        this(main, jarFiles[0].getParentFile().toURI().toURL(), filesToUrls(jarFiles));
+
+    }
+    
+    private static URL[] filesToUrls(File[] f) throws MalformedURLException{
+        URL[] r = new URL[f.length];
+        for (int i = 0; i < f.length; i++) {
+            r[i]=f[i].toURI().toURL();
+        }
+        return r;
+    }
+    
+    public DummyJNLPFileWithJar(int main, URL codebaseRewritter, URL... jarFiles) throws MalformedURLException {
+        codeBase = codebaseRewritter;
         this.jarFiles = jarFiles;
         jarDescs = new JARDesc[jarFiles.length];
 
         for (int i = 0; i < jarFiles.length; i++) {
-            jarDescs[i] = makeJarDesc(jarFiles[i].toURI().toURL(), i==main);
+            jarDescs[i] = makeJarDesc(jarFiles[i], i==main);
 
         }
-        info = new ArrayList<InformationDesc>();
+        info = new ArrayList<>();
+        this.security = new SecurityDesc(this, SecurityDesc.SANDBOX_PERMISSIONS, null);
     }
 
     public URL getJarLocation() {
-        try {
-            return jarFiles[0].toURI().toURL();
-        } catch (MalformedURLException e) {
-            throw new RuntimeException(e);
-        }
+            return jarFiles[0];
     }
     
     public URL getJarLocation(int i) {
-        try {
-            return jarFiles[i].toURI().toURL();
-        } catch (MalformedURLException e) {
-            throw new RuntimeException(e);
-        }
+            return jarFiles[i];
     }
 
     public JARDesc[] getJarDescs() {
@@ -85,11 +95,6 @@ public class DummyJNLPFileWithJar extends JNLPFile {
     @Override
     public URL getCodeBase() {
         return codeBase;
-    }
-
-    @Override
-    public SecurityDesc getSecurity() {
-        return new SecurityDesc(this, SecurityDesc.SANDBOX_PERMISSIONS, null);
     }
 
     public void setInfo(List<InformationDesc> info) {

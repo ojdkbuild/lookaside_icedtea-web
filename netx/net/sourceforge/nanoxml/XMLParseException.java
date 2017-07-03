@@ -32,7 +32,8 @@ package net.sourceforge.nanoxml;
  * An XMLParseException is thrown when an error occures while parsing an XML
  * string.
  * <p>
- * $Revision: 1.1 $<br/>
+ * $Revision: 1.1 $</p>
+ * <p>
  * $Date: 2002/08/03 04:05:32 $</p>
  *
  * @see net.sourceforge.nanoxml.XMLElement
@@ -56,7 +57,7 @@ public class XMLParseException
      * <ul><li>{@code lineNr > 0 || lineNr == NO_LINE}
      * </ul></dd></dl>
      */
-    private int lineNr;
+    private final int lineNr;
 
     /**
      * Creates an exception.
@@ -111,6 +112,7 @@ public class XMLParseException
      * Where the error occurred, or {@code NO_LINE} if the line number is
      * unknown.
      *
+     * @return  line in source where exception occurred
      * @see net.sourceforge.nanoxml.XMLParseException#NO_LINE
      */
     public int getLineNr() {

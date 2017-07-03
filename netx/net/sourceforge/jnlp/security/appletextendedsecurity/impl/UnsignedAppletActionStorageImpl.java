@@ -41,19 +41,25 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.regex.PatternSyntaxException;
+import net.sourceforge.jnlp.security.appletextendedsecurity.InvalidLineException;
 import net.sourceforge.jnlp.security.appletextendedsecurity.ExecuteAppletAction;
 import net.sourceforge.jnlp.security.appletextendedsecurity.UnsignedAppletActionEntry;
 import net.sourceforge.jnlp.security.appletextendedsecurity.UnsignedAppletActionStorage;
+import net.sourceforge.jnlp.util.FileUtils;
 import net.sourceforge.jnlp.util.lockingfile.LockingReaderWriter;
 import net.sourceforge.jnlp.util.lockingfile.StorageIoException;
+import net.sourceforge.jnlp.util.logging.OutputController;
 
 public class UnsignedAppletActionStorageImpl extends LockingReaderWriter implements UnsignedAppletActionStorage {
 
     protected List<UnsignedAppletActionEntry> items;
-
-    public UnsignedAppletActionStorageImpl(String location) {
-        this(new File(location));
-    }
+    private String readVersion = null;
+    public static final String versionPreffix="#VERSION ";
+    public static final String BACKUP_SUFFIX = "-backup";
+    public static final int currentVersion = 2;
+    private int lineCounter = 0;
+    private boolean loadingDisabled = false;
 
     public UnsignedAppletActionStorageImpl(File location) {
         super(location);
@@ -72,7 +78,7 @@ public class UnsignedAppletActionStorageImpl extends LockingReaderWriter impleme
     @Override
     protected void readContents() throws IOException {
         if (items == null) {
-            items = new ArrayList<UnsignedAppletActionEntry>();
+            items = new ArrayList<>();
         } else {
             items.clear();
         }
@@ -82,15 +88,36 @@ public class UnsignedAppletActionStorageImpl extends LockingReaderWriter impleme
     @Override
     protected void readLine(String line) {
         if (line.trim().length() != 0) {
-            this.items.add(UnsignedAppletActionEntry.createFromString(line));
+            lineCounter++;
+            if (line.startsWith(versionPreffix) && line.trim().split("\\s+").length > 1) {
+                if (readVersion == null) {
+                    readVersion = line.trim();
+                    actOnVersionLoad();
+                }
+            } else {
+                if (lineCounter>0 && readVersion == null){
+                    actOnNoVersionLoad();
+                }
+                if (!loadingDisabled) {
+                    this.items.add(UnsignedAppletActionEntry.createFromString(line));
+                }
+            }
         }
     }
 
     @Override
     public void writeContent(BufferedWriter bw) throws IOException {
+        lineCounter = 0;
+        readVersion = null;
+        bw.write(versionPreffix + currentVersion + " - note, do not edit or modify this line. It may cause removal of this file.");
+        bw.newLine();
         for (UnsignedAppletActionEntry item : items) {
-            item.write(bw);
-            bw.newLine();
+            try{
+                item.write(bw);
+                bw.newLine();
+            }catch (InvalidLineException ex){
+                OutputController.getLogger().log(ex);
+            }
         }
     }
 
@@ -131,17 +158,21 @@ public class UnsignedAppletActionStorageImpl extends LockingReaderWriter impleme
     }
 
     @Override
-    public UnsignedAppletActionEntry getMatchingItem(String documentBase, String codeBase, List<String> archives) {
+    public UnsignedAppletActionEntry getMatchingItem(String documentBase, String codeBase, List<String> archives, Integer id) {
         List<UnsignedAppletActionEntry> results = getMatchingItems(documentBase, codeBase, archives);
         if (results == null || results.isEmpty()) {
             return null;
+        }
+        //no comaprsion id provided
+        if (id  == null){
+            return results.get(0);    
         }
         // Chose the first result, unless we find a 'stronger' result
         // Actions such as 'always accept' or 'always reject' are 'stronger' than
         // the hints 'was accepted' or 'was rejected'.
         for (UnsignedAppletActionEntry candidate : results) {
-                if (candidate.getUnsignedAppletAction() == ExecuteAppletAction.ALWAYS
-                    || candidate.getUnsignedAppletAction() == ExecuteAppletAction.NEVER) {
+                if (candidate.getAppletSecurityActions().getAction(id) == ExecuteAppletAction.ALWAYS
+                    || candidate.getAppletSecurityActions().getAction(id) == ExecuteAppletAction.NEVER) {
                     //return first found strong
                     return  candidate;
                 }
@@ -172,21 +203,26 @@ public class UnsignedAppletActionStorageImpl extends LockingReaderWriter impleme
     }
 
     private boolean isMatching(UnsignedAppletActionEntry unsignedAppletActionEntry, String documentBase, String codeBase, List<String> archives) {
-        boolean result = true;
-        if (documentBase != null && !documentBase.trim().isEmpty()) {
-            result = result && documentBase.matches(unsignedAppletActionEntry.getDocumentBase().getRegEx());
-        }
-        if (codeBase != null && !codeBase.trim().isEmpty()) {
-            result = result && codeBase.matches(unsignedAppletActionEntry.getCodeBase().getRegEx());
-        }
-        if (archives != null) {
-            List<String> saved = unsignedAppletActionEntry.getArchives();
-            if (saved == null || saved.isEmpty()) {
-                return result;
+        try {
+            boolean result = true;
+            if (documentBase != null && !documentBase.trim().isEmpty()) {
+                result = result && documentBase.matches(unsignedAppletActionEntry.getDocumentBase().getRegEx());
             }
-            result = result && compareArchives(archives, saved);
+            if (codeBase != null && !codeBase.trim().isEmpty()) {
+                result = result && codeBase.matches(unsignedAppletActionEntry.getCodeBase().getRegEx());
+            }
+            if (archives != null) {
+                List<String> saved = unsignedAppletActionEntry.getArchives();
+                if (saved == null || saved.isEmpty()) {
+                    return result;
+                }
+                result = result && compareArchives(archives, saved);
+            }
+            return result;
+        } catch (PatternSyntaxException ex) {
+            OutputController.getLogger().log(OutputController.Level.WARNING_ALL, ex);
+            return false;
         }
-        return result;
     }
 
     @Override
@@ -228,17 +264,58 @@ public class UnsignedAppletActionStorageImpl extends LockingReaderWriter impleme
     }
 
     @Override
-    public UnsignedAppletActionEntry getMatchingItemByDocumentBase(String documentBase) {
-        return getMatchingItem(documentBase, null, null);
+    public UnsignedAppletActionEntry getMatchingItemByDocumentBase(String documentBase, Integer id) {
+        return getMatchingItem(documentBase, null, null, id);
     }
 
     @Override
-    public UnsignedAppletActionEntry getMatchingItemByCodeBase(String codeBase) {
-        return getMatchingItem(null, codeBase, null);
+    public UnsignedAppletActionEntry getMatchingItemByCodeBase(String codeBase, Integer id) {
+        return getMatchingItem(null, codeBase, null, id);
     }
 
     @Override
-    public UnsignedAppletActionEntry getMatchingItemByBases(String documentBase, String codeBase) {
-        return getMatchingItem(documentBase, codeBase, null);
+    public UnsignedAppletActionEntry getMatchingItemByBases(String documentBase, String codeBase, Integer id) {
+        return getMatchingItem(documentBase, codeBase, null, id);
+    }
+
+    private void actOnVersionLoad() {
+        String versionS = readVersion.split("\\s+")[1];
+        int version = 0;
+        try{
+            version = Integer.valueOf(versionS);
+        } catch (NumberFormatException e){
+            OutputController.getLogger().log(e);
+        }
+        if (version < 2){
+            OutputController.getLogger().log("Stoping laoding of vulnereable "+getBackingFile().getAbsolutePath()+". Will be replaced");
+            loadingDisabled = true;
+            backupOldFile(version, getBackingFile());
+        } else {
+            loadingDisabled = false;
+        }
+    }
+
+    private void actOnNoVersionLoad() {
+        readVersion=versionPreffix+"0";
+        actOnVersionLoad();
+    }
+
+    private void backupOldFile(int version, File backingFile) {
+        try {
+            File backup = new File(backingFile.getAbsolutePath() + "." + version + BACKUP_SUFFIX);
+            OutputController.getLogger().log(OutputController.Level.MESSAGE_ALL, "backuping " + getBackingFile().getAbsolutePath() + " as " + backup.getName());
+            String warning = "- !WARNING! this is automated copy of old " + backingFile.getName() + " which was removed/replaced. Before you blindly copy those items back, please note, that this file might be modified without your approval by evil attacker. It is advised to not return below lines, or verify them before returning";
+            String s = FileUtils.loadFileAsString(backingFile);
+            s.replaceFirst("\\s*", "");
+            if (s.startsWith(versionPreffix)) {
+                s = s.replaceFirst("\n", " " + warning + "\n");
+            } else {
+                s = readVersion + " " + warning + "\n" + s;
+            }
+            FileUtils.saveFile(s, backup);
+        } catch (Exception ex) {
+            OutputController.getLogger().log(OutputController.Level.WARNING_ALL, "Error during backuping: " + ex.getMessage());
+            OutputController.getLogger().log(ex);
+        }
     }
 }

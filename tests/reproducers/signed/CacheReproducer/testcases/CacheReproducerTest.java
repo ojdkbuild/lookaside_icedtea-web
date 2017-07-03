@@ -44,13 +44,12 @@ import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.util.Arrays;
 import java.util.List;
-import java.util.PropertyResourceBundle;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import net.sourceforge.jnlp.ServerAccess;
 import net.sourceforge.jnlp.ProcessResult;
 import net.sourceforge.jnlp.annotations.KnownToFail;
-import net.sourceforge.jnlp.config.Defaults;
+import net.sourceforge.jnlp.config.PathsAndFiles;
 import net.sourceforge.jnlp.tools.MessageProperties;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -60,7 +59,6 @@ import org.junit.Test;
 public class CacheReproducerTest {
 
     private static final ServerAccess server = new ServerAccess();
-    private static final List<String> clear = Arrays.asList(new String[]{server.getJavawsLocation(), "-Xclearcache",  ServerAccess.HEADLES_OPTION});
     private static final List<String> trustedVerboses = Arrays.asList(new String[]{"-Xtrustall", ServerAccess.HEADLES_OPTION,"-verbose"});
     private static final List<String> verbosed = Arrays.asList(new String[]{"-verbose", ServerAccess.HEADLES_OPTION});
 
@@ -70,13 +68,12 @@ public class CacheReproducerTest {
     private static final Pattern corruptPatern = Pattern.compile(corruptRegex);
     private static final String corruptString = "156dsf1562kd5";
 
-    private static final File icedteaCache = new File(Defaults.USER_CACHE_HOME, "cache");
-    private static final File icedteaCacheFile = new File(icedteaCache, "recently_used");
-    private static final File netxLock = new File(System.getProperty("java.io.tmpdir"),
-            System.getProperty("user.name") + File.separator +
-            "netx" + File.separator +
-            "locks" + File.separator +
-            "netx_running");
+    //recently.used is always here
+    private static final int PERMANENT_FILES = 1;
+    
+    private static final File icedteaCache = PathsAndFiles.CACHE_DIR.getFile();
+    private static final File icedteaCacheFile = PathsAndFiles.getRecentlyUsedFile().getFile();
+    private static final File netxLock = PathsAndFiles.MAIN_LOCK.getFile();
 
     String testS = "#netx file\n"
                + "#Mon Dec 12 16:20:46 CET 2011\n"
@@ -142,7 +139,7 @@ public class CacheReproducerTest {
     private void assertCacheIsNotEmpty() {
         Assert.assertTrue("icedtea cache " + icedteaCache.getAbsolutePath() + " should exist some any run", icedteaCache.exists());
         Assert.assertTrue("icedtea cache file " + icedteaCacheFile.getAbsolutePath() + " should exist some any run", icedteaCacheFile.exists());
-        Assert.assertTrue("icedtea cache file " + icedteaCacheFile.getAbsolutePath() + " should not be empty", icedteaCacheFile.length() > 0);
+        Assert.assertTrue("icedtea cache file " + icedteaCacheFile.getAbsolutePath() + " should not be empty", icedteaCacheFile.length() > PERMANENT_FILES);
     }
 
     /**
@@ -346,7 +343,7 @@ public class CacheReproducerTest {
 
         }
         tryToClearcache();
-        Assert.assertFalse("icedtea cache " + icedteaCache.getAbsolutePath() + " should not exist after clearing", icedteaCache.exists());
+        Assert.assertTrue("icedtea cache " + icedteaCache.getAbsolutePath() + " should be empty after clearing", icedteaCache.listFiles().length == PERMANENT_FILES);
     }
 
     private static String loadFile(File f) throws FileNotFoundException, UnsupportedEncodingException, IOException {
@@ -476,7 +473,7 @@ public class CacheReproducerTest {
     }
 
     private static ProcessResult tryToClearcache() throws Exception {
-        ProcessResult pr1 = ServerAccess.executeProcess(clear);
+        ProcessResult pr1 = server.executeJavawsClearCache();
         return pr1;
     }
 }

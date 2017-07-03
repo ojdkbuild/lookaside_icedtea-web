@@ -1,4 +1,4 @@
-/* RemoteApplicationTests.java
+/* 
  Copyright (C) 2011 Red Hat, Inc.
 
  This file is part of IcedTea.
@@ -40,9 +40,11 @@ import java.util.Collections;
 import java.util.List;
 import net.sourceforge.jnlp.ProcessResult;
 import net.sourceforge.jnlp.ServerAccess;
-import net.sourceforge.jnlp.annotations.KnownToFail;
 import net.sourceforge.jnlp.annotations.NeedsDisplay;
 import net.sourceforge.jnlp.annotations.Remote;
+
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 @Remote
@@ -51,6 +53,19 @@ public class RemoteApplicationTests {
     private static ServerAccess server = new ServerAccess();
     private final List<String> l = Collections.unmodifiableList(Arrays.asList(new String[]{"-Xtrustall"}));
     private final List<String> ll = Collections.unmodifiableList(Arrays.asList(new String[]{"-Xtrustall", "-Xnofork"}));
+
+    private static final long defaultTimeout = server.PROCESS_TIMEOUT;
+
+    @BeforeClass
+    public static void setup() {
+        //Remote applications need to download files and take a little longer (20s)
+        server.PROCESS_TIMEOUT = 20 * 1000l;
+    }
+
+    @AfterClass
+    public static void teardown() {
+        server.PROCESS_TIMEOUT = defaultTimeout;
+    }
 
     @Test
     @NeedsDisplay
@@ -106,7 +121,7 @@ public class RemoteApplicationTests {
     @NeedsDisplay
     public void orawebCernChRemoteTest() throws Exception {
         RemoteApplicationSettings.RemoteApplicationTestcaseSettings settings = new RemoteApplicationSettings.OrawebCernCh();
-        ProcessResult pr = server.executeJavawsUponUrl(ll, settings.getUrl());
+        ProcessResult pr = server.executeJavawsUponUrl(settings.modifyParams(ll), settings.getUrl());
         settings.evaluate(pr);
     }
 

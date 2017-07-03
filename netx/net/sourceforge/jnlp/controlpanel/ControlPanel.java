@@ -53,9 +53,9 @@ import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
 import net.sourceforge.jnlp.config.DeploymentConfiguration;
+import net.sourceforge.jnlp.config.PathsAndFiles;
 import net.sourceforge.jnlp.controlpanel.JVMPanel.JvmValidationResult;
 import net.sourceforge.jnlp.runtime.Translator;
-import net.sourceforge.jnlp.security.KeyStores;
 import net.sourceforge.jnlp.security.viewer.CertificatePane;
 import net.sourceforge.jnlp.util.ImageResources;
 import net.sourceforge.jnlp.util.logging.OutputController;
@@ -169,7 +169,7 @@ public class ControlPanel extends JFrame {
             return JOptionPane.showConfirmDialog(ControlPanel.this,
                     "<html>"+Translator.R("CPJVMNotokMessage1", s)+"<br/>"
                     + validationResult.formattedText+"<br/>"
-                    + Translator.R("CPJVMNotokMessage2", DeploymentConfiguration.KEY_JRE_DIR, DeploymentConfiguration.USER_DEPLOYMENT_PROPERTIES_FILE)+"</html>",
+                    + Translator.R("CPJVMNotokMessage2", DeploymentConfiguration.KEY_JRE_DIR, PathsAndFiles.USER_DEPLOYMENT_FILE.getFullPath(config))+"</html>",
                     Translator.R("CPJVMconfirmInvalidJdkTitle"),JOptionPane.OK_CANCEL_OPTION);
         }
         return JOptionPane.OK_OPTION;
@@ -264,7 +264,7 @@ public class ControlPanel extends JFrame {
                 new SettingsPanel(Translator.R("CPTabSecurity"), createSecuritySettingsPanel()),
                 //todo refactor to work with tmp file and apply as asu designed it
                 new SettingsPanel(Translator.R("CPTabPolicy"), createPolicySettingsPanel()),
-                new SettingsPanel(Translator.R("APPEXTSECControlPanelExtendedAppletSecurityTitle"), new UnsignedAppletsTrustingListPanel(DeploymentConfiguration.getAppletTrustGlobalSettingsPath(), DeploymentConfiguration.getAppletTrustUserSettingsPath(), this.config))
+                new SettingsPanel(Translator.R("APPEXTSECControlPanelExtendedAppletSecurityTitle"), new UnsignedAppletsTrustingListPanel(PathsAndFiles.APPLET_TRUST_SETTINGS_SYS.getFile(), PathsAndFiles.APPLET_TRUST_SETTINGS_USER.getFile(), this.config))
         };
 
         // Add panels.
@@ -291,12 +291,13 @@ public class ControlPanel extends JFrame {
             settingsPanel.add(p, panel.toString());
         }
 
-        final JList settingsList = new JList(panels);
+        final JList<SettingsPanel> settingsList = new JList<>(panels);
         settingsList.addListSelectionListener(new ListSelectionListener() {
             @Override
             public void valueChanged(ListSelectionEvent e) {
-                JList list = (JList) e.getSource();
-                SettingsPanel panel = (SettingsPanel) list.getSelectedValue();
+                @SuppressWarnings("unchecked")
+                JList<SettingsPanel> list = (JList<SettingsPanel>) e.getSource();
+                SettingsPanel panel = list.getSelectedValue();
                 CardLayout cl = (CardLayout) settingsPanel.getLayout();
                 cl.show(settingsPanel, panel.toString());
             }
@@ -427,7 +428,6 @@ public class ControlPanel extends JFrame {
             // ignore; not a big deal
         }
 
-        KeyStores.setConfiguration(config);
 
         SwingUtilities.invokeLater(new Runnable() {
             @Override

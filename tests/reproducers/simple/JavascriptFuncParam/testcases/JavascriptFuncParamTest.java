@@ -49,7 +49,7 @@ import org.junit.Test;
 
 public class JavascriptFuncParamTest extends BrowserTest {
 
-    public final boolean doNotRunInOpera = true;
+    public final boolean doNotRunInOpera = false;
 
     private final String initStr = "JToJSFuncParam applet initialized.";
     private final String afterStr = "afterTests";
@@ -230,5 +230,4 @@ public class JavascriptFuncParamTest extends BrowserTest {
     public void AppletJToJSFuncParam_JSObject_Test() throws Exception {
         javaToJSFuncParamTest("jjsCallJSObjectParam");
     }
-
 }

@@ -1,10 +1,23 @@
+# Functions to compose path/classpath
+
+EMPTY :=
+SPACE := $(EMPTY) $(EMPTY)
+define joinsegments
+$(subst $(SPACE),:,$(strip $1))
+endef
+define composeclasspath
+$(if $(call joinsegments,$1),-classpath $(call joinsegments,$1),)
+endef
+
 # Source directories
 
 export TOP_BUILD_DIR = $(abs_top_builddir)
 
 export NETX_DIR = $(abs_top_builddir)/netx.build
+export DOCS_DIR=$(TOP_BUILD_DIR)/icedtea-web-docs/$(FULL_VERSION)
 export NETX_SRCDIR = $(abs_top_srcdir)/netx
 export NETX_RESOURCE_DIR=$(NETX_SRCDIR)/net/sourceforge/jnlp/resources
+export ICONS_DEST_DIR=$(DESTDIR)$(datadir)/pixmaps
 
 export REPORT_STYLES_DIRNAME=report-styles
 
@@ -39,14 +52,13 @@ export EXPORTED_TEST_CERT_SUFFIX=crt
 export TEST_CERT_ALIAS=icedteaweb
 export PUBLIC_KEYSTORE_STUB=icedtea-web/security/trusted.certs
 export PUBLIC_KEYSTORE_PASS=changeit
-export SOFTKILLER=softkiller
 
 export JUNIT_RUNNER_JAR=$(abs_top_builddir)/junit-runner.jar
 export UNIT_CLASS_NAMES = $(abs_top_builddir)/unit_class_names
 export REPRODUCERS_CLASS_NAMES = $(abs_top_builddir)/reproducers_class_names
 export REPRODUCERS_CLASS_WHITELIST = $(abs_top_srcdir)/netx-dist-tests-whitelist
-export EMMA_JAVA_ARGS=-Xmx2G
-export EMMA_MODIFIED_FILES=tests-output.xml ServerAccess-logs.xml stdout.log stderr.log all.log
+export COVERAGE_JAVA_ARGS=-Xmx2G
+export COVERAGE_MODIFIED_FILES=tests-output.xml ServerAccess-logs.xml stdout.log stderr.log all.log
 export EMMA_BACKUP_SUFFIX=_noEmma
 export EMMA_SUFFIX=_withEmma
 export META_MANIFEST = META-INF/MANIFEST.MF
@@ -64,14 +76,15 @@ export JACOCO_AGENTRT=org.jacoco.agent.rt.jar
 export JACOCO_CORE=org.jacoco.core.jar
 export JACOCO_JAVAWS_RESULTS=$(TEST_EXTENSIONS_DIR)/jacoco_javaws.exec
 export JACOCO_PLUGIN_RESULTS=$(TEST_EXTENSIONS_DIR)/jacoco_plugin.exec
-export JACOCO_CLASSPATH=$(JACOCO_PATH)/$(JACOCO_CORE):$(JACOCO_PATH)/$(JACOCO_AGENT):$(JACOCO_PATH)/$(JACOCO_REPORT):$(JACOCO_PATH)/$(JACOCO_AGENTRT):$(JACOCO_PATH)/$(JACOCO_ANT):$(ASM_JAR)
+# space separated fragments for composeclasspath
+export JACOCO_CLASSPATH=$(JACOCO_PATH)/$(JACOCO_CORE) $(JACOCO_PATH)/$(JACOCO_AGENT) $(JACOCO_PATH)/$(JACOCO_REPORT) $(JACOCO_PATH)/$(JACOCO_AGENTRT) $(JACOCO_PATH)/$(JACOCO_ANT) $(ASM_JAR)
 export JACOCO_AGENT_SWITCH_BODY=-javaagent:$(JACOCO_PATH)/$(JACOCO_AGENTRT)
 export JACOCO_BASE_EXCLUDE=org.junit.*:junit.*
 export JACOCO_ADVANCED_EXCLUDE=:*jacoco*:java.lang.*:java.reflect.*:java.util.*:sun.reflect.*
 export JACOCO_AGENT_SWITCH="$(JACOCO_AGENT_SWITCH_BODY)=excludes=$(JACOCO_BASE_EXCLUDE)$(JACOCO_ADVANCED_EXCLUDE),inclbootstrapclasses=true"
 export JACOCO_AGENT_JAVAWS_SWITCH=\"$(JACOCO_AGENT_SWITCH),destfile=$(JACOCO_JAVAWS_RESULTS)\"
 export JACOCO_AGENT_PLUGIN_SWITCH=\"$(JACOCO_AGENT_SWITCH),destfile=$(JACOCO_PLUGIN_RESULTS)\"
-export JACOCO_OPERATOR_EXEC=$(BOOT_DIR)/bin/java $(EMMA_JAVA_ARGS) -cp $(JACOCO_OPERATOR_DIR):$(JACOCO_CLASSPATH):. org.jacoco.operator.Main
+export JACOCO_OPERATOR_EXEC=$(SYSTEM_JRE_DIR)/bin/java $(COVERAGE_JAVA_ARGS) -cp $(call joinsegments, $(JACOCO_OPERATOR_DIR) $(JACOCO_CLASSPATH) .) org.jacoco.operator.Main
 
 # linking variables
 export PLUGIN_LINK_NAME=libjavaplugin.so
@@ -93,21 +106,26 @@ export MOZILLA_FAMILY_TEST= "$(FIREFOX)" != "" -o "$(CHROMIUM)" != "" -o "$(CHRO
 
 # Build directories
 
-export BOOT_DIR = $(abs_top_builddir)/bootstrap/jdk1.6.0
+# note this is *space* separated list, as composeclasspath is called on them in classpath usage
+JUNIT_RUNTIME:=$(JUNIT_JAR) $(HAMCREST_JAR)
 
-if WITH_RHINO
-  RHINO_RUNTIME=:$(RHINO_JAR)
-else
-  RHINO_RUNTIME=
+# support for javaws -html needs plugin.jar on classpath. rest of javaws works of course without it.
+if ENABLE_PLUGIN
+  PLUGIN_JAR=$(datadir)/$(PACKAGE_NAME)/plugin.jar
 endif
 
-export RUNTIME = $(BOOT_DIR)/jre/lib/rt.jar:$(BOOT_DIR)/jre/lib/jsse.jar$(RHINO_RUNTIME):$(BOOT_DIR)/jre/lib/resources.jar
+# Conditional defintions
+if HAVE_TAGSOUP
+  NETX_EXCLUDE_SRCS=
+else
+  NETX_EXCLUDE_SRCS=net.sourceforge.jnlp.MalformedXMLParser.java
+endif
 
 # Flags
 export IT_CFLAGS=$(CFLAGS) $(ARCHFLAG)
 export IT_JAVAC_SETTINGS=-g -encoding utf-8 $(JAVACFLAGS) $(MEMORY_LIMIT) $(PREFER_SOURCE)
-export IT_LANGUAGE_SOURCE_VERSION=6
-export IT_CLASS_TARGET_VERSION=6
+export IT_LANGUAGE_SOURCE_VERSION=7
+export IT_CLASS_TARGET_VERSION=7
 export IT_JAVACFLAGS=$(IT_JAVAC_SETTINGS) -source $(IT_LANGUAGE_SOURCE_VERSION) -target $(IT_CLASS_TARGET_VERSION)
 
 #
@@ -117,9 +135,15 @@ export IT_JAVACFLAGS=$(IT_JAVAC_SETTINGS) -source $(IT_LANGUAGE_SOURCE_VERSION) 
 #    IllegalAccessException
 #  - we want full privileges
 #
-export LAUNCHER_BOOTCLASSPATH="-Xbootclasspath/a:$(datadir)/$(PACKAGE_NAME)/netx.jar$(RHINO_RUNTIME):$(TAGSOUP_JAR)"
-export PLUGIN_BOOTCLASSPATH='"-Xbootclasspath/a:$(datadir)/$(PACKAGE_NAME)/netx.jar:$(datadir)/$(PACKAGE_NAME)/plugin.jar$(RHINO_RUNTIME):$(TAGSOUP_JAR)"'
-export PLUGIN_COVERAGE_BOOTCLASSPATH='"-Xbootclasspath/a:$(datadir)/$(PACKAGE_NAME)/netx.jar:$(datadir)/$(PACKAGE_NAME)/plugin.jar$(RHINO_RUNTIME):$(JACOCO_CLASSPATH):$(TAGSOUP_JAR)"'
+export UNIFIED_CLASSPATH_SEGMENTS=$(datadir)/$(PACKAGE_NAME)/netx.jar $(PLUGIN_JAR) $(RHINO_JAR) $(TAGSOUP_JAR)
+export UNIFIED_JACOCO_CLASSPATH_SEGMENTS=$(UNIFIED_CLASSPATH_SEGMENTS) $(JACOCO_CLASSPATH)
+export UNIFIED_CLASSPATH=$(call joinsegments, $(UNIFIED_CLASSPATH_SEGMENTS))
+export UNIFIED_JACOCO_CLASSPATH=$(call joinsegments, $(UNIFIED_JACOCO_CLASSPATH_SEGMENTS))
+export UNIFIED_BOOTCLASSPATH=-Xbootclasspath/a:$(UNIFIED_CLASSPATH)
+# note javaws, itwebsettings and policyeditor (== LAUNCHER_BOOTCLASSPATH) must be always able to compile and run *without* plugin
+export LAUNCHER_BOOTCLASSPATH="$(UNIFIED_BOOTCLASSPATH)"
+export PLUGIN_BOOTCLASSPATH='"$(UNIFIED_BOOTCLASSPATH)"'
+export PLUGIN_COVERAGE_BOOTCLASSPATH='"-Xbootclasspath/a:$(UNIFIED_JACOCO_CLASSPATH)"'
 
 # Fake update version to work with the Deployment Toolkit script used by Oracle
 # http://download.oracle.com/javase/tutorial/deployment/deploymentInDepth/depltoolkit_index.html
@@ -137,15 +161,6 @@ export NETX_PKGS = javax.jnlp net.sourceforge.nanoxml net.sourceforge.jnlp \
 	net.sourceforge.jnlp.security.viewer net.sourceforge.jnlp.services \
 	net.sourceforge.jnlp.tools net.sourceforge.jnlp.util \
 	sun.applet
-
-NETX_EXCLUDE_SRCS=
-
-# Conditional defintions
-if HAVE_TAGSOUP
-NETX_CLASSPATH_ARG=-classpath $(TAGSOUP_JAR)
-else
-NETX_EXCLUDE_SRCS+=net.sourceforge.jnlp.MalformedXMLParser.java
-endif
 
 if ENABLE_PLUGIN
 export ICEDTEAPLUGIN_CLEAN = clean-IcedTeaPlugin
@@ -177,6 +192,18 @@ JAVADOC_MEM_OPTS=-J-Xmx1024m -J-Xms128m
 endif
 endif
 
+# if you create netx-dist-tests-whitelist in top directory, and place "expr match" regexes
+# (separate by one of IFS's values (most commonly space)) into it, you can control reproducers which compile or/xor run.
+# if you need declare space in your regex, use \s as described in "expr match" documentation
+ECHO_WHITELIST=if [ -f $(REPRODUCERS_CLASS_WHITELIST) ] ; then cat $(REPRODUCERS_CLASS_WHITELIST) ; else echo ".*" ; fi
+if ENABLE_WHITELIST
+COMPILE_WHITELIST_FILTER=`$(ECHO_WHITELIST)`
+RUN_WHITELIST_FILTER=.*
+else
+COMPILE_WHITELIST_FILTER=.*
+RUN_WHITELIST_FILTER=`$(ECHO_WHITELIST)`
+endif
+
 if WITH_RHINO
   RHINO_TESTS=stamps/check-pac-functions.stamp
 else
@@ -192,8 +219,8 @@ endif
 
 export PLUGIN_VERSION = IcedTea-Web $(FULL_VERSION)
 
-export EXTRA_DIST = $(top_srcdir)/netx $(top_srcdir)/plugin javaws.png javaws.desktop.in policyeditor.desktop.in  \
- itweb-settings.desktop.in launcher $(top_srcdir)/tests html-gen.sh netx-dist-tests-whitelist NEW_LINE_IFS
+export EXTRA_DIST = $(top_srcdir)/netx $(top_srcdir)/plugin javaws.png javaws.desktop.in policyeditor.desktop.in icedteaweb-completion \
+ itweb-settings.desktop.in launcher $(top_srcdir)/tests html-gen.sh NEW_LINE_IFS
 
 # reproducers `D`shortcuts
 export DTEST_SERVER=-Dtest.server.dir=$(REPRODUCERS_TESTS_SERVER_DEPLOYDIR)
@@ -203,7 +230,11 @@ export REPRODUCERS_DPARAMETERS= $(DTEST_SERVER) $(DJAVAWS_BUILD) $(DBROWSERS) $(
 # end of `D`shortcuts
 
 #exported autoconf copies
-export EXPORTED_JAVAC=$(BOOT_DIR)/bin/javac
+export EXPORTED_JAVAC=$(SYSTEM_JDK_DIR)/bin/javac
+export EXPORTED_JAR=$(SYSTEM_JDK_DIR)/bin/jar
+export EXPORTED_KEYTOOL=$(SYSTEM_JDK_DIR)/bin/keytool
+export EXPORTED_JARSIGNER=$(SYSTEM_JDK_DIR)/bin/jarsigner
+export EXPORTED_PACK200=$(SYSTEM_JDK_DIR)/bin/pack200
 #end of exported autoconf copies
 
 # binary names
@@ -232,33 +263,33 @@ all-local: stamps/netx-dist.stamp stamps/plugin.stamp launcher.build/$(javaws) \
 check-local: $(RHINO_TESTS) $(JUNIT_TESTS)
 
 clean-local: clean-netx clean-plugin clean-liveconnect \
- clean-native-ecj clean-launchers clean-desktop-files clean-docs clean-tests clean-bootstrap-directory
+ clean-native-ecj clean-launchers clean-desktop-files clean-docs clean-generated-docs clean-tests clean-bootstrap-directory
 	if [ -e stamps ] ; then \
 	  rmdir stamps ; \
 	fi
 
 .PHONY: clean-IcedTeaPlugin clean-add-netx clean-add-netx-debug clean-add-plugin clean-add-plugin-debug \
- clean-bootstrap-directory clean-native-ecj clean-desktop-files clean-netx-docs clean-docs clean-plugin-docs \
+ clean-bootstrap-directory clean-native-ecj clean-desktop-files clean-netx-docs clean-docs clean-plugin-docs clean-generated-docs \
  clean-tests check-local clean-launchers stamps/check-pac-functions.stamp stamps/run-netx-unit-tests.stamp clean-netx-tests \
  clean-junit-runner clean-netx-unit-tests
 
 install-exec-local:
-	${mkinstalldirs} $(DESTDIR)$(bindir) $(DESTDIR)$(datadir)/$(PACKAGE_NAME)/ $(DESTDIR)$(libdir)
+	${mkinstalldirs} $(DESTDIR)$(bindir) $(DESTDIR)$(datadir)/$(PACKAGE_NAME)/ $(DESTDIR)$(libdir) $(ICONS_DEST_DIR)
 if ENABLE_PLUGIN
 	${INSTALL_PROGRAM} $(PLUGIN_DIR)/$(BUILT_PLUGIN_LIBRARY) $(DESTDIR)$(libdir)
 	${INSTALL_DATA} $(abs_top_builddir)/liveconnect/lib/classes.jar $(DESTDIR)$(datadir)/$(PACKAGE_NAME)/plugin.jar
 endif
 	${INSTALL_DATA} $(NETX_DIR)/lib/classes.jar $(DESTDIR)$(datadir)/$(PACKAGE_NAME)/netx.jar
 	${INSTALL_DATA} $(NETX_SRCDIR)/javaws_splash.png $(DESTDIR)$(datadir)/$(PACKAGE_NAME)/javaws_splash.png
+	${INSTALL_DATA} $(abs_top_srcdir)/javaws.png $(ICONS_DEST_DIR)/
 	${INSTALL_PROGRAM} launcher.build/$(javaws) $(DESTDIR)$(bindir)
 	${INSTALL_PROGRAM} launcher.build/$(itweb_settings) $(DESTDIR)$(bindir)
 	${INSTALL_PROGRAM} launcher.build/$(policyeditor) $(DESTDIR)$(bindir)
 
+# all generated manpages are installed in swarm
 install-data-local:
-	${mkinstalldirs} -d $(DESTDIR)$(mandir)/man1
-	${INSTALL_DATA} $(NETX_SRCDIR)/javaws.1 $(DESTDIR)$(mandir)/man1
-	${INSTALL_DATA} $(NETX_SRCDIR)/itweb-settings.1 $(DESTDIR)$(mandir)/man1
-	${INSTALL_DATA} $(NETX_SRCDIR)/policyeditor.1 $(DESTDIR)$(mandir)/man1
+	${mkinstalldirs} -d $(DESTDIR)$(mandir)
+	cp -r "$(DOCS_DIR)/man/"* $(DESTDIR)$(mandir)/
 if ENABLE_DOCS
 	${mkinstalldirs} $(DESTDIR)$(htmldir)
 	(cd ${abs_top_builddir}/docs/netx; \
@@ -275,13 +306,20 @@ if ENABLE_PLUGIN
 endif
 endif
 
+# all generated manpages must be removed one by one
 uninstall-local:
 	rm -f $(DESTDIR)$(libdir)/$(BUILT_PLUGIN_LIBRARY)
 	rm -f $(DESTDIR)$(datadir)/$(PACKAGE_NAME)/plugin.jar
 	rm -f $(DESTDIR)$(datadir)/$(PACKAGE_NAME)/netx.jar
-	rm -f $(DESTDIR)$(mandir)/man1/javaws.1
-	rm -f $(DESTDIR)$(mandir)/man1/itweb-settings.1
-	rm -f $(DESTDIR)$(mandir)/man1/policyeditor.1
+	rm -r $(DESTDIR)$(datadir)/$(PACKAGE_NAME)/javaws_splash.png
+	rm -r $(ICONS_DEST_DIR)/javaws.png
+	KNOWN_MANS="icedtea-web.1  icedtea-web-plugin.1  itweb-settings.1  javaws.1  policyeditor.1" ; \
+	KNOWN_DIRS="man1 de/man1 pl/man1 cs/man1" ; \
+	for file in $$KNOWN_MANS ; do \
+	  for dir in $$KNOWN_DIRS ; do \
+	    rm -f $(DESTDIR)$(mandir)/$$dir/$$file ; \
+	  done ; \
+	done
 	rm -f $(DESTDIR)$(bindir)/$(javaws)
 	rm -f $(DESTDIR)$(bindir)/$(itweb_settings)
 	rm -f $(DESTDIR)$(bindir)/$(policyeditor)
@@ -310,6 +348,8 @@ $(PLUGIN_DIR)/%.o: $(PLUGIN_SRCDIR)/%.cc
 	   $(DEFS) $(VERSION_DEFS) \
 	  -DJDK_UPDATE_VERSION="\"$(JDK_UPDATE_VERSION)\"" \
 	  -DPLUGIN_NAME="\"IcedTea-Web Plugin\"" \
+	  -DJAVAWS_BIN="\"$(bindir)/$(javaws)\"" \
+	  -DJAVAWS_NAME="\"$(javaws)\"" \
 	  -DPLUGIN_VERSION="\"$(PLUGIN_VERSION)\"" \
 	  -DPACKAGE_URL="\"$(PACKAGE_URL)\"" \
 	  -DMOZILLA_VERSION_COLLAPSED="$(MOZILLA_VERSION_COLLAPSED)" \
@@ -360,6 +400,8 @@ stamps/cpp-unit-tests-compile.stamp: $(CPP_UNITTEST_FRAMEWORK_LIB) $(CPP_UNITTES
 	   $(DEFS) $(VERSION_DEFS) \
 	  -DJDK_UPDATE_VERSION="\"$(JDK_UPDATE_VERSION)\"" \
 	  -DPLUGIN_NAME="\"IcedTea-Web Plugin\"" \
+	  -DJAVAWS_BIN="\"$(bindir)/$(javaws)\"" \
+	  -DJAVAWS_NAME="\"$(javaws)\"" \
 	  -DPLUGIN_VERSION="\"$(PLUGIN_VERSION)\"" \
 	  -DPACKAGE_URL="\"$(PACKAGE_URL)\"" \
 	  -DMOZILLA_VERSION_COLLAPSED="$(MOZILLA_VERSION_COLLAPSED)" \
@@ -424,10 +466,9 @@ liveconnect-source-files.txt:
 stamps/liveconnect.stamp: liveconnect-source-files.txt stamps/netx.stamp
 	if test "x${LIVECONNECT_DIR}" != x; then \
 	  mkdir -p $(abs_top_builddir)/liveconnect && \
-	  $(BOOT_DIR)/bin/javac $(IT_JAVACFLAGS) \
+	  $(SYSTEM_JDK_DIR)/bin/javac $(IT_JAVACFLAGS) \
 	      -d $(abs_top_builddir)/liveconnect \
-	      -bootclasspath $(NETX_DIR):$(RUNTIME) \
-	      $(NETX_CLASSPATH_ARG) \
+	      $(call composeclasspath,$(NETX_DIR) $(TAGSOUP_JAR) $(RHINO_JAR)) \
 	      -sourcepath $(LIVECONNECT_SRCS) \
 	      @liveconnect-source-files.txt ; \
 	fi
@@ -438,7 +479,7 @@ stamps/liveconnect-dist.stamp: stamps/liveconnect.stamp
 	if test "x${LIVECONNECT_DIR}" != x; then \
 	  (cd $(abs_top_builddir)/liveconnect ; \
 	   mkdir -p lib ; \
-	   $(BOOT_DIR)/bin/jar cf lib/classes.jar $(LIVECONNECT_DIR) ; \
+	   $(SYSTEM_JDK_DIR)/bin/jar cf lib/classes.jar $(LIVECONNECT_DIR) ; \
 	   cp -pPR $(SRC_DIR_LINK) $(LIVECONNECT_SRCS) src; \
 	   find src -type f -exec chmod 640 '{}' ';' -o -type d -exec chmod 750 '{}' ';'; \
 	   cd src ; \
@@ -466,29 +507,61 @@ netx-source-files.txt:
 if !WITH_RHINO
 	sed -i '/RhinoBasedPacEvaluator/ d' $@
 endif
-if !HAVE_JAVA7
-	sed -i '/VariableX509TrustManagerJDK7/ d' $@
-endif
+
+stamps/generate-docs.stamp: stamps/netx.stamp
+	mkdir -p "$(DOCS_DIR)" ; \
+	HTML_DOCS_TARGET_DIR="$(DOCS_DIR)/html"  ; \
+	PLAIN_DOCS_TARGET_DIR="$(DOCS_DIR)/plain" ; \
+	MAN_DOCS_TARGET_DIR="$(DOCS_DIR)/man"  ; \
+	mkdir "$$HTML_DOCS_TARGET_DIR" ; \
+	mkdir "$$PLAIN_DOCS_TARGET_DIR" ; \
+	mkdir "$$MAN_DOCS_TARGET_DIR" ; \
+	HTML_DOCS_INDEX="$$HTML_DOCS_TARGET_DIR/index.html" ; \
+	TP_COMMAND="$(SYSTEM_JRE_DIR)/bin/java -cp $(NETX_DIR) net.sourceforge.jnlp.util.docprovider.TextsProvider" ; \
+	TP_TAIL="false $(FULL_VERSION)" ; \
+	LANG_BACKUP=$$LANG ; \
+	echo "<html><head><title>$(PLUGIN_VERSION)</title></head>" > "$$HTML_DOCS_INDEX" ; \
+	echo "<body><h3>$(PLUGIN_VERSION) docs:</h3>"  >> $$HTML_DOCS_INDEX ; \
+	for LANG_ID in en_US.UTF-8 cs_CZ.UTF-8 pl_PL.UTF-8 de_DE.UTF-8 ;  do \
+	  ID=`echo "$$LANG_ID" | head -c 2` ; \
+	  ENCOD=`echo "$$LANG_ID" | tail -c 6 -` ; \
+	  export LANG=$$LANG_ID; \
+	  mkdir "$$HTML_DOCS_TARGET_DIR/$$ID" ; \
+	  echo "<li><a href='$$ID/icedtea-web.html'>$$LANG_ID</a></li>"  >> "$$HTML_DOCS_INDEX" ; \
+	  $$TP_COMMAND html "$$HTML_DOCS_TARGET_DIR/$$ID" $$TP_TAIL ; \
+	  mkdir "$$PLAIN_DOCS_TARGET_DIR/$$ID" ; \
+	  $$TP_COMMAND plain "$$PLAIN_DOCS_TARGET_DIR/$$ID" 160 $$TP_TAIL; \
+	  if [ $$ID == "en" ] ; then \
+	    MAN_DESC="$$MAN_DOCS_TARGET_DIR/man1" ; \
+	  else \
+	    MAN_DESC="$$MAN_DOCS_TARGET_DIR/$$ID/man1" ; \
+	  fi ; \
+	  mkdir -p "$$MAN_DESC" ; \
+	  $$TP_COMMAND man $$ENCOD "$$MAN_DESC" $$TP_TAIL ; \
+	  $$TP_COMMAND htmlIntro "$(NETX_DIR)/net/sourceforge/jnlp/resources/about_$$ID.html" $$TP_TAIL; \
+	done ; \
+	export LANG=$$LANG_BACKUP ; \
+	echo "</body></html>"  >> $$HTML_DOCS_INDEX ; \
+	touch $@
 
 stamps/netx-html-gen.stamp:
 	(cd $$NETX_SRCDIR/..; \
 	mkdir -p html-gen; \
 	cp AUTHORS NEWS COPYING ChangeLog html-gen/; \
 	export HTML_GEN_DEBUG=true; \
-	bash html-gen.sh 22; \
+	bash html-gen.sh 40; \
 	unset HTML_GEN_DEBUG)
 	${INSTALL_DATA} $(NETX_SRCDIR)/../html-gen/*.html $(NETX_RESOURCE_DIR)
 	rm -r $(NETX_SRCDIR)/../html-gen/
 	mkdir -p stamps
 	touch $@
 
-stamps/netx.stamp: netx-source-files.txt stamps/bootstrap-directory.stamp stamps/netx-html-gen.stamp
+stamps/netx.stamp: netx-source-files.txt stamps/netx-html-gen.stamp
 	mkdir -p $(NETX_DIR)
-	$(BOOT_DIR)/bin/javac $(IT_JAVACFLAGS) \
-	    -d $(NETX_DIR) \
-	    -sourcepath $(NETX_SRCDIR) \
-	    -bootclasspath $(RUNTIME) \
-	    $(NETX_CLASSPATH_ARG) \
+	$(SYSTEM_JDK_DIR)/bin/javac $(IT_JAVACFLAGS) \
+		-d $(NETX_DIR) \
+		-sourcepath $(NETX_SRCDIR) \
+		$(call composeclasspath, $(TAGSOUP_JAR) $(RHINO_JAR)) \
 	    @netx-source-files.txt
 	(cd $(NETX_RESOURCE_DIR); \
 	 for files in $$(find . -type f); \
@@ -502,10 +575,10 @@ stamps/netx.stamp: netx-source-files.txt stamps/bootstrap-directory.stamp stamps
 	mkdir -p stamps
 	touch $@
 
-stamps/netx-dist.stamp: stamps/netx.stamp $(abs_top_builddir)/netx.manifest
+stamps/netx-dist.stamp: stamps/netx.stamp $(abs_top_builddir)/netx.manifest stamps/generate-docs.stamp
 	(cd $(NETX_DIR) ; \
 	 mkdir -p lib ; \
-	 $(BOOT_DIR)/bin/jar cfm lib/classes.jar \
+	 $(SYSTEM_JDK_DIR)/bin/jar cfm lib/classes.jar \
 	  $(abs_top_builddir)/netx.manifest javax/jnlp net sun; \
 	 cp -pPR $(SRC_DIR_LINK) $(NETX_SRCDIR) src; \
 	 find src -type f -exec chmod 640 '{}' ';' -o -type d -exec chmod 750 '{}' ';'; \
@@ -577,13 +650,14 @@ clean-docs: clean-netx-docs clean-plugin-docs
 	fi
 	rm -f stamps/docs.stamp
 
-stamps/netx-docs.stamp: stamps/bootstrap-directory.stamp
+stamps/netx-docs.stamp:
 if ENABLE_DOCS
-	$(BOOT_DIR)/bin/javadoc $(JAVADOC_MEM_OPTS) $(JAVADOC_OPTS) \
+	$(SYSTEM_JDK_DIR)/bin/javadoc $(JAVADOC_MEM_OPTS) $(	_OPTS) \
 	 -d ${abs_top_builddir}/docs/netx -sourcepath $(NETX_SRCDIR) \
 	 -doctitle 'IcedTea-Web: NetX API Specification' \
 	 -windowtitle 'IcedTea-Web: NetX ' \
 	 -header '<strong>IcedTea-Web<br/>NetX</strong>' \
+	 $(call composeclasspath, $(TAGSOUP_JAR) $(RHINO_JAR)) \
 	 $(NETX_PKGS)
 endif
 	mkdir -p stamps
@@ -593,14 +667,15 @@ clean-netx-docs:
 	rm -rf ${abs_top_builddir}/docs/netx
 	rm -f stamps/netx-docs.stamp
 
-stamps/plugin-docs.stamp: stamps/bootstrap-directory.stamp
+stamps/plugin-docs.stamp:
 if ENABLE_DOCS
 if ENABLE_PLUGIN
-	$(BOOT_DIR)/bin/javadoc $(JAVADOC_MEM_OPTS) $(JAVADOC_OPTS) \
+	$(SYSTEM_JDK_DIR)/bin/javadoc $(JAVADOC_MEM_OPTS) $(JAVADOC_OPTS) \
 	 -d ${abs_top_builddir}/docs/plugin -sourcepath $(NETX_SRCDIR):$(LIVECONNECT_SRCS) \
 	 -doctitle 'IcedTea-Web: Plugin API Specification' \
 	 -windowtitle 'IcedTea-Web: Plugin ' \
 	 -header '<strong>IcedTea-Web<br/>Plugin</strong>' \
+	 $(call composeclasspath, $(TAGSOUP_JAR) $(RHINO_JAR)) \
 	 $(PLUGIN_PKGS)
 endif
 endif
@@ -610,6 +685,10 @@ endif
 clean-plugin-docs:
 	rm -rf ${abs_top_builddir}/docs/plugin
 	rm -f stamps/plugin-docs.stamp
+
+clean-generated-docs:
+	rm -rf "$(DOCS_DIR)"
+	rm -f stamps/generate-docs.stamp
 
 
 # check
@@ -623,7 +702,7 @@ clean-tests: clean-netx-tests clean-cpp-unit-tests clean-unittest++
 		rmdir $(TESTS_DIR) ; \
 	fi
 
-stamps/check-pac-functions.stamp: stamps/bootstrap-directory.stamp
+stamps/check-pac-functions.stamp:
 	./jrunscript $(abs_top_srcdir)/tests/netx/pac/pac-funcs-test.js \
 	  $$(readlink -f $(abs_top_srcdir)/netx/net/sourceforge/jnlp/runtime/pac-funcs.js) ; \
 	mkdir -p stamps && \
@@ -637,11 +716,11 @@ jacoco-operator-source-files.txt:
 
 $(JUNIT_RUNNER_JAR): junit-runner-source-files.txt stamps/test-extensions-compile.stamp
 	mkdir -p $(JUNIT_RUNNER_DIR) && \
-	$(BOOT_DIR)/bin/javac $(IT_JAVACFLAGS) \
+	$(SYSTEM_JDK_DIR)/bin/javac $(IT_JAVACFLAGS) \
 	  -d $(JUNIT_RUNNER_DIR) \
-	  -classpath $(JUNIT_JAR):$(TEST_EXTENSIONS_DIR) \
+	  $(call composeclasspath, $(JUNIT_RUNTIME) $(TEST_EXTENSIONS_DIR)) \
 	  @junit-runner-source-files.txt && \
-	$(BOOT_DIR)/bin/jar cf $@  -C $(JUNIT_RUNNER_DIR) .
+	$(SYSTEM_JDK_DIR)/bin/jar cf $@  -C $(JUNIT_RUNNER_DIR) .
 
 stamps/junit-jnlp-dist-dirs: junit-jnlp-dist-simple.txt stamps/junit-jnlp-dist-signed.stamp junit-jnlp-dist-custom.txt
 	mkdir -p $(REPRODUCERS_TESTS_SERVER_DEPLOYDIR)
@@ -650,17 +729,23 @@ stamps/junit-jnlp-dist-dirs: junit-jnlp-dist-simple.txt stamps/junit-jnlp-dist-s
 
 junit-jnlp-dist-custom.txt:
 	cd $(REPRODUCERS_TESTS_SRCDIR)/$(CUSTOM_REPRODUCERS)/ ; \
-	find .  -maxdepth 1 -mindepth 1 | sed "s/.\/*//" > $(abs_top_builddir)/$@
+	for x in $(COMPILE_WHITELIST_FILTER) ; do \
+	  find .  -maxdepth 1 -mindepth 1 | sed "s/.\/*//" | grep $$x > $(abs_top_builddir)/$@ || true ; \
+	done
 
 junit-jnlp-dist-simple.txt:
 	cd $(REPRODUCERS_TESTS_SRCDIR)/simple/ ; \
-	find .  -maxdepth 1 -mindepth 1 | sed "s/.\/*//" > $(abs_top_builddir)/$@
+	for x in $(COMPILE_WHITELIST_FILTER) ; do \
+	  find .  -maxdepth 1 -mindepth 1 | sed "s/.\/*//" | grep $$x > $(abs_top_builddir)/$@ || true ; \
+	done
 
-stamps/junit-jnlp-dist-signed.stamp: 
+stamps/junit-jnlp-dist-signed.stamp:
 	types=($(SIGNED_REPRODUCERS)) ; \
 	for which in "$${types[@]}" ; do \
 	  pushd $(REPRODUCERS_TESTS_SRCDIR)/$$which/ ; \
-	  find .  -maxdepth 1 -mindepth 1 | sed "s/.\/*//" > $(abs_top_builddir)/junit-jnlp-dist-$$which.txt ; \
+	    for x in $(COMPILE_WHITELIST_FILTER) ; do \
+	      find .  -maxdepth 1 -mindepth 1 | sed "s/.\/*//" | grep $$x > $(abs_top_builddir)/junit-jnlp-dist-$$which.txt ; \
+	    done ; \
 	  popd ; \
 	done ; \
 	mkdir -p stamps && \
@@ -680,17 +765,27 @@ stamps/netx-dist-tests-prepare-reproducers.stamp: stamps/junit-jnlp-dist-dirs st
 	      cd "$(REPRODUCERS_TESTS_SRCDIR)/$$which/$$dir/srcs/" ; \
 	      srcFiles=`find . -mindepth 1 -type f -name "*.java" | sed "s/.\/*//"` ; \
 	      notSrcFiles=`find . -mindepth 1 -type f \! -name "*.java" | sed "s/.\/*//"` ; \
-	      $(BOOT_DIR)/bin/javac -cp $(NETX_DIR)/lib/classes.jar:$(abs_top_builddir)/liveconnect -d "$(REPRODUCERS_BUILD_DIR)/$$dir/" $$srcFiles ; \
+	      $(SYSTEM_JDK_DIR)/bin/javac -cp $(NETX_DIR)/lib/classes.jar:$(abs_top_builddir)/liveconnect -d "$(REPRODUCERS_BUILD_DIR)/$$dir/" $$srcFiles ; \
 	      if [ -n "$$notSrcFiles" ] ; then \
 	        cp -R --parents $$notSrcFiles "$(REPRODUCERS_BUILD_DIR)/$$dir/" ; \
 	      fi ; \
 	      cd "$(REPRODUCERS_BUILD_DIR)/$$dir/" ; \
 	      if [ -f $(META_MANIFEST) ]; \
 	      then \
-	        $(BOOT_DIR)/bin/jar cfm "$(REPRODUCERS_TESTS_SERVER_DEPLOYDIR)/$$dir.jar" $(META_MANIFEST) * ; \
+	        $(SYSTEM_JDK_DIR)/bin/jar cfm "$(REPRODUCERS_TESTS_SERVER_DEPLOYDIR)/$$dir.jar" $(META_MANIFEST) * ; \
 	      else \
-	        $(BOOT_DIR)/bin/jar cf "$(REPRODUCERS_TESTS_SERVER_DEPLOYDIR)/$$dir.jar" * ; \
+	        $(SYSTEM_JDK_DIR)/bin/jar cf "$(REPRODUCERS_TESTS_SERVER_DEPLOYDIR)/$$dir.jar" * ; \
 	      fi; \
+	      AN="Application-Name:" ; \
+	      grep $$AN $(META_MANIFEST) 2>/dev/null >/dev/null ; \
+	      GREP_R=$$?; \
+	      if [ ! -f $(META_MANIFEST) -o  $$GREP_R -ne 0  ]; \
+	      then \
+	       TMP_MANIFEST=`mktemp` ; \
+	       echo "$$AN $$dir" > $$TMP_MANIFEST ; \
+	       $(SYSTEM_JDK_DIR)/bin/jar ufm "$(REPRODUCERS_TESTS_SERVER_DEPLOYDIR)/$$dir.jar"  $$TMP_MANIFEST ; \
+	       rm -f $$TMP_MANIFEST ; \
+	      fi ; \
 	      cd "$$d" ; \
 	    fi; \
 	  done ; \
@@ -703,12 +798,12 @@ stamps/netx-dist-tests-sign-some-reproducers.stamp: stamps/netx-dist-tests-prepa
 	types=($(SIGNED_REPRODUCERS)) ; \
 	for which in "$${types[@]}" ; do \
 	  tcaw=$(TEST_CERT_ALIAS)_$$which ; \
-	  $(BOOT_DIR)/bin/keytool -genkey -alias $$tcaw -keystore $$keystore -keypass $(PRIVATE_KEYSTORE_PASS) -storepass $(PRIVATE_KEYSTORE_PASS) -dname "cn=$$tcaw, ou=$$tcaw, o=$$tcaw, c=$$tcaw" ; \
+	  $(SYSTEM_JRE_DIR)/bin/keytool -genkey -alias $$tcaw -keystore $$keystore -keypass $(PRIVATE_KEYSTORE_PASS) -storepass $(PRIVATE_KEYSTORE_PASS) -dname "cn=$$tcaw, ou=$$tcaw, o=$$tcaw, c=$$tcaw" ; \
 	    . $(abs_top_srcdir)/NEW_LINE_IFS ; \
 	  signedReproducers=(`cat $(abs_top_builddir)/junit-jnlp-dist-$$which.txt `); \
 	    IFS="$$IFS_BACKUP" ; \
 	  for dir in "$${signedReproducers[@]}" ; do \
-	   $(BOOT_DIR)/bin/jarsigner -keystore $$keystore -storepass $(PRIVATE_KEYSTORE_PASS) -keypass $(PRIVATE_KEYSTORE_PASS)  "$(REPRODUCERS_TESTS_SERVER_DEPLOYDIR)/$$dir.jar"  $$tcaw ; \
+	   $(SYSTEM_JDK_DIR)/bin/jarsigner -keystore $$keystore -storepass $(PRIVATE_KEYSTORE_PASS) -keypass $(PRIVATE_KEYSTORE_PASS)  "$(REPRODUCERS_TESTS_SERVER_DEPLOYDIR)/$$dir.jar"  $$tcaw ; \
 	  done ; \
 	done ; \
 	mkdir -p stamps && \
@@ -759,11 +854,11 @@ stamps/exported-test-certs.stamp: stamps/change-dots-to-paths.stamp
 	keystoredir=`dirname $(PUBLIC_KEYSTORE)`; \
 	[ ! -d $(keystoredir) ] && mkdir -p $(keystoredir); \
 	for which in "$${types[@]}" ; do \
-	  $(BOOT_DIR)/bin/keytool -delete -alias $(TEST_CERT_ALIAS)_$$which -keystore $$PUBLIC_KEYSTORE -storepass $(PUBLIC_KEYSTORE_PASS) ; \
+	  $(SYSTEM_JDK_DIR)/bin/keytool -delete -alias $(TEST_CERT_ALIAS)_$$which -keystore $$PUBLIC_KEYSTORE -storepass $(PUBLIC_KEYSTORE_PASS) ; \
 	done ;
 	types=($(SIGNED_REPRODUCERS)) ; \
 	for which in "$${types[@]}" ; do \
-	  $(BOOT_DIR)/bin/keytool -export -alias $(TEST_CERT_ALIAS)_$$which -file $(EXPORTED_TEST_CERT_PREFIX)_$$which.$(EXPORTED_TEST_CERT_SUFFIX) -storepass $(PRIVATE_KEYSTORE_PASS) -keystore $(PRIVATE_KEYSTORE_NAME) ; \
+	  $(SYSTEM_JDK_DIR)/bin/keytool -export -alias $(TEST_CERT_ALIAS)_$$which -file $(EXPORTED_TEST_CERT_PREFIX)_$$which.$(EXPORTED_TEST_CERT_SUFFIX) -storepass $(PRIVATE_KEYSTORE_PASS) -keystore $(PRIVATE_KEYSTORE_NAME) ; \
 	done ;
 	mkdir -p stamps && \
 	touch $@
@@ -778,7 +873,7 @@ stamps/netx-dist-tests-import-cert-to-public: stamps/exported-test-certs.stamp
 	keystoredir=`dirname $(PUBLIC_KEYSTORE)`; \
 	[ ! -d $(keystoredir) ] && mkdir -p $(keystoredir); \
 	for which in "$${types[@]}" ; do \
-	  yes | $(BOOT_DIR)/bin/keytool -import -alias $(TEST_CERT_ALIAS)_$$which -keystore $$PUBLIC_KEYSTORE -storepass $(PUBLIC_KEYSTORE_PASS) -file $(EXPORTED_TEST_CERT_PREFIX)_$$which.$(EXPORTED_TEST_CERT_SUFFIX) ;\
+	  yes | $(SYSTEM_JDK_DIR)/bin/keytool -import -alias $(TEST_CERT_ALIAS)_$$which -keystore $$PUBLIC_KEYSTORE -storepass $(PUBLIC_KEYSTORE_PASS) -file $(EXPORTED_TEST_CERT_PREFIX)_$$which.$(EXPORTED_TEST_CERT_SUFFIX) ;\
 	done ;
 	mkdir -p stamps && \
 	touch $@
@@ -793,7 +888,7 @@ netx-dist-tests-remove-cert-from-public:
 	keystoredir=`dirname $(PUBLIC_KEYSTORE)`; \
 	[ ! -d $(keystoredir) ] && mkdir -p $(keystoredir); \
 	for which in "$${types[@]}" ; do \
-	  $(BOOT_DIR)/bin/keytool -delete -alias $(TEST_CERT_ALIAS)_$$which -keystore $$PUBLIC_KEYSTORE -storepass $(PUBLIC_KEYSTORE_PASS) ; \
+	  $(SYSTEM_JDK_DIR)/bin/keytool -delete -alias $(TEST_CERT_ALIAS)_$$which -keystore $$PUBLIC_KEYSTORE -storepass $(PUBLIC_KEYSTORE_PASS) ; \
 	done ;
 	-rm -rf stamps/netx-dist-tests-import-cert-to-public
 
@@ -804,22 +899,26 @@ stamps/test-extensions-compile.stamp: stamps/netx-dist.stamp stamps/plugin.stamp
 	mkdir -p $(TEST_EXTENSIONS_DIR);
 	mkdir -p $(NETX_TEST_DIR);
 	ln -s $(TEST_EXTENSIONS_DIR) $(TEST_EXTENSIONS_COMPATIBILITY_SYMLINK);
-	$(BOOT_DIR)/bin/javac $(IT_JAVACFLAGS) \
+	$(SYSTEM_JDK_DIR)/bin/javac $(IT_JAVACFLAGS) \
 	 -d $(TEST_EXTENSIONS_DIR) \
-	 -classpath $(JUNIT_JAR):$(NETX_DIR)/lib/classes.jar:$(abs_top_builddir)/liveconnect/lib/classes.jar \
+	 $(call composeclasspath, $(JUNIT_RUNTIME) $(NETX_DIR)/lib/classes.jar $(abs_top_builddir)/liveconnect/lib/classes.jar) \
 	 @test-extensions-source-files.txt && \
 	mkdir -p stamps && \
 	touch $@
 
 test-extensions-tests-source-files.txt:
-	find $(TEST_EXTENSIONS_TESTS_SRCDIR) -name '*.java' | sort > $@
+	for x in $(COMPILE_WHITELIST_FILTER) ; do \
+	  find $(TEST_EXTENSIONS_TESTS_SRCDIR) -name '*.java' | grep $$x | sort > $@ ; \
+	done
 
 stamps/test-extensions-tests-compile.stamp: stamps/junit-jnlp-dist-dirs test-extensions-tests-source-files.txt  stamps/test-extensions-compile.stamp
 	mkdir -p $(TEST_EXTENSIONS_TESTS_DIR);
-	$(BOOT_DIR)/bin/javac $(IT_JAVACFLAGS) \
-	 -d $(TEST_EXTENSIONS_TESTS_DIR) \
-	 -classpath $(JUNIT_JAR):$(NETX_DIR)/lib/classes.jar:$(TEST_EXTENSIONS_DIR) \
-	 @test-extensions-tests-source-files.txt && \
+	for x in `cat $(abs_top_builddir)/test-extensions-tests-source-files.txt` ; do \
+	  $(SYSTEM_JDK_DIR)/bin/javac $(IT_JAVACFLAGS) \
+	   -d $(TEST_EXTENSIONS_TESTS_DIR) \
+	   $(call composeclasspath, $(JUNIT_RUNTIME) $(NETX_DIR)/lib/classes.jar $(TEST_EXTENSIONS_DIR)) \
+	   $$x ; \
+	done ; \
 	mkdir -p stamps && \
 	touch $@
 
@@ -831,9 +930,10 @@ stamps/compile-reproducers-testcases.stamp: stamps/netx-dist.stamp stamps/plugin
 	  simpleReproducers=(`cat $(abs_top_builddir)/junit-jnlp-dist-$$which.txt `); \
 	  IFS="$$IFS_BACKUP" ; \
 	  for dir in "$${simpleReproducers[@]}" ; do \
-	    $(BOOT_DIR)/bin/javac $(IT_JAVACFLAGS) \
+	    echo "compiling" $$dir ; \
+	    $(SYSTEM_JDK_DIR)/bin/javac $(IT_JAVACFLAGS) \
 	      -d $(TEST_EXTENSIONS_TESTS_DIR) \
-	      -classpath $(JUNIT_JAR):$(NETX_DIR)/lib/classes.jar:$(TEST_EXTENSIONS_DIR) \
+	      $(call composeclasspath, $(JUNIT_RUNTIME) $(NETX_DIR)/lib/classes.jar $(TEST_EXTENSIONS_DIR)) \
 	    "$(REPRODUCERS_TESTS_SRCDIR)/$$which/$$dir/testcases/"*.java ; \
 	    if [ -d "$(REPRODUCERS_TESTS_SRCDIR)/$$which/$$dir/testcases" ]; then \
 	        pushd "$(REPRODUCERS_TESTS_SRCDIR)/$$which/$$dir/testcases" ; \
@@ -861,23 +961,23 @@ stamps/copy-reproducers-resources.stamp: stamps/junit-jnlp-dist-dirs
 	mkdir -p stamps && \
 	touch $@
 
-$(REPRODUCERS_CLASS_NAMES): $(REPRODUCERS_CLASS_WHITELIST)
-	whiteListed=`cat $(REPRODUCERS_CLASS_WHITELIST)`; \
+$(REPRODUCERS_CLASS_NAMES):
+	whiteListed=$(RUN_WHITELIST_FILTER); \
 	cd $(TEST_EXTENSIONS_TESTS_DIR) ; \
 	class_names= ; \
 	for test in `find -type f` ; do \
 	  class_name=`echo $$test | sed -e 's|\.class$$||' -e 's|^\./||'` ; \
 	  class_name=`echo $$class_name | sed -e 's|/|.|g' ` ; \
-	  INLCUDE="NO" ; \
+	  INCLUDE="NO" ; \
 	  for x in $$whiteListed ; do \
 	    q=`expr match "$$class_name" "$$x"`; \
 	    r=$$? ; \
 	    if [ $$r = 0  ]; then \
 	      echo "$$class_name will be included in reproducers testcases because of $$x pattern in $(REPRODUCERS_CLASS_WHITELIST). Matching was  $$q"; \
-	      INLCUDE="YES" ; \
+	      INCLUDE="YES" ; \
 	    fi; \
 	  done; \
-	  if [ "$$INLCUDE" = "YES"  ]; then \
+	  if [ "$$INCLUDE" = "YES" ]; then \
 	    class_names="$$class_names $$class_name" ; \
 	  else \
 	    echo "$$class_name had no match in $(REPRODUCERS_CLASS_WHITELIST). Excluding"; \
@@ -885,21 +985,16 @@ $(REPRODUCERS_CLASS_NAMES): $(REPRODUCERS_CLASS_WHITELIST)
 	done ; \
 	echo $$class_names > $(REPRODUCERS_CLASS_NAMES)
 
-$(TESTS_DIR)/$(SOFTKILLER):
-	cd  $(TESTS_SRCDIR)/$(SOFTKILLER); \
-	$(MAKE) ; \
-	mv $(SOFTKILLER) $(TESTS_DIR)/
-
 stamps/run-netx-dist-tests.stamp: stamps/netx-dist.stamp stamps/plugin.stamp launcher.build/$(javaws) \
  javaws.desktop stamps/docs.stamp launcher.build/$(itweb_settings) itweb-settings.desktop launcher.build/$(policyeditor) policyeditor.desktop \
- stamps/netx.stamp stamps/junit-jnlp-dist-dirs stamps/netx-dist-tests-import-cert-to-public $(TESTS_DIR)/softkiller \
+ stamps/netx.stamp stamps/junit-jnlp-dist-dirs stamps/netx-dist-tests-import-cert-to-public \
  stamps/test-extensions-compile.stamp stamps/compile-reproducers-testcases.stamp $(JUNIT_RUNNER_JAR) stamps/copy-reproducers-resources.stamp\
  $(TESTS_DIR)/$(REPORT_STYLES_DIRNAME) $(REPRODUCERS_CLASS_NAMES) stamps/process-custom-reproducers.stamp
 	cd $(TEST_EXTENSIONS_DIR) ; \
 	class_names=`cat $(REPRODUCERS_CLASS_NAMES)` ; \
-	CLASSPATH=$(NETX_DIR)/lib/classes.jar:$(JUNIT_JAR):$(JUNIT_RUNNER_JAR):.:$(TEST_EXTENSIONS_TESTS_DIR):$(TEST_EXTENSIONS_SRCDIR) ; \
-	  $(BOOT_DIR)/bin/java $(REPRODUCERS_DPARAMETERS) \
-	 -Xbootclasspath/a:$(RUNTIME):$$CLASSPATH CommandLine $$class_names
+	CLASSPATH=$(call joinsegments, $(NETX_DIR)/lib/classes.jar $(JUNIT_RUNTIME) $(JUNIT_RUNNER_JAR) . $(TEST_EXTENSIONS_TESTS_DIR) $(TEST_EXTENSIONS_SRCDIR)) ; \
+	  $(SYSTEM_JRE_DIR)/bin/java $(REPRODUCERS_DPARAMETERS) \
+	 -Xbootclasspath/a:$$CLASSPATH CommandLine $$class_names
 if WITH_XSLTPROC
 	-$(XSLTPROC)  --stringparam logs logs_reproducers.html $(TESTS_SRCDIR)/$(REPORT_STYLES_DIRNAME)/jreport.xsl $(TEST_EXTENSIONS_DIR)/tests-output.xml > $(TESTS_DIR)/index_reproducers.html
 	-$(XSLTPROC)  $(TESTS_SRCDIR)/$(REPORT_STYLES_DIRNAME)/logs.xsl $(TEST_EXTENSIONS_DIR)/ServerAccess-logs.xml > $(TESTS_DIR)/logs_reproducers.html
@@ -1044,9 +1139,9 @@ netx-unit-tests-source-files.txt:
 stamps/netx-unit-tests-compile.stamp: stamps/netx.stamp \
  netx-unit-tests-source-files.txt stamps/test-extensions-compile.stamp
 	mkdir -p $(NETX_UNIT_TEST_DIR) && \
-	$(BOOT_DIR)/bin/javac $(IT_JAVACFLAGS) \
+	$(SYSTEM_JDK_DIR)/bin/javac $(IT_JAVACFLAGS) \
 	 -d $(NETX_UNIT_TEST_DIR) \
-	 -classpath $(JUNIT_JAR):$(abs_top_builddir)/liveconnect/lib/classes.jar:$(NETX_DIR)/lib/classes.jar:$(TEST_EXTENSIONS_DIR):$(TAGSOUP_JAR) \
+	 $(call composeclasspath, $(JUNIT_RUNTIME) $(abs_top_builddir)/liveconnect/lib/classes.jar $(NETX_DIR)/lib/classes.jar $(TEST_EXTENSIONS_DIR) $(TAGSOUP_JAR)) \
 	 @netx-unit-tests-source-files.txt && \
 	mkdir -p stamps && \
 	touch $@
@@ -1076,8 +1171,8 @@ stamps/run-netx-unit-tests.stamp: stamps/netx-unit-tests-compile.stamp $(JUNIT_R
 	done ; \
 	cd $(NETX_UNIT_TEST_DIR) ; \
 	class_names=`cat $(UNIT_CLASS_NAMES)` ; \
-	CLASSPATH=$(NETX_DIR)/lib/classes.jar:$(abs_top_builddir)/liveconnect/lib/classes.jar:$(JUNIT_JAR):$(JUNIT_RUNNER_JAR):$(TEST_EXTENSIONS_DIR):.:$(TEST_EXTENSIONS_SRCDIR):$(TAGSOUP_JAR) ; \
-	  $(BOOT_DIR)/bin/java -Xbootclasspath/a:$(RUNTIME):$$CLASSPATH CommandLine $$class_names 
+	CLASSPATH=$(call joinsegments, $(NETX_DIR)/lib/classes.jar $(abs_top_builddir)/liveconnect/lib/classes.jar $(JUNIT_RUNTIME) $(JUNIT_RUNNER_JAR) $(TEST_EXTENSIONS_DIR) . $(TEST_EXTENSIONS_SRCDIR) $(TAGSOUP_JAR)) ; \
+	  $(SYSTEM_JRE_DIR)/bin/java -Xbootclasspath/a:$$CLASSPATH CommandLine $$class_names 
 if WITH_XSLTPROC
 	-$(XSLTPROC) --stringparam logs logs_unit.html $(TESTS_SRCDIR)/$(REPORT_STYLES_DIRNAME)/jreport.xsl $(NETX_UNIT_TEST_DIR)/tests-output.xml > $(TESTS_DIR)/index_unit.html
 	-$(XSLTPROC) $(TESTS_SRCDIR)/$(REPORT_STYLES_DIRNAME)/logs.xsl $(NETX_UNIT_TEST_DIR)/ServerAccess-logs.xml > $(TESTS_DIR)/logs_unit.html
@@ -1086,58 +1181,12 @@ endif
 	mkdir -p stamps && \
 	touch $@
 
-#warning,  during this target tests.build/netx/unit/tests-output.xml is backup and rewriten (but not coresponding html file)
-#xml results run from emma sandbox, however, can be wrong, co the new tests-output.xml is then renamed and orginal one restored
-#you can add -ix "-*Test*" -ix "-*test*"  to ignore all test cases from statistics
-stamps/run-unit-test-code-coverage.stamp: stamps/netx-unit-tests-compile.stamp $(JUNIT_RUNNER_JAR)  \
- $(TESTS_DIR)/$(REPORT_STYLES_DIRNAME)  $(UNIT_CLASS_NAMES)
-if WITH_EMMA
-	cd $(NETX_UNIT_TEST_DIR) ; \
-	for file in $(EMMA_MODIFIED_FILES) ; do \
-	  mv $(NETX_UNIT_TEST_DIR)/$$file  $(NETX_UNIT_TEST_DIR)/"$$file""$(EMMA_BACKUP_SUFFIX)" ; \
-	done ;\
-	class_names=`cat $(UNIT_CLASS_NAMES)` ; \
-	CLASSPATH=$(NETX_DIR)/lib/classes.jar:$(abs_top_builddir)/liveconnect/lib/classes.jar:$(JUNIT_JAR):$(JUNIT_RUNNER_JAR):$(TEST_EXTENSIONS_DIR):.:$(TEST_EXTENSIONS_SRCDIR) ; \
-	$(BOOT_DIR)/bin/java $(EMMA_JAVA_ARGS) -Xbootclasspath/a:$(RUNTIME):$$CLASSPATH -cp $(EMMA_JAR) -Demma.report.html.out.encoding=UTF-8 emmarun \
-	 -Dreport.html.out.encoding=UTF-8 \
-	 -raw \
-	 -sp $(NETX_SRCDIR) \
-	 -sp $(NETX_UNIT_TEST_SRCDIR) \
-	 -sp $(JUNIT_RUNNER_SRCDIR) \
-	 -r html \
-	 -r xml \
-	 -cp $(NETX_DIR)/lib/classes.jar \
-	 -cp $(JUNIT_JAR) \
-	 -cp $(JUNIT_RUNNER_JAR) \
-	 -cp $(BOOT_DIR)/jre/lib/rt.jar \
-	 -cp $(BOOT_DIR)/jre/lib/jsse.jar \
-	 -cp $(BOOT_DIR)/jre/lib/resources.jar \
-	 -cp $(RHINO_RUNTIME) \
-	 -cp $(TEST_EXTENSIONS_DIR) \
-	 -cp $(TEST_EXTENSIONS_SRCDIR) \
-if HAVE_TAGSOUP
-	 -cp $(TAGSOUP_JAR) \
-endif
-	 -cp . \
-	 -ix "-org.junit.*" \
-	 -ix "-junit.*" \
-	 CommandLine $$class_names ;  \
-	for file in $(EMMA_MODIFIED_FILES) ; do \
-	  mv $(NETX_UNIT_TEST_DIR)/$$file  $(NETX_UNIT_TEST_DIR)/"$$file""$(EMMA_SUFFIX)" ; \
-	  mv $(NETX_UNIT_TEST_DIR)/"$$file""$(EMMA_BACKUP_SUFFIX)"  $(NETX_UNIT_TEST_DIR)/$$file ; \
-	done ;
-else 
-	echo "Sorry, coverage report cant be run without emma installed. Try install emma or specify with-emma value" ;
-	exit 5
-endif 
-	touch $@
-
 stamps/compile-jacoco-operator.stamp: jacoco-operator-source-files.txt
 if WITH_JACOCO	
 	mkdir -p $(JACOCO_OPERATOR_DIR) && \
-	$(BOOT_DIR)/bin/javac $(IT_JAVACFLAGS) \
+	$(SYSTEM_JDK_DIR)/bin/javac $(IT_JAVACFLAGS) \
 	  -d $(JACOCO_OPERATOR_DIR) \
-	  -classpath $(JACOCO_CLASSPATH) \
+	  $(call composeclasspath, $(JACOCO_CLASSPATH)) \
 	  @jacoco-operator-source-files.txt ;
 else 
 	echo "Sorry, jacoco coverage report generator  cant be compiled without jacoco installed. Try installing jacoco or specify with-jacoco value" ;
@@ -1158,13 +1207,13 @@ if WITH_JACOCO
 		cp --parents $$filename $(NETX_UNIT_TEST_DIR) ; \
 	done ; \
 	cd $(NETX_UNIT_TEST_DIR) ; \
-	for file in $(EMMA_MODIFIED_FILES) ; do \
+	for file in $(COVERAGE_MODIFIED_FILES) ; do \
 	  mv $(NETX_UNIT_TEST_DIR)/$$file  $(NETX_UNIT_TEST_DIR)/"$$file""$(EMMA_BACKUP_SUFFIX)" ; \
 	done ;\
 	class_names=`cat $(UNIT_CLASS_NAMES)` ; \
-	CLASSPATH=$(NETX_DIR)/lib/classes.jar:$(abs_top_builddir)/liveconnect/lib/classes.jar:$(JUNIT_JAR):$(JUNIT_RUNNER_JAR):$(TEST_EXTENSIONS_DIR):$(JACOCO_CLASSPATH):.:$(TEST_EXTENSIONS_SRCDIR):$(TAGSOUP_JAR) ; \
-	  $(BOOT_DIR)/bin/java $(JACOCO_AGENT_SWITCH) -Xbootclasspath/a:$(RUNTIME):$$CLASSPATH  CommandLine $$class_names ; \
-	for file in $(EMMA_MODIFIED_FILES) ; do \
+	CLASSPATH=$(call joinsegments, $(NETX_DIR)/lib/classes.jar $(abs_top_builddir)/liveconnect/lib/classes.jar $(JUNIT_RUNTIME) $(JUNIT_RUNNER_JAR) $(TEST_EXTENSIONS_DIR) $(JACOCO_CLASSPATH) . $(TEST_EXTENSIONS_SRCDIR) $(TAGSOUP_JAR)) ; \
+	  $(SYSTEM_JRE_DIR)/bin/java $(JACOCO_AGENT_SWITCH) -Xbootclasspath/a:$$CLASSPATH CommandLine $$class_names ; \
+	for file in $(COVERAGE_MODIFIED_FILES) ; do \
 	  mv $(NETX_UNIT_TEST_DIR)/$$file  $(NETX_UNIT_TEST_DIR)/"$$file""$(EMMA_SUFFIX)" ; \
 	  mv $(NETX_UNIT_TEST_DIR)/"$$file""$(EMMA_BACKUP_SUFFIX)"  $(NETX_UNIT_TEST_DIR)/$$file ; \
 	done ; \
@@ -1179,98 +1228,6 @@ else
 endif 
 	touch $@
 
-#warning,  during this target tests.build/netx/jnlp_testsengine/tests-output.xml is backup and rewriten (but not coresponding html file)
-#xml results run from emma sandbox, however, can be wrong, co the new tests-output.xml is then renamed and orginal one restored
-stamps/run-reproducers-test-code-coverage.stamp: stamps/run-netx-dist-tests.stamp $(REPRODUCERS_CLASS_NAMES)
-if WITH_EMMA
-	cd $(TESTS_DIR) ; \
-	for file in $(EMMA_MODIFIED_FILES) ; do \
-	  mv $(TEST_EXTENSIONS_DIR)/$$file $(TEST_EXTENSIONS_DIR)/"$$file""$(EMMA_BACKUP_SUFFIX)" ; \
-	done ;\
-	echo "backuping javaws and netx.jar in $(DESTDIR)" ; \
-	netx_backup=$(DESTDIR)$(datadir)/$(PACKAGE_NAME)/netx_backup.jar ; \
-	javaws_backup=$(DESTDIR)$(bindir)/javaws_backup ; \
-	mv $(DESTDIR)$(bindir)/javaws $$javaws_backup ;  \
-	mv $(DESTDIR)$(datadir)/$(PACKAGE_NAME)/netx.jar $$netx_backup ; \
-	nw_bootclasspath="$(LAUNCHER_BOOTCLASSPATH):$(EMMA_JAR):$$netx_backup" ; \
-	instructed_dir=$(TESTS_DIR)/instr ; \
-	echo "instrumenting netx.jar from $$netx_backup through $$instructed_dir" ; \
-	$(BOOT_DIR)/bin/java -cp  $(EMMA_JAR) emma instr -d $$instructed_dir -ip $$netx_backup ; \
-	pushd $$instructed_dir ; \
-	$(BOOT_DIR)/bin/jar -cf $(DESTDIR)$(datadir)/$(PACKAGE_NAME)/netx.jar * ; \
-	popd ; \
-	rm -rf $$instructed_dir ; \
-	echo "patching $(javaws)" ; \
-	cat $$javaws_backup | sed "s,$(LAUNCHER_BOOTCLASSPATH),$$nw_bootclasspath," > $(DESTDIR)$(bindir)/$(javaws) ; \
-	chmod 777 $(DESTDIR)$(bindir)/$(javaws) ; \
-	testcases_srcs=( ) ; \
-	k=0 ; \
-	types=($(ALL_REPRODUCERS)); \
-	for which in "$${types[@]}" ; do \
-	  . $(abs_top_srcdir)/NEW_LINE_IFS ; \
-	  simpleReproducers=(`cat $(abs_top_builddir)/junit-jnlp-dist-$$which.txt `); \
-	  IFS="$$IFS_BACKUP" ; \
-	  for dir in "$${simpleReproducers[@]}" ; do \
-	    testcases_srcs[k]="-sp" ; \
-	    k=$$((k+1)) ; \
-	    testcases_srcs[k]="$(REPRODUCERS_TESTS_SRCDIR)/$$which/$$dir/testcases/" ; \
-	    k=$$((k+1)) ; \
-	    done ; \
-	  done ; \
-	cd $(TEST_EXTENSIONS_DIR) ; \
-	class_names=`cat $(REPRODUCERS_CLASS_NAMES)` ; \
-	CLASSPATH=$(NETX_DIR)/lib/classes.jar:$(abs_top_builddir)/liveconnect/lib/classes.jar:$(JUNIT_JAR):$(JUNIT_RUNNER_JAR):$(TEST_EXTENSIONS_DIR):.:$(TEST_EXTENSIONS_SRCDIR) ; \
-	$(BOOT_DIR)/bin/java  \
-	 $(EMMA_JAVA_ARGS) \
-	  $(REPRODUCERS_DPARAMETERS) \
-	 -Xbootclasspath/a:$(RUNTIME):$$CLASSPATH -cp $(EMMA_JAR) emmarun  \
-	   -raw \
-	   -cp $(NETX_DIR)/lib/classes.jar \
-	   -cp $(JUNIT_JAR) \
-	   -cp $(JUNIT_RUNNER_JAR) \
-	   -cp $(BOOT_DIR)/jre/lib/rt.jar \
-	   -cp $(BOOT_DIR)/jre/lib/jsse.jar \
-	   -cp $(BOOT_DIR)/jre/lib/resources.jar \
-	   -cp $(RHINO_RUNTIME) \
-	   -cp . \
-	   -cp $(TEST_EXTENSIONS_SRCDIR) \
-	   -cp $(TEST_EXTENSIONS_TESTS_DIR) \
-	   -ix "-org.junit.*" \
-	   -ix "-junit.*" \
-	   CommandLine $$class_names ; \
-	mv $(TEST_EXTENSIONS_DIR)/coverage.ec $(TEST_EXTENSIONS_DIR)/coverageX.ec ; \
-	mv $(TEST_EXTENSIONS_DIR)/coverage.es $(TEST_EXTENSIONS_DIR)/coverageX.es ; \
-	$(BOOT_DIR)/bin/java $(EMMA_JAVA_ARGS) -cp $(EMMA_JAR) emma merge \
-	  -in $(TESTS_DIR)/coverage.em \
-	  -in $(TEST_EXTENSIONS_DIR)/coverageX.ec \
-	  -in $(TEST_EXTENSIONS_DIR)/coverageX.es ; \
-	$(BOOT_DIR)/bin/java $(EMMA_JAVA_ARGS) -cp $(EMMA_JAR)  -Demma.report.html.out.encoding=UTF-8 emma report \
-	  -Dreport.html.out.encoding=UTF-8 \
-	  -in $(TEST_EXTENSIONS_DIR)/coverage.es  \
-	  -sp $(NETX_SRCDIR) \
-	  -sp $(NETX_UNIT_TEST_SRCDIR) \
-	  -sp $(JUNIT_RUNNER_SRCDIR) \
-	  -sp $(TEST_EXTENSIONS_SRCDIR) \
-	  -sp $(TEST_EXTENSIONS_TESTS_SRCDIR) \
-	  -r html \
-	  -r xml \
-	  "$${testcases_srcs[@]}" ; \
-	echo "restoring javaws and netx.jar in $(DESTDIR)" ; \
-	rm -f $(DESTDIR)$(bindir)/$(javaws) $(DESTDIR)$(datadir)/$(PACKAGE_NAME)/netx.jar ; \
-	rm -f $(DESTDIR)$(bindir)/$(javaws);  \
-	mv $$javaws_backup $(DESTDIR)$(bindir)/$(javaws);  \
-	mv $$netx_backup $(DESTDIR)$(datadir)/$(PACKAGE_NAME)/netx.jar ; \
-	for file in $(EMMA_MODIFIED_FILES) ; do \
-	  mv $(TEST_EXTENSIONS_DIR)/$$file  $(TEST_EXTENSIONS_DIR)/"$$file""$(EMMA_SUFFIX)" ; \
-	  mv $(TEST_EXTENSIONS_DIR)/"$$file""$(EMMA_BACKUP_SUFFIX)"  $(TEST_EXTENSIONS_DIR)/$$file ; \
-	done ;\
-	rm $(TEST_EXTENSIONS_DIR)/coverage.txt ; 
-else
-	echo "Sorry, coverage report cant be run without emma installed. Try install emma or specify with-emma value" ;
-	exit 5
-endif
-	touch $@
-
 $(COVERABLE_PLUGIN_DIR):
 	mkdir -p $(COVERABLE_PLUGIN_DIR);
 	
@@ -1280,6 +1237,8 @@ $(COVERABLE_PLUGIN_DIR)/%.o: $(PLUGIN_SRCDIR)/%.cc
 	   $(DEFS) $(VERSION_DEFS) \
 	  -DJDK_UPDATE_VERSION="\"$(JDK_UPDATE_VERSION)\"" \
 	  -DPLUGIN_NAME="\"IcedTea-Web Plugin with jacoco coverage agent\"" \
+	  -DJAVAWS_BIN="\"$(bindir)/$(javaws)\"" \
+	  -DJAVAWS_NAME="\"$(javaws)\"" \
 	  -DPLUGIN_VERSION="\"$(PLUGIN_VERSION)\"" \
 	  -DPACKAGE_URL="\"$(PACKAGE_URL)\"" \
 	  -DMOZILLA_VERSION_COLLAPSED="$(MOZILLA_VERSION_COLLAPSED)" \
@@ -1308,14 +1267,14 @@ stamps/run-reproducers-test-code-coverage-jacoco.stamp: stamps/run-netx-dist-tes
 stamps/compile-jacoco-operator.stamp stamps/build-fake-plugin.stamp
 if WITH_JACOCO
 	cd $(TESTS_DIR) ; \
-	for file in $(EMMA_MODIFIED_FILES) ; do \
+	for file in $(COVERAGE_MODIFIED_FILES) ; do \
 	  mv $(TEST_EXTENSIONS_DIR)/$$file $(TEST_EXTENSIONS_DIR)/"$$file""$(EMMA_BACKUP_SUFFIX)" ; \
 	done ;\
 	echo "backuping javaws in $(DESTDIR)$(bindir)" ; \
 	javaws_backup=$(DESTDIR)$(bindir)/javaws_backup ; \
 	mv $(DESTDIR)$(bindir)/javaws $$javaws_backup ;  \
 	echo "patching $(javaws)" ; \
-	nw_bootclasspath="$(LAUNCHER_BOOTCLASSPATH):$(JACOCO_CLASSPATH)" ; \
+	nw_bootclasspath="-Xbootclasspath/a:$(UNIFIED_JACOCO_CLASSPATH)" ; \
 	cat $$javaws_backup | sed "s|COMMAND.k.=\"..JAVA.\"|COMMAND[k]=\"\\$$\\{JAVA\\}\" ;  k=1 ; COMMAND[k]=$(JACOCO_AGENT_JAVAWS_SWITCH)|" | sed "s,$(LAUNCHER_BOOTCLASSPATH),$$nw_bootclasspath," > $(DESTDIR)$(bindir)/$(javaws) ; \
 	chmod 777 $(DESTDIR)$(bindir)/$(javaws) ; \
 	echo "backuping plugin in $(DESTDIR)/$(libdir)$(BUILT_PLUGIN_LIBRARY)" ; \
@@ -1337,9 +1296,9 @@ if WITH_JACOCO
 	  done ; \
 	cd $(TEST_EXTENSIONS_DIR) ; \
 	class_names=`cat $(REPRODUCERS_CLASS_NAMES)` ; \
-	CLASSPATH=$(NETX_DIR)/lib/classes.jar:$(JUNIT_JAR):$(JUNIT_RUNNER_JAR):.:$(TEST_EXTENSIONS_DIR):$(JACOCO_CLASSPATH):$(TEST_EXTENSIONS_TESTS_DIR):$(TEST_EXTENSIONS_SRCDIR) ; \
-	  $(BOOT_DIR)/bin/java $(JACOCO_AGENT_SWITCH) $(REPRODUCERS_DPARAMETERS) \
-	 -Xbootclasspath/a:$(RUNTIME):$$CLASSPATH CommandLine $$class_names ; \
+	CLASSPATH=$(call joinsegments, $(NETX_DIR)/lib/classes.jar $(JUNIT_RUNTIME) $(JUNIT_RUNNER_JAR) . $(TEST_EXTENSIONS_DIR) $(JACOCO_CLASSPATH) $(TEST_EXTENSIONS_TESTS_DIR) $(TEST_EXTENSIONS_SRCDIR)) ; \
+	  $(SYSTEM_JRE_DIR)/bin/java $(JACOCO_AGENT_SWITCH) $(REPRODUCERS_DPARAMETERS) \
+	 -Xbootclasspath/a:$$CLASSPATH CommandLine $$class_names ; \
 	if [ -f $(JACOCO_JAVAWS_RESULTS) ] ; then \
 	  jacoco_javaws_results=$(JACOCO_JAVAWS_RESULTS) ; \
 	  $(JACOCO_OPERATOR_EXEC) \
@@ -1368,7 +1327,7 @@ if WITH_JACOCO
 	mv $$javaws_backup $(DESTDIR)$(bindir)/$(javaws);  \
 	echo "restoring  plugin in $(DESTDIR)/$(libdir)$(BUILT_PLUGIN_LIBRARY)" ; \
 	mv $$plugin_backup $(DESTDIR)$(libdir)/$(BUILT_PLUGIN_LIBRARY) ; \
-	for file in $(EMMA_MODIFIED_FILES) ; do \
+	for file in $(COVERAGE_MODIFIED_FILES) ; do \
 	  mv $(TEST_EXTENSIONS_DIR)/$$file  $(TEST_EXTENSIONS_DIR)/"$$file""$(EMMA_SUFFIX)" ; \
 	  mv $(TEST_EXTENSIONS_DIR)/"$$file""$(EMMA_BACKUP_SUFFIX)"  $(TEST_EXTENSIONS_DIR)/$$file ; \
 	done ;
@@ -1407,57 +1366,21 @@ else
 	exit 5
 endif
 
-run-test-code-coverage: stamps/run-unit-test-code-coverage.stamps stamps/run-reproducers-test-code-coverage.stamps
-if WITH_EMMA
-	cd $(TESTS_DIR) ; \
-	k=0 ; \
-	types=($(ALL_REPRODUCERS)); \
-	for which in "$${types[@]}" ; do \
-	  . $(abs_top_srcdir)/NEW_LINE_IFS ; \
-	  simpleReproducers=(`cat $(abs_top_builddir)/junit-jnlp-dist-$$which.txt `); \
-	  IFS="$$IFS_BACKUP" ; \
-	  for dir in "$${simpleReproducers[@]}" ; do \
-	    testcases_srcs[k]="-sp" ; \
-	    k=$$((k+1)) ; \
-	    testcases_srcs[k]="$(REPRODUCERS_TESTS_SRCDIR)/$$which/$$dir/testcases/" ; \
-	    k=$$((k+1)) ; \
-	  done ; \
-	done ; \
-	$(BOOT_DIR)/bin/java $(EMMA_JAVA_ARGS) -cp $(EMMA_JAR) emma merge \
-	 -in $(NETX_UNIT_TEST_DIR)/coverage.es \
-	 -in $(TEST_EXTENSIONS_DIR)/coverage.es ; \
-	$(BOOT_DIR)/bin/java $(EMMA_JAVA_ARGS) -cp $(EMMA_JAR)  -Demma.report.html.out.encoding=UTF-8 emma report \
-	 -Dreport.html.out.encoding=UTF-8 \
-	 -in $(TESTS_DIR)/coverage.es \
-	 -in $(TESTS_DIR)/coverage.em \
-	 -sp $(NETX_SRCDIR) \
-	 -sp $(NETX_UNIT_TEST_SRCDIR) \
-	 -sp $(JUNIT_RUNNER_SRCDIR) \
-	 -sp $(TEST_EXTENSIONS_SRCDIR) \
-	 -sp $(TEST_EXTENSIONS_TESTS_SRCDIR) \
-	 "$${testcases_srcs[@]}" \
-	 -r html \
-	 -r xml ; 
-else
-	echo "Sorry, coverage report cant be run without emma installed. Try install emma or specify with-emma value" ;
-	exit 5
-endif
-
 run-test-server-on-44321: stamps/netx.stamp stamps/junit-jnlp-dist-dirs stamps/netx-dist-tests-import-cert-to-public \
  stamps/test-extensions-compile.stamp stamps/compile-reproducers-testcases.stamp $(JUNIT_RUNNER_JAR) stamps/copy-reproducers-resources.stamp
 	cd $(TEST_EXTENSIONS_DIR) ; \
-	CLASSPATH=$(NETX_DIR)/lib/classes.jar:$(JUNIT_JAR):$(JUNIT_RUNNER_JAR):.:$(TEST_EXTENSIONS_TESTS_DIR) ; \
-	  $(BOOT_DIR)/bin/java $(REPRODUCERS_DPARAMETERS) \
-	 -Xbootclasspath/a:$(RUNTIME):$$CLASSPATH net.sourceforge.jnlp.ServerAccess
+	CLASSPATH=$(call joinsegments, $(NETX_DIR)/lib/classes.jar $(JUNIT_RUNTIME) $(JUNIT_RUNNER_JAR) . $(TEST_EXTENSIONS_TESTS_DIR)) ; \
+	  $(SYSTEM_JRE_DIR)/bin/java $(REPRODUCERS_DPARAMETERS) \
+	 -Xbootclasspath/a:$$CLASSPATH net.sourceforge.jnlp.ServerAccess
 
 run-test-server-on-random-port: stamps/netx.stamp stamps/junit-jnlp-dist-dirs stamps/netx-dist-tests-import-cert-to-public \
  stamps/test-extensions-compile.stamp stamps/compile-reproducers-testcases.stamp $(JUNIT_RUNNER_JAR) stamps/copy-reproducers-resources.stamp
 	cd $(TEST_EXTENSIONS_DIR) ; \
-	CLASSPATH=$(NETX_DIR)/lib/classes.jar:$(JUNIT_JAR):$(JUNIT_RUNNER_JAR):.:$(TEST_EXTENSIONS_TESTS_DIR) ; \
-	  $(BOOT_DIR)/bin/java $(REPRODUCERS_DPARAMETERS) \
-	 -Xbootclasspath/a:$(RUNTIME):$$CLASSPATH net.sourceforge.jnlp.ServerAccess randomport 
+	CLASSPATH=$(call joinsegments, $(NETX_DIR)/lib/classes.jar $(JUNIT_RUNTIME) $(JUNIT_RUNNER_JAR) . $(TEST_EXTENSIONS_TESTS_DIR)) ; \
+	  $(SYSTEM_JRE_DIR)/bin/java $(REPRODUCERS_DPARAMETERS) \
+	 -Xbootclasspath/a:$$CLASSPATH net.sourceforge.jnlp.ServerAccess randomport 
 
-clean-netx-tests: clean-netx-unit-tests clean-junit-runner clean-netx-dist-tests clean-test-code-coverage-jacoco clean-test-code-coverage
+clean-netx-tests: clean-netx-unit-tests clean-junit-runner clean-netx-dist-tests clean-test-code-coverage-jacoco
 	if [ -e $(TESTS_DIR)/netx ]; then \
 	  rmdir $(TESTS_DIR)/netx ; \
 	fi
@@ -1481,10 +1404,7 @@ clean_tests_reports:
 	rm -f $(TESTS_DIR)/summary_unit.txt
 	rm -f $(TESTS_DIR)/summary_reproducers.txt
 
-clean-$(SOFTKILLER):
-	rm -f $(TESTS_DIR)/softkiller
- 
-clean-netx-dist-tests: clean_tests_reports netx-dist-tests-remove-cert-from-public clean-custom-reproducers clean-$(SOFTKILLER)
+clean-netx-dist-tests: clean_tests_reports netx-dist-tests-remove-cert-from-public clean-custom-reproducers
 	rm -f test-extensions-source-files.txt
 	rm -f test-extensions-tests-source-files.txt
 	rm -f $(TEST_EXTENSIONS_COMPATIBILITY_SYMLINK)
@@ -1513,34 +1433,6 @@ clean-netx-dist-tests: clean_tests_reports netx-dist-tests-remove-cert-from-publ
 	rm -f $(REPRODUCERS_CLASS_NAMES)
 	rm -f $(abs_top_builddir)/$(PRIVATE_KEYSTORE_NAME)
 	rm -f stamps/run-netx-dist-tests.stamp
-
-clean-unit-test-code-coverage:
-	if [ -e stamps/run-unit-test-code-coverage.stamp ]; then \
-	  rm -rf $(NETX_UNIT_TEST_DIR)/coverage ; \
-	  rm -f $(NETX_UNIT_TEST_DIR)/coverage.xml ; \
-	  rm -f $(NETX_UNIT_TEST_DIR)/coverageX.es ; \
-	  rm -f $(NETX_UNIT_TEST_DIR)/coverageX.ec ; \
-	  rm -f $(NETX_UNIT_TEST_DIR)/coverage.es ; \
-	  rm -f $(NETX_UNIT_TEST_DIR)/tests-output_withEmma.xml ; \
-	  rm -f stamps/run-unit-test-code-coverage.stamp ; \
-	fi
-
-clean-reproducers-test-code-coverage:
-	if [ -e stamps/run-reproducers-test-code-coverage.stamp ]; then \
-	 rm -rf $(TEST_EXTENSIONS_DIR)/coverage ; \
-	 rm -f $(TEST_EXTENSIONS_DIR)/coverage.xml ; \
-	 rm -f $(TEST_EXTENSIONS_DIR)/coverage.es ; \
-	 rm -f $(TEST_EXTENSIONS_DIR)/tests-output_withEmma.xml ; \
-	 rm -f stamps/run-reproducers-test-code-coverage.stamp ; \
-	fi
-
-clean-test-code-coverage: clean-unit-test-code-coverage clean-reproducers-test-code-coverage
-	if [ -e $(TESTS_DIR)/coverage.xml ]; then \
-	  rm -rf $(TESTS_DIR)/coverage  ; \
-	  rm -f $(TESTS_DIR)/coverage.xml  ; \
-	  rm -f $(TESTS_DIR)/coverage.es  ; \
-	  rm -f $(TESTS_DIR)/coverage.em ; \
-	fi
 
 clean-unit-test-code-coverage-jacoco:
 	if [ -e stamps/run-unit-test-code-coverage-jacoco.stamp ]; then \
@@ -1579,17 +1471,16 @@ clean-test-code-coverage-tools-jacoco:
 	rm -f jacoco-operator-source-files.txt
 	rm -f stamps/build-fake-plugin.stamp
 
-
 # plugin tests
 
 if ENABLE_PLUGIN
 stamps/plugin-tests.stamp: $(PLUGIN_TEST_SRCS) stamps/plugin.stamp
 	mkdir -p plugin/tests/LiveConnect
-	$(BOOT_DIR)/bin/javac $(IT_JAVACFLAGS) \
+	$(SYSTEM_JDK_DIR)/bin/javac $(IT_JAVACFLAGS) \
 	 -d plugin/tests/LiveConnect \
 	 -classpath liveconnect/lib/classes.jar \
 	 $(PLUGIN_TEST_SRCS) ;
-	$(BOOT_DIR)/bin/jar cf plugin/tests/LiveConnect/PluginTest.jar \
+	$(SYSTEM_JDK_DIR)/bin/jar cf plugin/tests/LiveConnect/PluginTest.jar \
 	  plugin/tests/LiveConnect/*.class ;
 	cp -pPR $(SRC_DIR_LINK) $(abs_top_srcdir)/plugin/tests/LiveConnect/*.{js,html} \
 	  plugin/tests/LiveConnect ;
@@ -1597,78 +1488,6 @@ stamps/plugin-tests.stamp: $(PLUGIN_TEST_SRCS) stamps/plugin.stamp
 	mkdir -p stamps
 	touch stamps/plugin-tests.stamp
 endif
-
-# Bootstrap Directory Targets
-# ===========================
-
-stamps/native-ecj.stamp: 
-	mkdir -p stamps ; \
-	if test "x$(GCJ)" != "xno"; then \
-	  $(GCJ) $(IT_CFLAGS) -Wl,-Bsymbolic -findirect-dispatch -o native-ecj \
-	    --main=org.eclipse.jdt.internal.compiler.batch.Main ${ECJ_JAR} ; \
-	fi ; \
-	touch stamps/native-ecj.stamp
-
-clean-native-ecj:
-	rm -f native-ecj
-	rm -rf stamps/native-ecj.stamp
-
-# bootstrap
-stamps/bootstrap-directory.stamp: stamps/native-ecj.stamp
-	mkdir -p $(BOOT_DIR)/bin stamps/
-	ln -sf $(JAVA) $(BOOT_DIR)/bin/java
-	ln -sf $(JAR) $(BOOT_DIR)/bin/jar
-	ln -sf $(abs_top_builddir)/javac $(BOOT_DIR)/bin/javac
-	ln -sf $(JAVADOC) $(BOOT_DIR)/bin/javadoc
-	if [ -e "$(KEYTOOL)" ] ; then \
-	  ln -sf $(KEYTOOL) $(BOOT_DIR)/bin/keytool ;\
-	else \
-	  echo "#! /bin/sh" > $(BOOT_DIR)/bin/keytool ;\
-	  echo "echo \"keytool not exist on your system, signed part of reproducers test will fail\"" >> $(BOOT_DIR)/bin/keytool ;\
-	  chmod 777 $(BOOT_DIR)/bin/keytool ;\
-	fi
-	if [ -e "$(JARSIGNER)" ] ; then \
-	  ln -sf $(JARSIGNER) $(BOOT_DIR)/bin/jarsigner ;\
-	else \
-	  echo "#! /bin/sh" > $(BOOT_DIR)/bin/jarsigner ;\
-	  echo "echo \"jarsigner not exist on your system, signed part of reproducers test will fail\"" >> $(BOOT_DIR)/bin/jarsigner ;\
-	  chmod 777 $(BOOT_DIR)/bin/jarsigner ;\
-	fi
-	mkdir -p $(BOOT_DIR)/jre/lib && \
-	ln -s $(SYSTEM_JRE_DIR)/lib/rt.jar $(BOOT_DIR)/jre/lib && \
-	if [ -e $(SYSTEM_JRE_DIR)/lib/jsse.jar ] ; then \
-	  ln -s $(SYSTEM_JRE_DIR)/lib/jsse.jar $(BOOT_DIR)/jre/lib ; \
-	else \
-	  ln -s rt.jar $(BOOT_DIR)/jre/lib/jsse.jar ; \
-	fi
-	if [ -e $(SYSTEM_JRE_DIR)/lib/resources.jar ] ; then \
-	  ln -s $(SYSTEM_JRE_DIR)/lib/resources.jar $(BOOT_DIR)/jre/lib ; \
-	else \
-	  ln -s rt.jar $(BOOT_DIR)/jre/lib/resources.jar ; \
-	fi
-	ln -sf $(SYSTEM_JRE_DIR)/lib/$(JRE_ARCH_DIR) \
-	  $(BOOT_DIR)/jre/lib/ && \
-	if ! test -d $(BOOT_DIR)/jre/lib/$(INSTALL_ARCH_DIR); \
-	  then \
-	  ln -sf ./$(JRE_ARCH_DIR) \
-	    $(BOOT_DIR)/jre/lib/$(INSTALL_ARCH_DIR); \
-	fi;
-	mkdir -p $(BOOT_DIR)/include && \
-	for i in $(SYSTEM_JDK_DIR)/include/*; do \
-	  test -r $$i | continue; \
-	  i=`basename $$i`; \
-	  rm -f $(BOOT_DIR)/include/$$i; \
-	  ln -s $(SYSTEM_JDK_DIR)/include/$$i $(BOOT_DIR)/include/$$i; \
-	done
-	mkdir -p stamps
-	touch stamps/bootstrap-directory.stamp
-
-clean-bootstrap-directory:
-	rm -rf $(BOOT_DIR)
-	if [ -e ${abs_top_builddir}/bootstrap ] ; then \
-	  rmdir ${abs_top_builddir}/bootstrap ; \
-	fi
-	rm -f stamps/bootstrap-directory.stamp
 
 # Target Aliases
 # ===============
@@ -1694,10 +1513,6 @@ links: stamps/global-links.stamp
 user-links: stamps/user-links.stamp
 
 run-netx-dist-tests: stamps/run-netx-dist-tests.stamp
-
-run-unit-test-code-coverage: stamps/run-unit-test-code-coverage.stamp
-
-run-reproducers-test-code-coverage: stamps/run-reproducers-test-code-coverage.stamp
 
 run-unit-test-code-coverage-jacoco: stamps/run-unit-test-code-coverage-jacoco.stamp
 

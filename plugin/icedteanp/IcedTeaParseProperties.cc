@@ -136,23 +136,14 @@ string get_log_dir(){
 		}
 		string itw_dir = config_dir+"/icedtea-web";
 		string log_dir = itw_dir+"/"+default_itw_log_dir_name;
-		mkdir_checked(itw_dir);
-		mkdir_checked(log_dir);
+		bool created_config = IcedTeaPluginUtilities::create_dir(itw_dir);
+		bool created_log = IcedTeaPluginUtilities::create_dir(log_dir);
+		if (!created_config || !created_log){
+			PLUGIN_ERROR("IcedTea-Web log directory creation failed. IcedTea-Web may fail to work!");
+		}
 		return log_dir;
 	}
 	return value;
-}
-
-void mkdir_checked(string dir){
-	if (!IcedTeaPluginUtilities::file_exists(dir))
-	{
-		const int PERMISSIONS_MASK = S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH; // 0755
-		int stat = g_mkdir(dir.c_str(), PERMISSIONS_MASK);
-		if (stat != 0)
-		{
-			PLUGIN_DEBUG("WARNING: Creation of directory %s failed: %s\n", dir.c_str(), strerror(errno));
-		}
-	}
 }
 
 string main_properties_file(){

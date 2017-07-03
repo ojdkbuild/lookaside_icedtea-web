@@ -17,6 +17,10 @@
 package net.sourceforge.jnlp;
 
 import java.util.*;
+import javax.swing.JOptionPane;
+import net.sourceforge.jnlp.runtime.JNLPRuntime;
+import net.sourceforge.jnlp.runtime.Translator;
+import net.sourceforge.jnlp.util.logging.OutputController;
 
 /**
  * <p>
@@ -39,6 +43,61 @@ import java.util.*;
  * @version $Revision: 1.5 $
  */
 public class Version {
+    
+    /**
+     * This is special case of version, used only for checking jre version. If
+     * jre do not match, in strict not-headless mode the dialog with
+     * confirrmation appears If jre do not match, in strict headless mode the
+     * exception is thrown If jre match, or non-strict mode is run, then only
+     * message is printed
+     *
+     */
+    public static class JreVersion extends Version {
+
+        public static boolean warned = false;
+
+        public JreVersion(String v, boolean strict) {
+            this(v, strict, JNLPRuntime.isHeadless());
+        }
+
+        /*
+         *  for testing purposes
+         */
+        JreVersion(String v, boolean strict, boolean headless) {
+            super(v);
+            boolean match = matchesJreVersion();
+            if (!match) {
+                String s = Translator.R("JREversionDontMatch", getJreVersion(), v);
+                String e = "Strict run is  deffined, and your JRE - " + getJreVersion() + " - dont match requested JRE(s) - " + v;
+                if (strict) {
+                    if (!headless) {
+                        if (!warned) {
+                            int r = JOptionPane.showConfirmDialog(null, s + "\n" + Translator.R("JREContinueDialogSentence2"), Translator.R("JREContinueDialogSentenceTitle"), JOptionPane.YES_NO_OPTION);
+                            if (r == JOptionPane.NO_OPTION) {
+                                throw new RuntimeException(e);
+                            }
+                            warned = true;
+                        }
+                    } else {
+                        throw new RuntimeException(e);
+                    }
+                } else {
+                    OutputController.getLogger().log(OutputController.Level.WARNING_ALL, s);
+                }
+            } else {
+                OutputController.getLogger().log("good - your JRE - " + getJreVersion() + " - match requested JRE - " + v);
+            }
+        }
+
+        public boolean matchesJreVersion() {
+            return matches(getJreVersion());
+        }
+
+        private String getJreVersion() {
+            return System.getProperty("java.version");
+        }
+
+    }
 
     // to do: web start does not match versions with a "-" like
     // "1.4-beta1" using the + modifier, change to mimic that
@@ -49,35 +108,33 @@ public class Version {
     // "*" and "+" modifiers.
 
     /** separates parts of a version string */
-    private static String seperators = ".-_";
+    private static final String seperators = ".-_";
 
     /** magic key for whether a version part was created due to normalization */
-    private static String emptyString = new String("<EMPTY>"); // not intern'ed
+    private static final String emptyString = new String("<EMPTY>"); // not intern'ed
 
     /** contains all the versions matched */
-    private String versionString;
+    private final String versionString;
 
     /**
      * Create a Version object based on a version string (ie,
      * "1.2.3+ 4.56*").
+     * @param versions string describing version
      */
     public Version(String versions) {
         versionString = versions;
     }
 
     /**
-     * Returns true if the version represents a <i>version-id</i> (a
+     * @return true if the version represents a <i>version-id</i> (a
      * single version number such as 1.2) and false otherwise.
      */
     public boolean isVersionId() {
-        if (-1 != versionString.indexOf(" "))
-            return false;
-
-        return true;
+        return -1 == versionString.indexOf(" ");
     }
 
     /**
-     * Returns true if all of this version's version-ids match one
+     * @return true if all of this version's version-ids match one
      * or more of the specifed version's version-id.
      *
      * @param version a version string
@@ -87,7 +144,7 @@ public class Version {
     }
 
     /**
-     * Returns true if all of this version's version-ids match one
+     * @return true if all of this version's version-ids match one
      * or more of the specifed version's version-id.
      *
      * @param version a Version object
@@ -95,16 +152,17 @@ public class Version {
     public boolean matches(Version version) {
         List<String> versionStrings = version.getVersionStrings();
 
-        for (int i = 0; i < versionStrings.size(); i++) {
-            if (!this.matchesSingle(versionStrings.get(i)))
+        for (String versionString1 : versionStrings) {
+            if (!this.matchesSingle(versionString1)) {
                 return false;
+            }
         }
 
         return true;
     }
 
     /**
-     * Returns true if any of this version's version-ids match one
+     * @return true if any of this version's version-ids match one
      * or more of the specifed version's version-id.
      *
      * @param version a version string
@@ -114,7 +172,7 @@ public class Version {
     }
 
     /**
-     * Returns true if any of this version's version-ids match one
+     * @return true if any of this version's version-ids match one
      * or more of the specifed version's version-id.
      *
      * @param version a Version object
@@ -122,9 +180,10 @@ public class Version {
     public boolean matchesAny(Version version) {
         List<String> versionStrings = version.getVersionStrings();
 
-        for (int i = 0; i < versionStrings.size(); i++) {
-            if (this.matchesSingle(versionStrings.get(i)))
+        for (String versionString1 : versionStrings) {
+            if (this.matchesSingle(versionString1)) {
                 return true;
+            }
         }
 
         return false;
@@ -138,9 +197,10 @@ public class Version {
      */
     private boolean matchesSingle(String version) {
         List<String> versionStrings = this.getVersionStrings();
-        for (int i = 0; i < versionStrings.size(); i++) {
-            if (matches(version, versionStrings.get(i)))
+        for (String versionString1 : versionStrings) {
+            if (matches(version, versionString1)) {
                 return true;
+            }
         }
         return false;
     }
@@ -160,7 +220,7 @@ public class Version {
         if (version.endsWith("*")) // star means rest of parts irrelevant: truncate them
             maxLength = parts.size();
 
-        List<List<String>> versions = new ArrayList<List<String>>();
+        List<List<String>> versions = new ArrayList<>();
         versions.add(subparts);
         versions.add(parts);
         normalize(versions, maxLength);
@@ -168,14 +228,11 @@ public class Version {
         if (equal(subparts, parts))
             return true;
 
-        if (version.endsWith("+") && greater(subparts, parts))
-            return true;
-
-        return false;
+        return version.endsWith("+") && greater(subparts, parts);
     }
 
     /**
-     * Returns whether the parts of one version are equal to the
+     * @return whether the parts of one version are equal to the
      * parts of another version.
      *
      * @param parts1 normalized version parts
@@ -191,7 +248,7 @@ public class Version {
     }
 
     /**
-     * Returns whether the parts of one version are greater than
+     * @return whether the parts of one version are greater than
      * the parts of another version.
      *
      * @param parts1 normalized version parts
@@ -229,8 +286,8 @@ public class Version {
      * @return comparison of the two parts
      */
     protected int compare(String part1, String part2) {
-        Integer number1 = Integer.valueOf(0);
-        Integer number2 = Integer.valueOf(0);
+        Integer number1 = 0;
+        Integer number2 = 0;
 
         // compare as integers
         // for normalization key, compare exact object, not using .equals
@@ -281,10 +338,10 @@ public class Version {
     }
 
     /**
-     * Return the individual version strings that make up a Version.
+     * @return the individual version strings that make up a Version.
      */
     protected List<String> getVersionStrings() {
-        ArrayList<String> strings = new ArrayList<String>();
+        ArrayList<String> strings = new ArrayList<>();
 
         StringTokenizer st = new StringTokenizer(versionString, " ");
         while (st.hasMoreTokens())
@@ -294,12 +351,12 @@ public class Version {
     }
 
     /**
-     * Return the constituent parts of a version string.
+     * @return the constituent parts of a version string.
      *
      * @param oneVersion a single version id string (not compound)
      */
     protected List<String> getParts(String oneVersion) {
-        ArrayList<String> strings = new ArrayList<String>();
+        ArrayList<String> strings = new ArrayList<>();
 
         StringTokenizer st = new StringTokenizer(oneVersion, seperators + "+*");
         while (st.hasMoreTokens()) {
@@ -309,6 +366,7 @@ public class Version {
         return strings;
     }
 
+    @Override
     public String toString() {
         return versionString;
     }  

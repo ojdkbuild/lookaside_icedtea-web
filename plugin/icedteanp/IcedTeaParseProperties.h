@@ -45,7 +45,6 @@ exception statement from your version. */
 //public api
 std::string  user_properties_file();
 std::string  get_log_dir();
-void  mkdir_checked(std::string);
 bool  find_system_config_file(std::string& dest);
 bool  find_custom_jre(std::string& dest);
 bool  read_deploy_property_value(std::string property, std::string& dest);

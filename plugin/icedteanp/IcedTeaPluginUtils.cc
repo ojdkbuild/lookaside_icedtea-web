@@ -59,6 +59,33 @@ std::queue<std::string> pre_jvm_message;
 /* Plugin async call queue */
 static std::vector< PluginThreadCall* >* pendingPluginThreadRequests = new std::vector< PluginThreadCall* >();
 
+bool
+IcedTeaPluginUtilities::create_dir(std::string dir)
+{
+	if (file_exists(dir))
+	{
+		if (!is_directory(dir))
+		{
+			PLUGIN_ERROR("WARNING: Needed to create directory %s but there is already a file of the same name at this location.\n", dir.c_str());
+			return false;
+		}
+		PLUGIN_DEBUG("Directory %s already exists\n", dir.c_str());
+	} else
+	{
+		PLUGIN_DEBUG("Directory %s does not yet exist\n", dir.c_str());
+		const int PERMISSIONS_MASK = S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH; // 0755
+		bool created_directory = (g_mkdir(dir.c_str(), PERMISSIONS_MASK) == 0);
+		int err = errno;
+		if (!created_directory)
+		{
+			PLUGIN_ERROR("WARNING: Failed to create new directory %s. Reason: %s\n", dir.c_str(), strerror(err));
+			return false;
+		}
+		PLUGIN_DEBUG("Directory %s created\n", dir.c_str());
+	}
+	return true;
+}
+
 void *flush_pre_init_messages(void* data) {
   while (true){
     struct timespec ts;
@@ -836,7 +863,7 @@ javaJSObjectResultToNPVariant(const std::string& js_id, NPVariant* variant)
 }
 
 static bool
-javaObjectResultToNPVariant(NPP instance, const std::string& jobject_id, NPVariant* variant)
+javaObjectResultToNPVariant(NPP instance, const std::string& jclass_name, const std::string& jobject_id, NPVariant* variant)
 {
     // Reference the class object so we can construct an NPObject with it and the instance
 
@@ -851,12 +878,14 @@ javaObjectResultToNPVariant(NPP instance, const std::string& jobject_id, NPVaria
     std::string jclass_id = *jclass_result->return_string;
 
     NPObject* obj;
-    if (jclass_id.at(0) == '[') // array
+    if (jclass_name.at(0) == '[') // array
     {
+        PLUGIN_DEBUG( "javaObjectResultToNPVariant Array detected: \"%s\"\n", jclass_name.c_str());
         obj = IcedTeaScriptableJavaObject::get_scriptable_java_object(instance, jclass_id,
                 jobject_id, true);
     } else
     {
+        PLUGIN_DEBUG( "javaObjectResultToNPVariant Scalar object: \"%s\"\n", jclass_name.c_str());
         obj = IcedTeaScriptableJavaObject::get_scriptable_java_object(instance, jclass_id,
                 jobject_id, false);
     }
@@ -897,7 +926,8 @@ IcedTeaPluginUtilities::javaResultToNPVariant(NPP instance,
             return javaStringResultToNPVariant(jobject_id, variant);
         } else // Else this needs a java object wrapper
         {
-            return javaObjectResultToNPVariant(instance, jobject_id, variant);
+            return javaObjectResultToNPVariant(instance, *jclassname_result->return_string,
+                   jobject_id, variant);
         }
     }
 
@@ -1134,6 +1164,17 @@ bool IcedTeaPluginUtilities::file_exists(std::string filename)
 {
     std::ifstream infile(filename.c_str());
     return infile.good();
+}
+
+bool IcedTeaPluginUtilities::is_directory(std::string filename)
+{
+	if (!file_exists)
+	{
+		return false;
+	}
+	struct stat buf;
+	stat(filename.c_str(), &buf);
+	return S_ISDIR(buf.st_mode);
 }
 
 void IcedTeaPluginUtilities::initFileLog(){

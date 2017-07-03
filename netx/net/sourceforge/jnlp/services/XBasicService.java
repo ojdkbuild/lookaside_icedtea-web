@@ -19,8 +19,10 @@ package net.sourceforge.jnlp.services;
 import static net.sourceforge.jnlp.runtime.Translator.R;
 
 import java.io.IOException;
+import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.net.URLConnection;
 
 import javax.jnlp.BasicService;
 import javax.swing.JOptionPane;
@@ -59,6 +61,7 @@ class XBasicService implements BasicService {
      * JAR was specified then the location of the JAR containing the
      * main class is returned.
      */
+    @Override
     public URL getCodeBase() {
         ApplicationInstance app = JNLPRuntime.getApplication();
 
@@ -88,16 +91,12 @@ class XBasicService implements BasicService {
     /**
      * Return true if the Environment is Offline
      */
+    @Override
     public boolean isOffline() {
 
         URL url = findFirstURLFromJNLPFile();
-
-        try {
-            url.openConnection().getInputStream().close();
-            return false;
-        } catch (IOException exception) {
-            return true;
-        }
+        JNLPRuntime.detectOnline(url);
+        return !JNLPRuntime.isOnline();
     }
 
     /**
@@ -148,6 +147,7 @@ class XBasicService implements BasicService {
     /**
      * Return true if a Web Browser is Supported
      */
+    @Override
     public boolean isWebBrowserSupported() {
         initialize();
 
@@ -159,6 +159,7 @@ class XBasicService implements BasicService {
      *
      * @return whether the document was opened
      */
+    @Override
     public boolean showDocument(URL url) {
         initialize();
 

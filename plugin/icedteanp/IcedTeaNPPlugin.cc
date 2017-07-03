@@ -64,16 +64,24 @@ exception statement from your version. */
 #define PLUGIN_FULL_NAME PLUGIN_NAME " (using " PLUGIN_VERSION ")"
 #define PLUGIN_DESC "The <a href=\"" PACKAGE_URL "\">" PLUGIN_NAME "</a> executes Java applets."
 
-#ifdef HAVE_JAVA7
- #define JPI_VERSION "1.7.0_" JDK_UPDATE_VERSION
- #define PLUGIN_APPLET_MIME_DESC7 \
-  "application/x-java-applet;version=1.7:class,jar:IcedTea;"
- #define PLUGIN_BEAN_MIME_DESC7 \
-  "application/x-java-bean;version=1.7:class,jar:IcedTea;"
+#ifdef HAVE_JAVA9
+ #define JPI_VERSION "1.9.0_" JDK_UPDATE_VERSION
+ #define PLUGIN_APPLET_MIME_DESC \
+  "application/x-java-applet;version=1.8:class,jar:IcedTea;"\
+  "application/x-java-applet;version=1.9:class,jar:IcedTea;"
+ #define PLUGIN_BEAN_MIME_DESC \
+  "application/x-java-bean;version=1.8:class,jar:IcedTea;" \
+  "application/x-java-bean;version=1.9:class,jar:IcedTea;"
+#elif HAVE_JAVA8
+ #define JPI_VERSION "1.8.0_" JDK_UPDATE_VERSION
+ #define PLUGIN_APPLET_MIME_DESC \
+  "application/x-java-applet;version=1.8:class,jar:IcedTea;"
+ #define PLUGIN_BEAN_MIME_DESC \
+  "application/x-java-bean;version=1.8:class,jar:IcedTea;"
 #else
- #define JPI_VERSION "1.6.0_" JDK_UPDATE_VERSION
- #define PLUGIN_APPLET_MIME_DESC7
- #define PLUGIN_BEAN_MIME_DESC7
+ #define JPI_VERSION "1.7.0_" JDK_UPDATE_VERSION
+ #define PLUGIN_APPLET_MIME_DESC
+ #define PLUGIN_BEAN_MIME_DESC
 #endif
 
 #define PLUGIN_MIME_DESC                                               \
@@ -93,7 +101,8 @@ exception statement from your version. */
   "application/x-java-applet;version=1.4.2:class,jar:IcedTea;"         \
   "application/x-java-applet;version=1.5:class,jar:IcedTea;"           \
   "application/x-java-applet;version=1.6:class,jar:IcedTea;"           \
-  PLUGIN_APPLET_MIME_DESC7 \
+  "application/x-java-applet;version=1.7:class,jar:IcedTea;"           \
+  PLUGIN_APPLET_MIME_DESC \
   "application/x-java-applet;jpi-version=" JPI_VERSION ":class,jar:IcedTea;"  \
   "application/x-java-bean:class,jar:IcedTea;"                         \
   "application/x-java-bean;version=1.1:class,jar:IcedTea;"             \
@@ -110,7 +119,8 @@ exception statement from your version. */
   "application/x-java-bean;version=1.4.2:class,jar:IcedTea;"           \
   "application/x-java-bean;version=1.5:class,jar:IcedTea;"             \
   "application/x-java-bean;version=1.6:class,jar:IcedTea;"             \
-  PLUGIN_BEAN_MIME_DESC7 \
+  "application/x-java-bean;version=1.7:class,jar:IcedTea;"             \
+  PLUGIN_BEAN_MIME_DESC \
   "application/x-java-bean;jpi-version=" JPI_VERSION ":class,jar:IcedTea;"    \
   "application/x-java-vm-npruntime::IcedTea;"
 
@@ -129,6 +139,10 @@ static DIR *data_directory_descriptor;
 // Fully-qualified appletviewer default  executable and rt.jar
 static const char* appletviewer_default_executable = ICEDTEA_WEB_JRE "/bin/java";
 static const char* appletviewer_default_rtjar = ICEDTEA_WEB_JRE "/lib/rt.jar";
+//javaws name and binary
+static const char* javaws_bin_property = "-Dicedtea-web.bin.location=" JAVAWS_BIN;
+static const char* javaws_name_property = "-Dicedtea-web.bin.name=" JAVAWS_NAME;
+
 
 // Applet viewer input channel (needs to be static because it is used in plugin_in_pipe_callback)
 static GIOChannel* in_from_appletviewer = NULL;
@@ -1478,7 +1492,9 @@ plugin_start_appletviewer (ITNPPluginData* data)
   // Construct command line parameters
 
   command_line.push_back(get_plugin_executable());
-
+  //for javaws shortcuts
+  command_line.push_back(javaws_bin_property);
+  command_line.push_back(javaws_name_property);
   //Add JVM args to command_line
   for (int i = 0; i < jvm_args->size(); i++)
   {

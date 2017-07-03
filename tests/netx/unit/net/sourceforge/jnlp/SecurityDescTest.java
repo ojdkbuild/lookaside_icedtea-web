@@ -112,7 +112,7 @@ public class SecurityDescTest {
     }
 
     @Test
-    public void testGetHostWithSpecifiedPortWithUserInfoWi() throws Exception {
+    public void testGetHostWithSpecifiedPortWithUserInfo() throws Exception {
         final URI codebase = new URI("http://user:password@example.com");
         final URI expected = new URI("http://user:password@example.com:80");
         assertEquals(expected, SecurityDesc.getHostWithSpecifiedPort(codebase, 80));

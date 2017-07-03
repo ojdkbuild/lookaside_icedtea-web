@@ -40,7 +40,15 @@ package net.sourceforge.jnlp.security;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.IOException;
+import java.security.Key;
 import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.UnrecoverableKeyException;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateException;
+import javax.net.ssl.KeyManagerFactory;
 
 import net.sourceforge.jnlp.security.KeyStores.Level;
 import net.sourceforge.jnlp.security.KeyStores.Type;
@@ -48,15 +56,11 @@ import net.sourceforge.jnlp.util.logging.OutputController;
 
 public class SecurityUtil {
 
-    private static final char[] password = "changeit".toCharArray();
-
+  
     public static String getTrustedCertsFilename() throws Exception {
-        return KeyStores.getKeyStoreLocation(Level.USER, Type.CERTS);
+        return KeyStores.getKeyStoreLocation(Level.USER, Type.CERTS).getFullPath();
     }
 
-    public static char[] getTrustedCertsPassword() {
-        return password;
-    }
 
     /**
      * Extracts the CN field from a Certificate principal string. Or, if it
@@ -64,6 +68,8 @@ public class SecurityUtil {
      *
      * This is a simple (and hence 'wrong') version. See
      * http://www.ietf.org/rfc/rfc2253.txt for all the gory details.
+     * @param principal string, CN to be extracted from
+     * @return extracted CN
      */
     public static String getCN(String principal) {
 
@@ -163,6 +169,7 @@ public class SecurityUtil {
      * If it does not exist, it tries to create an empty keystore.
      * @return true if the trusted.certs file exists or a new trusted.certs
      * was created successfully, otherwise false.
+     * @throws java.lang.Exception if check goes wrong
      */
     public static boolean checkTrustedCertsFile() throws Exception {
 
@@ -179,10 +186,8 @@ public class SecurityUtil {
             //made directory, or directory exists
             if (madeDir || dir.isDirectory()) {
                 KeyStore ks = KeyStore.getInstance("JKS");
-                ks.load(null, password);
-                FileOutputStream fos = new FileOutputStream(certFile);
-                ks.store(fos, password);
-                fos.close();
+                loadKeyStore(ks, null);
+                storeKeyStore(ks, certFile);
                 return true;
             } else {
                 return false;
@@ -193,8 +198,9 @@ public class SecurityUtil {
     }
 
     /**
-     * Returns the keystore associated with the user's trusted.certs file,
+     * @return the keystore associated with the user's trusted.certs file,
      * or null otherwise.
+     * @throws java.lang.Exception if getting fails
      */
     public static KeyStore getUserKeyStore() throws Exception {
 
@@ -206,9 +212,8 @@ public class SecurityUtil {
             try {
                 File file = new File(getTrustedCertsFilename());
                 if (file.exists()) {
-                    fis = new FileInputStream(file);
                     ks = KeyStore.getInstance("JKS");
-                    ks.load(fis, password);
+                    loadKeyStore(ks, file);
                 }
             } catch (Exception e) {
                 OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e);
@@ -222,8 +227,9 @@ public class SecurityUtil {
     }
 
     /**
-     * Returns the keystore associated with the JDK cacerts file,
-         * or null otherwise.
+     * @return the keystore associated with the JDK cacerts file,
+     * or null otherwise.
+     * @throws java.lang.Exception if get fails
      */
     public static KeyStore getCacertsKeyStore() throws Exception {
 
@@ -249,8 +255,9 @@ public class SecurityUtil {
     }
 
     /**
-     * Returns the keystore associated with the system certs file,
+     * @return the keystore associated with the system certs file,
      * or null otherwise.
+     * @throws java.lang.Exception if get goes wrong
      */
     public static KeyStore getSystemCertStore() throws Exception {
 
@@ -277,4 +284,126 @@ public class SecurityUtil {
 
         return caks;
     }
+    
+     public static void initKeyManagerFactory(KeyManagerFactory kmf, KeyStore ks) throws KeyStoreException, NoSuchAlgorithmException, UnrecoverableKeyException {
+        try {
+            KeystorePasswordAttempter.INSTANCE.unlockKeystore(
+                    new KeystorePasswordAttempter.KeystoreOperation(kmf, ks) {
+
+                        @Override
+                        String getId() {
+                            return "'init keymanager-factory'";
+                        }
+
+                        @Override
+                        Key operateKeystore(char[] pass) throws KeyStoreException, NoSuchAlgorithmException, UnrecoverableKeyException, IOException, CertificateException {
+                            kmf.init(ks, pass);
+                            return null;
+                        }
+                    });
+        } catch (IOException | CertificateException ex) {
+            throw unexpectedException(ex);
+        }
+    }
+
+    public static void setKeyEntry(KeyStore ks, String alias, Key key, Certificate[] certChain) throws KeyStoreException {
+        try {
+            KeystorePasswordAttempter.INSTANCE.unlockKeystore(
+                    new KeystorePasswordAttempter.KeystoreOperation(ks, alias, key, certChain) {
+
+                @Override
+                String getId() {
+                    return "'set key entry'";
+                }
+
+                @Override
+                Key operateKeystore(char[] pass) throws KeyStoreException, NoSuchAlgorithmException, UnrecoverableKeyException, IOException, CertificateException {
+                    ks.setKeyEntry(alias, key, pass, certChain);
+                    return null;
+                }
+            });
+        } catch (NoSuchAlgorithmException | UnrecoverableKeyException | IOException | CertificateException ex) {
+            throw unexpectedException(ex);
+        }
+    }
+
+    public static Key getKey(KeyStore ks, String alias) throws KeyStoreException, NoSuchAlgorithmException, UnrecoverableKeyException {
+        try {
+            return KeystorePasswordAttempter.INSTANCE.unlockKeystore(
+                    new KeystorePasswordAttempter.KeystoreOperation(ks, alias, null, null) {
+
+                        @Override
+                        String getId() {
+                            return "'get key'";
+                        }
+
+                        @Override
+                        Key operateKeystore(char[] pass) throws KeyStoreException, NoSuchAlgorithmException, UnrecoverableKeyException, IOException, CertificateException {
+                            return ks.getKey(alias, pass);
+                        }
+                    });
+        } catch (IOException | CertificateException ex) {
+            throw unexpectedException(ex);
+        }
+    }
+
+    public static void loadKeyStore(KeyStore ks, File f) throws IOException, NoSuchAlgorithmException, CertificateException {
+        try {
+            KeystorePasswordAttempter.INSTANCE.unlockKeystore(
+                    new KeystorePasswordAttempter.KeystoreOperation(ks, f) {
+
+                        @Override
+                        String getId() {
+                            return "'load keystore'";
+                        }
+
+                        @Override
+                        Key operateKeystore(char[] pass) throws KeyStoreException, NoSuchAlgorithmException, UnrecoverableKeyException, IOException, CertificateException {
+                            if (f == null) {
+                                ks.load(null, pass);
+                            } else {
+                                try (FileInputStream fis = new FileInputStream(f)) {
+                                    ks.load(fis, pass);
+                                }
+                            }
+                            return null;
+                        }
+                    });
+        } catch (KeyStoreException | UnrecoverableKeyException ex) {
+            throw unexpectedException(ex);
+        }
+
+    }
+
+    public static void storeKeyStore(KeyStore ks, File f) throws KeyStoreException, IOException, NoSuchAlgorithmException, CertificateException {
+        try {
+            KeystorePasswordAttempter.INSTANCE.unlockKeystore(
+                    new KeystorePasswordAttempter.KeystoreOperation(ks, f) {
+
+                        @Override
+                        String getId() {
+                            return "'store keystore'";
+                        }
+
+                        @Override
+                        Key operateKeystore(char[] pass) throws KeyStoreException, NoSuchAlgorithmException, UnrecoverableKeyException, IOException, CertificateException {
+                            if (f == null) {
+                                ks.store(null, pass);
+                            } else {
+                                try (FileOutputStream fos = new FileOutputStream(f)) {
+                                    ks.store(fos, pass);
+                                }
+                            }
+                            return null;
+                        }
+                    });
+        } catch (UnrecoverableKeyException ex) {
+            throw unexpectedException(ex);
+        }
+    }
+
+    private static RuntimeException unexpectedException(Exception ex) {
+        return new RuntimeException("This usage of KeystorePasswordAttempter shopuld not throw this kind of exception", ex);
+    }
+
 }

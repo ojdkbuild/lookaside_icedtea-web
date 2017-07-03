@@ -38,6 +38,7 @@ import net.sourceforge.jnlp.event.ApplicationEvent;
 import net.sourceforge.jnlp.event.ApplicationListener;
 import net.sourceforge.jnlp.security.SecurityDialogs;
 import net.sourceforge.jnlp.security.SecurityDialogs.AccessType;
+import net.sourceforge.jnlp.security.dialogs.AccessWarningPaneComplexReturn;
 import net.sourceforge.jnlp.util.logging.OutputController;
 import net.sourceforge.jnlp.util.WeakList;
 import net.sourceforge.jnlp.util.XDesktopEntry;
@@ -56,13 +57,13 @@ public class ApplicationInstance {
     // installed by the application.
 
     /** the file */
-    private JNLPFile file;
+    private final JNLPFile file;
 
     /** the thread group */
-    private ThreadGroup group;
+    private final ThreadGroup group;
 
     /** the classloader */
-    private ClassLoader loader;
+    private final ClassLoader loader;
 
     /**
      * <p>
@@ -75,16 +76,16 @@ public class ApplicationInstance {
      * It is set to the AppContext which created this ApplicationInstance
      * </p>
      */
-    private AppContext appContext;
+    private final AppContext appContext;
 
     /** whether the application has stopped running */
     private boolean stopped = false;
 
     /** weak list of windows opened by the application */
-    private WeakList<Window> weakWindows = new WeakList<Window>();
+    private final WeakList<Window> weakWindows = new WeakList<>();
 
     /** list of application listeners  */
-    private EventListenerList listeners = new EventListenerList();
+    private final EventListenerList listeners = new EventListenerList();
 
     /** whether or not this application is signed */
     private boolean isSigned = false;
@@ -92,6 +93,9 @@ public class ApplicationInstance {
     /**
      * Create an application instance for the file. This should be done in the
      * appropriate {@link ThreadGroup} only.
+     * @param file jnlpfile for which the instance do exists
+     * @param group thread group to which it belongs
+     * @param loader loader for this application
      */
     public ApplicationInstance(JNLPFile file, ThreadGroup group, ClassLoader loader) {
         this.file = file;
@@ -103,6 +107,7 @@ public class ApplicationInstance {
 
     /**
      * Add an Application listener
+     * @param listener listener to be added
      */
     public void addApplicationListener(ApplicationListener listener) {
         listeners.add(ApplicationListener.class, listener);
@@ -110,6 +115,7 @@ public class ApplicationInstance {
 
     /**
      * Remove an Application Listener
+     * @param listener to be removed
      */
     public void removeApplicationListener(ApplicationListener listener) {
         listeners.remove(ApplicationListener.class, listener);
@@ -136,37 +142,51 @@ public class ApplicationInstance {
      */
     public void initialize() {
         installEnvironment();
-
-        //Fixme: -Should check whether a desktop entry already exists for
-        //        for this jnlp file, and do nothing if it exists.
-        //       -If no href is specified in the jnlp tag, it should
-        //        default to using the one passed in as an argument.
         addMenuAndDesktopEntries();
     }
 
     /**
-     * Creates menu and desktop entries if required by the jnlp file
+     * Creates menu and desktop entries if required by the jnlp file or settings
      */
 
     private void addMenuAndDesktopEntries() {
         XDesktopEntry entry = new XDesktopEntry(file);
         ShortcutDesc sd = file.getInformation().getShortcut();
         File possibleDesktopFile = entry.getLinuxDesktopIconFile();
+        File possibleMenuFile = entry.getLinuxMenuIconFile();
+        File generatedJnlp = entry.getGeneratedJnlpFileName();
+        //if one of menu or desktop exists, do not bother user
+        boolean exists = false;
         if (possibleDesktopFile.exists()) {
             OutputController.getLogger().log("ApplicationInstance.addMenuAndDesktopEntries(): file - "
-                    + possibleDesktopFile.getAbsolutePath() + " already exists. Not proceeding with desktop additions");
+                    + possibleDesktopFile.getAbsolutePath() + " already exists. Refreshing and not proceeding with desktop additions");
+            exists = true;
+            if (JNLPRuntime.isOnline()) {
+                entry.refreshExistingShortcuts(false, true); //update
+            }
+        }
+        if (possibleMenuFile.exists()) {
+            OutputController.getLogger().log("ApplicationInstance.addMenuAndDesktopEntries(): file - "
+                    + possibleMenuFile.getAbsolutePath() + " already exists. Refreshing and not proceeding with desktop additions");
+            exists = true;
+            if (JNLPRuntime.isOnline()) {
+                entry.refreshExistingShortcuts(true, false); //update
+            }
+        }
+        if (generatedJnlp.exists()) {
+            OutputController.getLogger().log("ApplicationInstance.addMenuAndDesktopEntries(): generated file - "
+                    + generatedJnlp.getAbsolutePath() + " already exists. Refreshing and not proceeding with desktop additions");
+            exists = true;
+            if (JNLPRuntime.isOnline()) {
+                entry.refreshExistingShortcuts(true, true); //update
+            }
+        }
+        if (exists){
             return;
         }
-        if (shouldCreateShortcut(sd)) {
-            entry.createDesktopShortcut();
-        }
-
-        if (sd != null && sd.getMenu() != null) {
-            /*
-             * Sun's WebStart implementation doesnt seem to do anything under GNOME
-             */
-            OutputController.getLogger().log(OutputController.Level.ERROR_DEBUG, "ApplicationInstance.addMenuAndDesktopEntries():"
-                    + " Adding menu entries NOT IMPLEMENTED");
+        AccessWarningPaneComplexReturn ics = getComplexReturn(sd);
+        if (ics.getRegularReturnAsBoolean()) {
+            entry.createDesktopShortcuts(ics.getMenu(), ics.getDekstop(), isSigned());
         }
 
     }
@@ -178,48 +198,59 @@ public class ApplicationInstance {
      * @param sd the ShortcutDesc element from the JNLP file
      * @return true if a desktop shortcut should be created
      */
-    private boolean shouldCreateShortcut(ShortcutDesc sd) {
+    private AccessWarningPaneComplexReturn getComplexReturn(ShortcutDesc sd) {
         if (JNLPRuntime.isTrustAll()) {
-            return (sd != null && sd.onDesktop());
+            boolean mainResult = (sd != null && (sd.onDesktop() || sd.getMenu() != null));
+            AccessWarningPaneComplexReturn r = new AccessWarningPaneComplexReturn(mainResult?0:1);
+            if (mainResult){
+                if (sd.onDesktop()){
+                    r.setDekstop(new AccessWarningPaneComplexReturn.ShortcutResult(true));
+                    r.getDekstop().setBrowser(XDesktopEntry.getBrowserBin());
+                    r.getDekstop().setShortcutType(AccessWarningPaneComplexReturn.ShortcutResult.Shortcut.BROWSER);
+                }
+                if (sd.getMenu() != null){
+                    r.setMenu(new AccessWarningPaneComplexReturn.ShortcutResult(true));
+                    r.getMenu().setBrowser(XDesktopEntry.getBrowserBin());
+                    r.getMenu().setShortcutType(AccessWarningPaneComplexReturn.ShortcutResult.Shortcut.BROWSER);
+                }
+            }
+            return r;
         }
         String currentSetting = JNLPRuntime.getConfiguration()
                 .getProperty(DeploymentConfiguration.KEY_CREATE_DESKTOP_SHORTCUT);
-        boolean createShortcut = false;
 
         /*
          * check configuration and possibly prompt user to find out if a
          * shortcut should be created or not
          */
-        if (currentSetting.equals(ShortcutDesc.CREATE_NEVER)) {
-            createShortcut = false;
-        } else if (currentSetting.equals(ShortcutDesc.CREATE_ALWAYS)) {
-            createShortcut = true;
-        } else if (currentSetting.equals(ShortcutDesc.CREATE_ASK_USER)) {
-            if (SecurityDialogs.showAccessWarningDialog(AccessType.CREATE_DESTKOP_SHORTCUT, file)) {
-                createShortcut = true;
-            }
-        } else if (currentSetting.equals(ShortcutDesc.CREATE_ASK_USER_IF_HINTED)) {
-            if (sd != null && sd.onDesktop()) {
-                if (SecurityDialogs.showAccessWarningDialog(AccessType.CREATE_DESTKOP_SHORTCUT, file)) {
-                    createShortcut = true;
+        switch (currentSetting) {
+            case ShortcutDesc.CREATE_NEVER:
+                return new AccessWarningPaneComplexReturn(1);
+            case ShortcutDesc.CREATE_ALWAYS:
+                return new AccessWarningPaneComplexReturn(0);
+            case ShortcutDesc.CREATE_ASK_USER:
+                return SecurityDialogs.showAccessWarningDialogComplexReturn(AccessType.CREATE_DESTKOP_SHORTCUT, file);
+            case ShortcutDesc.CREATE_ASK_USER_IF_HINTED:
+                if (sd != null && (sd.onDesktop() || sd.toMenu())) {
+                    return SecurityDialogs.showAccessWarningDialogComplexReturn(AccessType.CREATE_DESTKOP_SHORTCUT, file);
                 }
-            }
-        } else if (currentSetting.equals(ShortcutDesc.CREATE_ALWAYS_IF_HINTED)) {
-            if (sd != null && sd.onDesktop()) {
-                createShortcut = true;
-            }
+            case ShortcutDesc.CREATE_ALWAYS_IF_HINTED:
+                if (sd != null && (sd.onDesktop() || sd.toMenu())) {
+                    return new AccessWarningPaneComplexReturn(0);
+                }
         }
 
-        return createShortcut;
+        return new AccessWarningPaneComplexReturn(1);
     }
-
-    /**
+    
+     /**
      * Releases the application's resources before it is collected.
      * Only collectable if classloader and thread group are
      * also collectable so basically is almost never called (an
      * application would have to close its windows and exit its
      * threads but not call JNLPRuntime.exit).
      */
+    @Override
     public void finalize() {
         destroy();
     }
@@ -241,6 +272,7 @@ public class ApplicationInstance {
         AccessControlContext acc = new AccessControlContext(new ProtectionDomain[] { pd });
 
         PrivilegedAction<Object> installProps = new PrivilegedAction<Object>() {
+            @Override
             public Object run() {
                 for (PropertyDesc propDesc : props) {
                     System.setProperty(propDesc.getKey(), propDesc.getValue());
@@ -253,7 +285,8 @@ public class ApplicationInstance {
     }
 
     /**
-     * Returns the JNLP file for this task.
+     * Returns the jnlpfile on which is this application based
+     * @return JNLP file for this task.
      */
     public JNLPFile getJNLPFile() {
         return file;
@@ -261,6 +294,7 @@ public class ApplicationInstance {
 
     /**
      * Returns the application title.
+     * @return the title of this application
      */
     public String getTitle() {
         return file.getTitle();
@@ -268,6 +302,7 @@ public class ApplicationInstance {
 
     /**
      * Returns whether the application is running.
+     * @return state of application
      */
     public boolean isRunning() {
         return !stopped;
@@ -317,6 +352,7 @@ public class ApplicationInstance {
     /**
      * Returns the thread group.
      *
+     * @return thread group of this application, unless it is stopped
      * @throws IllegalStateException if the app is not running
      */
     public ThreadGroup getThreadGroup() throws IllegalStateException {
@@ -329,6 +365,7 @@ public class ApplicationInstance {
     /**
      * Returns the classloader.
      *
+     * @return the classloader of this application, unless it is stopped
      * @throws IllegalStateException if the app is not running
      */
     public ClassLoader getClassLoader() throws IllegalStateException {
@@ -341,6 +378,7 @@ public class ApplicationInstance {
     /**
      * Adds a window that this application opened.  When the
      * application is disposed, these windows will also be disposed.
+     * @param window to be added
      */
     protected void addWindow(Window window) {
         weakWindows.add(window);
@@ -348,12 +386,16 @@ public class ApplicationInstance {
     }
 
     /**
-     * Returns whether or not this jar is signed.
+     * @return whether or not this application is signed.
      */
     public boolean isSigned() {
         return isSigned;
     }
 
+    /**
+     *
+     * @return application context of this instance
+     */
     public AppContext getAppContext() {
         return appContext;
     }

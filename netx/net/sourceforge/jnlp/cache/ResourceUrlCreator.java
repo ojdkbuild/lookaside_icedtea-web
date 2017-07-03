@@ -38,14 +38,9 @@ exception statement from your version. */
 package net.sourceforge.jnlp.cache;
 
 import java.net.MalformedURLException;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.URL;
-import java.net.URLDecoder;
-import java.net.URLEncoder;
 import java.util.LinkedList;
 import java.util.List;
-import java.io.UnsupportedEncodingException;
 
 import net.sourceforge.jnlp.DownloadOptions;
 
@@ -66,8 +61,8 @@ public class ResourceUrlCreator {
      * @return a list of URLs that the resources might be downloadable from
      */
     public List<URL> getUrls() {
-        List<URL> urls = new LinkedList<URL>();
-        URL url = null;
+        List<URL> urls = new LinkedList<>();
+        URL url;
 
         if (downloadOptions.useExplicitPack() && downloadOptions.useExplicitVersion()) {
             url = getUrl(resource, true, true);
@@ -120,7 +115,7 @@ public class ResourceUrlCreator {
             return resource.getLocation();
         }
         String filename = location.substring(lastSlash + 1);
-        if (useVersion && resource.requestVersion != null) {
+        if (useVersion && resource.getRequestVersion() != null) {
             // With 'useVersion', j2-commons-cli.jar becomes, for example, j2-commons-cli__V1.0.jar
             String parts[] = filename.split("\\.", -1 /* Keep blank strings*/);
 
@@ -129,7 +124,7 @@ public class ResourceUrlCreator {
                 sb.append(parts[i]);
                 // Append __V<number> before last '.'
                 if (i == parts.length -2) {
-                    sb.append("__V" + resource.requestVersion);
+                    sb.append("__V").append(resource.getRequestVersion());
                 }
                 sb.append('.');
             }
@@ -152,6 +147,7 @@ public class ResourceUrlCreator {
 
     /**
      * Returns the URL for this resource, including the resource's version number in the query string
+     * @return  url with version cared about
      */
     protected URL getVersionedUrl() {
         URL resourceUrl = resource.getLocation();
@@ -172,13 +168,13 @@ public class ResourceUrlCreator {
         if (!query.isEmpty()) {
             query = "?" + query;
         }
-        if (resource.requestVersion != null && resource.requestVersion.isVersionId()) {
+        if (resource.getRequestVersion() != null && resource.getRequestVersion().isVersionId()) {
             if (!query.isEmpty()) {
                 query += "&";
             } else {
                 query = "?" + query;
             }
-            query += "version-id=" + resource.requestVersion;
+            query += "version-id=" + resource.getRequestVersion();
         }
         try {
             URL url = new URL(protocol + userInfo + host + port + path + query);

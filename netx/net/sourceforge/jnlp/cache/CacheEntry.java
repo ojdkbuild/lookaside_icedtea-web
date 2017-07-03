@@ -16,15 +16,14 @@
 
 package net.sourceforge.jnlp.cache;
 
-import net.sourceforge.jnlp.util.logging.OutputController;
 import static net.sourceforge.jnlp.runtime.Translator.R;
 
-import java.io.*;
-import java.net.*;
+import java.io.File;
+import java.net.URL;
 
-import net.sourceforge.jnlp.*;
-import net.sourceforge.jnlp.runtime.*;
-import net.sourceforge.jnlp.util.*;
+import net.sourceforge.jnlp.Version;
+import net.sourceforge.jnlp.util.PropertiesFile;
+import net.sourceforge.jnlp.util.logging.OutputController;
 
 /**
  * Describes an entry in the cache.
@@ -34,14 +33,21 @@ import net.sourceforge.jnlp.util.*;
  */
 public class CacheEntry {
 
+    public static final long LENGTH_UNKNOWN = -1;
+
+    private static final String KEY_CONTENT_LENGTH = "content-length";
+    private static final String KEY_CONTENT_ORIGINAL_LENGTH = "content-original-length";
+    private static final String KEY_LAST_MODIFIED = "last-modified";
+    private static final String KEY_LAST_UPDATED = "last-updated";
+
     /** the remote resource location */
-    private URL location;
+    private final URL location;
 
     /** the requested version */
-    private Version version;
+    private final Version version;
 
     /** info about the cached file */
-    private PropertiesFile properties;
+    private final PropertiesFile properties;
 
     /**
      * Create a CacheEntry for the resources specified as a remote
@@ -54,26 +60,22 @@ public class CacheEntry {
         this.location = location;
         this.version = version;
 
-        File infoFile = CacheUtil.getCacheFile(location, version);
-        infoFile = new File(infoFile.getPath() + ".info"); // replace with something that can't be clobbered
-
-        properties = new PropertiesFile(infoFile, R("CAutoGen"));
+        this.properties = readCacheEntryInfo();
     }
 
     /**
-     * Initialize the cache entry data from a connection to the
-     * remote resource (does not store data).
+     * Seam for testing
      */
-    void initialize(URLConnection connection) {
-        long modified = connection.getLastModified();
-        long length = connection.getContentLength(); // an int
+    PropertiesFile readCacheEntryInfo() {
+        File infoFile = CacheUtil.getCacheFile(location, version);
+        infoFile = new File(infoFile.getPath() + ".info"); // replace with something that can't be clobbered
 
-        properties.setProperty("content-length", Long.toString(length));
-        properties.setProperty("last-modified", Long.toString(modified));
+        return new PropertiesFile(infoFile, R("CAutoGen"));
     }
 
     /**
      * Returns the remote location this entry caches.
+     * @return URL same as the one on which this entry was created
      */
     public URL getLocation() {
         return location;
@@ -82,49 +84,94 @@ public class CacheEntry {
     /**
      * Returns the time in the local system clock that the file was
      * most recently checked for an update.
+     * @return when the item was updated (in ms)
      */
     public long getLastUpdated() {
-        try {
-            return Long.parseLong(properties.getProperty("last-updated"));
-        } catch (Exception ex) {
-            return 0;
-        }
+        return getLongKey(KEY_LAST_UPDATED);
     }
 
     /**
      * Sets the time in the local system clock that the file was
      * most recently checked for an update.
+     * @param updatedTime the time (in ms) to be set as last updated time
      */
     public void setLastUpdated(long updatedTime) {
-        properties.setProperty("last-updated", Long.toString(updatedTime));
+        setLongKey(KEY_LAST_UPDATED, updatedTime);
+    }
+
+    public long getRemoteContentLength() {
+        return getLongKey(KEY_CONTENT_LENGTH);
+    }
+
+    public void setRemoteContentLength(long length) {
+        setLongKey(KEY_CONTENT_LENGTH, length);
+    }
+
+    /**
+     * Return the length of the original content that was cached. May be different
+     * from the actual cache entry size due to (de)compression.
+     *
+     * @return the content length or {@link #LENGTH_UNKNOWN} if unknown.
+     */
+    public long getOriginalContentLength() {
+        return getLongKey(KEY_CONTENT_ORIGINAL_LENGTH, LENGTH_UNKNOWN);
+    }
+
+    /**
+     * Set the length of the original content that was cached. May be different
+     * from the actual cache entry size due to (de)compression.
+     * @param contentLength length of content
+     */
+    public void setOriginalContentLength(long contentLength) {
+        setLongKey(KEY_CONTENT_ORIGINAL_LENGTH, contentLength);
+    }
+
+    public long getLastModified() {
+        return getLongKey(KEY_LAST_MODIFIED);
+    }
+
+    public void setLastModified(long modifyTime) {
+        setLongKey(KEY_LAST_MODIFIED, modifyTime);
+    }
+
+    private long getLongKey(String key) {
+        return getLongKey(key, 0);
+    }
+
+    private long getLongKey(String key, long defaultValue) {
+        try {
+            return Long.parseLong(properties.getProperty(key));
+        } catch (Exception ex) {
+            OutputController.getLogger().log(ex);
+            return defaultValue;
+        }
+    }
+
+    private void setLongKey(String key, long value) {
+        properties.setProperty(key, Long.toString(value));
     }
 
     /**
      * Returns whether there is a version of the URL contents in
-     * the cache and it is up to date.  This method may not return
-     * immediately.
+     * the cache and it is up to date.
      *
-     * @param connection a connection to the remote URL
+     * @param lastModified - current time as get from server (in ms). Mostly value of "Last-Modified" http header'? 
      * @return whether the cache contains the version
      */
-    public boolean isCurrent(URLConnection connection) {
+    public boolean isCurrent(long lastModified) {
         boolean cached = isCached();
+        OutputController.getLogger().log("isCurrent:isCached " + cached);
 
-        if (!cached)
+        if (!cached) {
             return false;
-
+        }
         try {
-            long remoteModified = connection.getLastModified();
-            long cachedModified = Long.parseLong(properties.getProperty("last-modified"));
-
-            if (remoteModified > 0 && remoteModified <= cachedModified)
-                return true;
-            else
-                return false;
-        } catch (Exception ex) {
-            OutputController.getLogger().log(ex);;
-
-            return cached; // if can't connect return whether already in cache
+            long cachedModified = Long.parseLong(properties.getProperty(KEY_LAST_MODIFIED));
+            OutputController.getLogger().log("isCurrent:lastModified cache:" + cachedModified +  " actual:" + lastModified);
+            return lastModified > 0 && lastModified <= cachedModified;
+        } catch (Exception ex){
+            OutputController.getLogger().log(ex);
+            return cached;
         }
     }
 
@@ -135,13 +182,20 @@ public class CacheEntry {
      * @return true if the resource is in the cache
      */
     public boolean isCached() {
-        File localFile = CacheUtil.getCacheFile(location, version);
+        File localFile = getCacheFile();
         if (!localFile.exists())
             return false;
 
         try {
             long cachedLength = localFile.length();
-            long remoteLength = Long.parseLong(properties.getProperty("content-length", "-1"));
+            String originalLength = properties.getProperty(KEY_CONTENT_ORIGINAL_LENGTH);
+            if (originalLength != null) {
+                cachedLength = Long.parseLong(originalLength);
+            }
+
+            long remoteLength = Long.parseLong(properties.getProperty(KEY_CONTENT_LENGTH, "-1"));
+
+            OutputController.getLogger().log("isCached: remote:" + remoteLength + " cached:" + cachedLength);
 
             if (remoteLength >= 0 && cachedLength != remoteLength)
                 return false;
@@ -155,10 +209,24 @@ public class CacheEntry {
     }
 
     /**
-     * Save the current information for the cache entry.
+     * Seam for testing
      */
-    protected void store() {
-        properties.store();
+    File getCacheFile() {
+        return CacheUtil.getCacheFile(location, version);
+    }
+
+    /**
+     * Save the current information for the cache entry.
+     *
+     * @return True if successfuly stored into file, false otherwise
+     */
+    protected boolean store() {
+        if (properties.isHeldByCurrentThread()) {
+            properties.store();
+            return true;
+        } else {
+            return false;
+        }
     }
 
     /**
@@ -172,13 +240,22 @@ public class CacheEntry {
      * Lock cache item.
      */
     protected void lock() {
-        CacheUtil.lockFile(properties);
+        properties.lock();
     }
 
     /**
-     * Unlock cache item.
+     * Unlock cache item. Does not do anything if not holding the lock.
      */
     protected void unlock() {
-        CacheUtil.unlockFile(properties);
+        properties.unlock();
     }
+
+    protected boolean tryLock() {
+        return properties.tryLock();
+    }
+
+    protected boolean isHeldByCurrentThread() {
+        return properties.isHeldByCurrentThread();
+    }
+
 }

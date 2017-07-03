@@ -1,38 +1,38 @@
 /* 
-Copyright (C) 2011 Red Hat, Inc.
+ Copyright (C) 2011 Red Hat, Inc.
 
-This file is part of IcedTea.
+ This file is part of IcedTea.
 
-IcedTea is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License as published by
-the Free Software Foundation, version 2.
+ IcedTea is free software; you can redistribute it and/or
+ modify it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, version 2.
 
-IcedTea is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-General Public License for more details.
+ IcedTea is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ General Public License for more details.
 
-You should have received a copy of the GNU General Public License
-along with IcedTea; see the file COPYING.  If not, write to
-the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
-02110-1301 USA.
+ You should have received a copy of the GNU General Public License
+ along with IcedTea; see the file COPYING.  If not, write to
+ the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+ 02110-1301 USA.
 
-Linking this library statically or dynamically with other modules is
-making a combined work based on this library.  Thus, the terms and
-conditions of the GNU General Public License cover the whole
-combination.
+ Linking this library statically or dynamically with other modules is
+ making a combined work based on this library.  Thus, the terms and
+ conditions of the GNU General Public License cover the whole
+ combination.
 
-As a special exception, the copyright holders of this library give you
-permission to link this library with independent modules to produce an
-executable, regardless of the license terms of these independent
-modules, and to copy and distribute the resulting executable under
-terms of your choice, provided that you also meet, for each linked
-independent module, the terms and conditions of the license of that
-module.  An independent module is a module which is not derived from
-or based on this library.  If you modify this library, you may extend
-this exception to your version of the library, but you are not
-obligated to do so.  If you do not wish to do so, delete this
-exception statement from your version.
+ As a special exception, the copyright holders of this library give you
+ permission to link this library with independent modules to produce an
+ executable, regardless of the license terms of these independent
+ modules, and to copy and distribute the resulting executable under
+ terms of your choice, provided that you also meet, for each linked
+ independent module, the terms and conditions of the license of that
+ module.  An independent module is a module which is not derived from
+ or based on this library.  If you modify this library, you may extend
+ this exception to your version of the library, but you are not
+ obligated to do so.  If you do not wish to do so, delete this
+ exception statement from your version.
  */
 
 import java.io.File;
@@ -56,6 +56,8 @@ import net.sourceforge.jnlp.browsertesting.BrowserTest;
 import net.sourceforge.jnlp.browsertesting.Browsers;
 import net.sourceforge.jnlp.browsertesting.browsers.firefox.FirefoxProfilesOperator;
 import net.sourceforge.jnlp.closinglisteners.RulesFolowingClosingListener;
+import net.sourceforge.jnlp.config.DeploymentConfiguration;
+import net.sourceforge.jnlp.config.PathsAndFiles;
 import org.junit.Assert;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -66,8 +68,6 @@ import org.junit.Test;
 @Bug(id = "RH947647")
 public class XDGspecificationTests extends BrowserTest {
 
-    public static final String XDG_CONFIG_HOME = "XDG_CONFIG_HOME";
-    public static final String XDG_CACHE_HOME = "XDG_CACHE_HOME";
     private static File backupMainDir;
 
     private static class Backup {
@@ -91,9 +91,9 @@ public class XDGspecificationTests extends BrowserTest {
     static {
         String configHome = System.getProperty("user.home") + File.separator + ".config";
         String cacheHome = System.getProperty("user.home") + File.separator + ".cache";
-        ;
-        String XDG_CONFIG_HOME_value = System.getenv(XDG_CONFIG_HOME);
-        String XDG_CACHE_HOME_value = System.getenv(XDG_CACHE_HOME);
+
+        String XDG_CONFIG_HOME_value = System.getenv(PathsAndFiles.XDG_CONFIG_HOME_VAR);
+        String XDG_CACHE_HOME_value = System.getenv(PathsAndFiles.XDG_CACHE_HOME_VAR);
         if (XDG_CONFIG_HOME_value != null) {
             configHome = XDG_CONFIG_HOME_value;
         }
@@ -102,6 +102,23 @@ public class XDGspecificationTests extends BrowserTest {
         }
         realConfig = new File(configHome + File.separator + "icedtea-web");
         realCache = new File(cacheHome + File.separator + "icedtea-web");
+    }
+
+    // When current root is backuped,
+    // also new files, which legacy impl is not aware about
+    // cold be copied. Remove them in fake root
+    // if they are not, then firstrun cleanup fails, and so second prints unexpected warnings
+    public static void removeUnsupportedLegacyFiles() {
+        File gjp = new File(oldRoot, "generated_jnlps");
+        File icons = new File(oldRoot, "icons");
+        if (gjp.exists()) {
+            deleteRecursively(gjp);
+        }
+        if (icons.exists()) {
+            deleteRecursively(icons);
+        }
+        Assert.assertFalse(gjp.exists());
+        Assert.assertFalse(icons.exists());
     }
 
     @BeforeClass
@@ -149,10 +166,10 @@ public class XDGspecificationTests extends BrowserTest {
         config.mkdirs();
         File cache = new File(base, "cache");
         cache.mkdirs();
-        List<Backup> l = new ArrayList<Backup>();
+        List<Backup> l = new ArrayList<>();
         mv(oldRoot, base, l);
-        mv(realCache, config, l);
-        mv(realConfig, cache, l);
+        mv(realCache, cache, l);
+        mv(realConfig, config, l);
         return l;
     }
 
@@ -190,7 +207,7 @@ public class XDGspecificationTests extends BrowserTest {
     private String[] removeXdgVAlues() {
         Map<String, String> p = System.getenv();
         Set<Entry<String, String>> r = p.entrySet();
-        List<Entry<String, String>> rr = new ArrayList<Entry<String, String>>(r);
+        List<Entry<String, String>> rr = new ArrayList<>(r);
         Collections.sort(rr, new Comparator<Entry<String, String>>() {
 
             @Override
@@ -198,14 +215,14 @@ public class XDGspecificationTests extends BrowserTest {
                 return o1.getKey().compareTo(o2.getKey());
             }
         });
-        List<String> l = new ArrayList<String>(p.size());
+        List<String> l = new ArrayList<>(p.size());
         int i = 0;
         int c = 0;
         for (Iterator<Entry<String, String>> it = rr.iterator(); it.hasNext(); i++) {
             Entry<String, String> entry = it.next();
             String v = entry.getValue();
             String s = entry.getKey() + "=" + v;
-            if (entry.getKey().equals(XDG_CACHE_HOME) || entry.getKey().equals(XDG_CONFIG_HOME)) {
+            if (entry.getKey().equals(PathsAndFiles.XDG_CACHE_HOME_VAR) || entry.getKey().equals(PathsAndFiles.XDG_CONFIG_HOME_VAR)) {
                 ServerAccess.logOutputReprint("ignoring " + s);
                 c++;
             } else {
@@ -228,7 +245,7 @@ public class XDGspecificationTests extends BrowserTest {
         boolean config = false;
         Map<String, String> p = System.getenv();
         Set<Entry<String, String>> r = p.entrySet();
-        List<Entry<String, String>> rr = new ArrayList<Entry<String, String>>(r);
+        List<Entry<String, String>> rr = new ArrayList<>(r);
         Collections.sort(rr, new Comparator<Entry<String, String>>() {
 
             @Override
@@ -236,22 +253,25 @@ public class XDGspecificationTests extends BrowserTest {
                 return o1.getKey().compareTo(o2.getKey());
             }
         });
-        List<String> l = new ArrayList<String>(p.size() + 2);
+        List<String> l = new ArrayList<>(p.size() + 2);
         int i = 0;
         for (Iterator<Entry<String, String>> it = rr.iterator(); it.hasNext(); i++) {
             Entry<String, String> entry = it.next();
             String v = entry.getValue();
             String s = entry.getKey() + "=" + v;
-            if (entry.getKey().equals(XDG_CACHE_HOME)) {
-                ServerAccess.logOutputReprint(entry.getKey() + " was " + v);
-                v = cacheF.getAbsolutePath();
-                ServerAccess.logOutputReprint("set " + v);
-                cache = true;
-            } else if (entry.getKey().equals(XDG_CONFIG_HOME)) {
-                ServerAccess.logOutputReprint(entry.getKey() + " was " + v);
-                v = configF.getAbsolutePath();
-                ServerAccess.logOutputReprint("set " + v);
-                config = true;
+            switch (entry.getKey()) {
+                case PathsAndFiles.XDG_CACHE_HOME_VAR:
+                    ServerAccess.logOutputReprint(entry.getKey() + " was " + v);
+                    v = cacheF.getAbsolutePath();
+                    ServerAccess.logOutputReprint("set " + v);
+                    cache = true;
+                    break;
+                case PathsAndFiles.XDG_CONFIG_HOME_VAR:
+                    ServerAccess.logOutputReprint(entry.getKey() + " was " + v);
+                    v = configF.getAbsolutePath();
+                    ServerAccess.logOutputReprint("set " + v);
+                    config = true;
+                    break;
             }
             s = entry.getKey() + "=" + v;
             l.add(s);
@@ -260,23 +280,23 @@ public class XDGspecificationTests extends BrowserTest {
             ServerAccess.logOutputReprint("was no cache");
             String v = cacheF.getAbsolutePath();
             ServerAccess.logOutputReprint("set " + v);
-            String s = XDG_CACHE_HOME + "=" + v;
+            String s = PathsAndFiles.XDG_CACHE_HOME_VAR + "=" + v;
             l.add(s);
         }
         if (!config) {
             ServerAccess.logOutputReprint("was no config");
             String v = configF.getAbsolutePath();
             ServerAccess.logOutputReprint("set " + v);
-            String s = XDG_CONFIG_HOME + "=" + v;
+            String s = PathsAndFiles.XDG_CONFIG_HOME_VAR + "=" + v;
             l.add(s);
         }
-
 
         return l.toArray(new String[l.size()]);
     }
 
     private static void createFakeOldHomeCache() throws Exception {
         File tmp = tmpDir();
+        fakeExtendedSecurity(new File(tmp, PathsAndFiles.DEPLOYMENT_SUBDIR_DIR));
         try {
             ProcessWrapper pw = new ProcessWrapper(
                     server.getJavawsLocation(),
@@ -287,7 +307,7 @@ public class XDGspecificationTests extends BrowserTest {
                     setXdgVAlues(tmp, tmp));
             ProcessResult pr = pw.execute();
             Assert.assertTrue(simpletests2Run.toPassingString(), simpletests2Run.evaluate(pr.stderr));
-            File currentConfigCache = new File(tmp, "icedtea-web");
+            File currentConfigCache = new File(tmp, PathsAndFiles.DEPLOYMENT_SUBDIR_DIR);
             File oldIcedTea = new File(new File(System.getProperty("user.home")) + File.separator + ".icedtea");
             boolean a = currentConfigCache.renameTo(oldIcedTea);
             Assert.assertTrue("creation of old cache by renaming " + currentConfigCache + " to " + oldIcedTea + " failed", a);
@@ -312,25 +332,24 @@ public class XDGspecificationTests extends BrowserTest {
             pw1.setVars(setXdgVAlues(tmp, tmp));
             ProcessResult pr1 = pw1.execute();
 
-
             ProcessWrapper pw2 = new ProcessWrapper();
             pw2.setArgs(Arrays.asList(
                     new String[]{
                         new File(server.getJavawsFile().getParentFile(), "itweb-settings").getAbsolutePath(),
-                        "set", "oldBaf", "oldBaf"
+                        //one impl of new parser was unable to handle duplicates
+                        "set", "oldBaf", "differentOldBaf"
                     }));
             pw2.setVars(setXdgVAlues(tmp, tmp));
             ProcessResult pr2 = pw2.execute();
             Assert.assertTrue(notMoving.toPassingString(), notMoving.evaluate(pr1.stdout));
             Assert.assertTrue(notMoving.toPassingString(), notMoving.evaluate(pr2.stdout));
             Assert.assertTrue(unknownProperty.toPassingString(), unknownProperty.evaluate(pr2.stdout));
-            File currentConfigCache = new File(tmp, "icedtea-web");
+            File currentConfigCache = new File(tmp, PathsAndFiles.DEPLOYMENT_SUBDIR_DIR);
             File oldIcedTea = new File(new File(System.getProperty("user.home")) + File.separator + ".icedtea");
             boolean a = currentConfigCache.renameTo(oldIcedTea);
             Assert.assertTrue("creation of old config by renaming " + currentConfigCache + " to " + oldIcedTea + " failed", a);
             assertOldConfigFilesInHome(true, true, true);
             assertNotConfigFilesInHome(true, true, true);
-            ;
         } finally {
             ServerAccess.PROCESS_TIMEOUT = t;
             deleteRecursively(tmp);
@@ -351,27 +370,24 @@ public class XDGspecificationTests extends BrowserTest {
     }
 
     private static List<File> getContentOfDirectory(File f) {
-        List<File> result = new ArrayList<File>();
+        List<File> result = new ArrayList<>();
         if (f == null || !f.exists() || !f.isDirectory()) {
             return result;
         }
         File[] files = f.listFiles();
-        for (int i = 0; i < files.length; i++) {
-            File file = files[i];
+        for (File file : files) {
             if (file.isDirectory()) {
                 result.addAll(getContentOfDirectory(file));
             } else {
                 result.add(file);
             }
-
         }
         return result;
     }
 
     private static String listToString(List<File>... l) {
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < l.length; i++) {
-            List<File> list = l[i];
+        for (List<File> list : l) {
             for (File s : list) {
                 sb.append(s.getAbsolutePath()).append('\n');
             }
@@ -445,32 +461,32 @@ public class XDGspecificationTests extends BrowserTest {
     }
 
     private static void assertMainFilesInHome(boolean s1, boolean s2, boolean a1) {
-        String configHome = System.getProperty("user.home") + File.separator + ".config" + File.separator + "icedtea-web";
-        String cacheHome = System.getProperty("user.home") + File.separator + ".cache" + File.separator + "icedtea-web";
+        String configHome = System.getProperty("user.home") + File.separator + ".config" + File.separator + PathsAndFiles.DEPLOYMENT_SUBDIR_DIR;
+        String cacheHome = System.getProperty("user.home") + File.separator + ".cache" + File.separator + PathsAndFiles.DEPLOYMENT_SUBDIR_DIR;
         assertMainFiles(
                 listToString(getContentOfDirectory(new File(configHome))) + "\n"
                 + listToString(getContentOfDirectory(new File(cacheHome))), s1, s2, a1);
     }
 
     private static void assertConfigFilesInHome(boolean certs, boolean trust, boolean props) {
-        String configHome = System.getProperty("user.home") + File.separator + ".config" + File.separator + "icedtea-web";
-        String cacheHome = System.getProperty("user.home") + File.separator + ".cache" + File.separator + "icedtea-web";
+        String configHome = System.getProperty("user.home") + File.separator + ".config" + File.separator + PathsAndFiles.DEPLOYMENT_SUBDIR_DIR;
+        String cacheHome = System.getProperty("user.home") + File.separator + ".cache" + File.separator + PathsAndFiles.DEPLOYMENT_SUBDIR_DIR;
         assertConfigFiles(
                 listToString(getContentOfDirectory(new File(configHome))) + "\n"
                 + listToString(getContentOfDirectory(new File(cacheHome))), certs, trust, props);
     }
 
     private static void assertNotMainFilesInHome(boolean s1, boolean s2, boolean a1) {
-        String configHome = System.getProperty("user.home") + File.separator + ".config" + File.separator + "icedtea-web";
-        String cacheHome = System.getProperty("user.home") + File.separator + ".cache" + File.separator + "icedtea-web";
+        String configHome = System.getProperty("user.home") + File.separator + ".config" + File.separator + PathsAndFiles.DEPLOYMENT_SUBDIR_DIR;
+        String cacheHome = System.getProperty("user.home") + File.separator + ".cache" + File.separator + PathsAndFiles.DEPLOYMENT_SUBDIR_DIR;
         assertNotMainFiles(
                 listToString(getContentOfDirectory(new File(configHome))) + "\n"
                 + listToString(getContentOfDirectory(new File(cacheHome))), s1, s2, a1);
     }
 
     private static void assertNotConfigFilesInHome(boolean certs, boolean trust, boolean props) {
-        String configHome = System.getProperty("user.home") + File.separator + ".config" + File.separator + "icedtea-web";
-        String cacheHome = System.getProperty("user.home") + File.separator + ".cache" + File.separator + "icedtea-web";
+        String configHome = System.getProperty("user.home") + File.separator + ".config" + File.separator + PathsAndFiles.DEPLOYMENT_SUBDIR_DIR;
+        String cacheHome = System.getProperty("user.home") + File.separator + ".cache" + File.separator + PathsAndFiles.DEPLOYMENT_SUBDIR_DIR;
         assertNotConfigFiles(
                 listToString(getContentOfDirectory(new File(configHome))) + "\n"
                 + listToString(getContentOfDirectory(new File(cacheHome))), certs, trust, props);
@@ -478,8 +494,8 @@ public class XDGspecificationTests extends BrowserTest {
     //runs
     private static final RulesFolowingClosingListener.ContainsRule simpletests1Run = new RulesFolowingClosingListener.ContainsRule("Good simple javaws exapmle");
     private static final RulesFolowingClosingListener.ContainsRule simpletests2Run = new RulesFolowingClosingListener.ContainsRule("Correct exception");
-    private static final RulesFolowingClosingListener.ContainsRule moving = new RulesFolowingClosingListener.ContainsRule("Legacy configuration and cache found. Those will be now transported to new location");
-    private static final RulesFolowingClosingListener.NotContainsRule notMoving = new RulesFolowingClosingListener.NotContainsRule("Legacy configuration and cache found. Those will be now transported to new location");
+    private static final RulesFolowingClosingListener.ContainsRule moving = new RulesFolowingClosingListener.ContainsRule(DeploymentConfiguration.TRANSFER_TITLE);
+    private static final RulesFolowingClosingListener.NotContainsRule notMoving = new RulesFolowingClosingListener.NotContainsRule(DeploymentConfiguration.TRANSFER_TITLE);
     private static final RulesFolowingClosingListener.ContainsRule unknownProperty = new RulesFolowingClosingListener.ContainsRule("WARNING: Unknown property name");
     private static final RulesFolowingClosingListener.ContainsRule applet1Run = new RulesFolowingClosingListener.ContainsRule("applet was started");
     //javaws/plugin files
@@ -508,12 +524,24 @@ public class XDGspecificationTests extends BrowserTest {
     public void runJavawsInCleanSystemWithNoXdg() throws Exception {
         assertNotMainFilesInHome(true, true, true);
         assertOldNotMainFilesInHome(true, true, true);
-        ProcessWrapper pw = new ProcessWrapper(server.getJavawsLocation(), null, server.getUrl("simpletest1.jnlp"), (ContentReaderListener) null, null, removeXdgVAlues());
-        ProcessResult pr = pw.execute();
-        Assert.assertTrue(simpletests1Run.toPassingString(), simpletests1Run.evaluate(pr.stdout));
-        Assert.assertTrue(notMoving.toPassingString(), notMoving.evaluate(pr.stdout));
-        assertMainFilesInHome(true, false, false);
-        assertOldNotMainFilesInHome(true, true, true);
+        //we need fake security and manifests
+        File ff = new File(PathsAndFiles.USER_CONFIG_HOME);
+        try {
+            fakeExtendedSecurity(ff);
+            ProcessWrapper pw = new ProcessWrapper(server.getJavawsLocation(), null, server.getUrl("simpletest1.jnlp"), (ContentReaderListener) null, null, removeXdgVAlues());
+            ProcessResult pr = pw.execute();
+            Assert.assertTrue(simpletests1Run.toPassingString(), simpletests1Run.evaluate(pr.stdout));
+            Assert.assertTrue(notMoving.toPassingString(), notMoving.evaluate(pr.stdout));
+            itwDoesNotComplainAboutOldConfig(pr); //no old config
+            assertMainFilesInHome(true, false, false);
+            assertOldNotMainFilesInHome(true, true, true);
+            ProcessResult pr2 = pw.execute();
+            itwDoesNotComplainAboutOldConfig(pr2);
+            assertMainFilesInHome(true, false, false);
+            assertOldNotMainFilesInHome(true, true, true);
+        } finally {
+            deleteRecursively(ff);
+        }
     }
 
     @Test
@@ -522,10 +550,20 @@ public class XDGspecificationTests extends BrowserTest {
         try {
             assertNotMainFiles(listToString(getContentOfDirectory(f)), true, true, true);
             assertOldNotMainFilesInHome(true, true, true);
+            //we need fake security and manifests
+            File ff = new File(f, "customConfig/" + PathsAndFiles.DEPLOYMENT_SUBDIR_DIR);
+            fakeExtendedSecurity(ff);
             ProcessWrapper pw = new ProcessWrapper(server.getJavawsLocation(), null, server.getUrl("simpletest1.jnlp"), (ContentReaderListener) null, null, setXdgVAlues(f));
             ProcessResult pr = pw.execute();
+            itwDoesNotComplainAboutOldConfig(pr); //no old config
             Assert.assertTrue(simpletests1Run.toPassingString(), simpletests1Run.evaluate(pr.stdout));
             Assert.assertTrue(notMoving.toPassingString(), notMoving.evaluate(pr.stdout));
+            assertMainFiles(listToString(getContentOfDirectory(f)), true, false, false);
+            assertOldNotMainFilesInHome(true, true, true);
+            ProcessResult pr2 = pw.execute();
+            itwDoesNotComplainAboutOldConfig(pr2); //no old config
+            Assert.assertTrue(simpletests1Run.toPassingString(), simpletests1Run.evaluate(pr2.stdout));
+            Assert.assertTrue(notMoving.toPassingString(), notMoving.evaluate(pr2.stdout));
             assertMainFiles(listToString(getContentOfDirectory(f)), true, false, false);
             assertOldNotMainFilesInHome(true, true, true);
         } finally {
@@ -540,10 +578,20 @@ public class XDGspecificationTests extends BrowserTest {
             assertNotMainFiles(listToString(getContentOfDirectory(f)), true, true, true);
             assertOldNotMainFilesInHome(true, true, true);
             f.delete();
+            //we need fake security and manifests
+            File ff = new File(f, "customConfig/" + PathsAndFiles.DEPLOYMENT_SUBDIR_DIR);
+            fakeExtendedSecurity(ff);
             ProcessWrapper pw = new ProcessWrapper(server.getJavawsLocation(), null, server.getUrl("simpletest1.jnlp"), (ContentReaderListener) null, null, setXdgVAlues(f));
             ProcessResult pr = pw.execute();
+            itwDoesNotComplainAboutOldConfig(pr);
             Assert.assertTrue(simpletests1Run.toPassingString(), simpletests1Run.evaluate(pr.stdout));
             Assert.assertTrue(notMoving.toPassingString(), notMoving.evaluate(pr.stdout));
+            assertMainFiles(listToString(getContentOfDirectory(f)), true, false, false);
+            assertOldNotMainFilesInHome(true, true, true);
+            ProcessResult pr3 = pw.execute();
+            itwDoesNotComplainAboutOldConfig(pr3);
+            Assert.assertTrue(simpletests1Run.toPassingString(), simpletests1Run.evaluate(pr3.stdout));
+            Assert.assertTrue(notMoving.toPassingString(), notMoving.evaluate(pr3.stdout));
             assertMainFiles(listToString(getContentOfDirectory(f)), true, false, false);
             assertOldNotMainFilesInHome(true, true, true);
         } finally {
@@ -551,6 +599,20 @@ public class XDGspecificationTests extends BrowserTest {
         }
     }
 
+    private static void itwDoesNotComplainAboutOldConfig(ProcessResult pr) {
+        itwDoesNotComplainAboutOldConfig(pr.stdout);
+    }
+    private static void itwDoesNotComplainAboutOldConfig(String stdout) {
+        Assert.assertFalse(stdout.contains(DeploymentConfiguration.TRANSFER_TITLE));
+    }
+    
+    private static void itwDoesComplainAboutOldConfig(ProcessResult pr) {
+        itwDoesComplainAboutOldConfig(pr.stdout);
+    }
+    private static void itwDoesComplainAboutOldConfig(String stdout) {
+        Assert.assertTrue(stdout.contains(DeploymentConfiguration.TRANSFER_TITLE));
+    }
+    
     private static void assertOldMainFiles(String s, boolean s1, boolean s2, boolean a1) {
         if (a1) {
             Assert.assertTrue(appletJarInside.toPassingString(), appletJarInside.evaluate(s));
@@ -640,38 +702,46 @@ public class XDGspecificationTests extends BrowserTest {
      */
     @Test
     public void runJavawsWithNoXdg_oldIcedTeaConfigExisted() throws Exception {
-        assertNotMainFilesInHome(true, true, true);
-        assertOldNotMainFilesInHome(true, true, true);
-        createFakeOldHomeCache();
-        ProcessWrapper pw1 = new ProcessWrapper(server.getJavawsLocation(), null, server.getUrl("simpletest1.jnlp"), (ContentReaderListener) null, null, removeXdgVAlues());
-        ProcessResult pr1 = pw1.execute();
-        Assert.assertTrue(simpletests1Run.toPassingString(), simpletests1Run.evaluate(pr1.stdout));
-        Assert.assertTrue(moving.toPassingString(), moving.evaluate(pr1.stdout));
-        assertMainFilesInHome(true, true, false);
-        assertOldNotMainFilesInHome(true, true, true);
-
-        ProcessWrapper pw2 = new ProcessWrapper(server.getJavawsLocation(), null, server.getUrl("simpletest1.jnlp"), (ContentReaderListener) null, null, removeXdgVAlues());
-        ProcessResult pr2 = pw2.execute();
-        Assert.assertTrue(simpletests1Run.toPassingString(), simpletests1Run.evaluate(pr2.stdout));
-        Assert.assertTrue(notMoving.toPassingString(), notMoving.evaluate(pr2.stdout));
-        assertMainFilesInHome(true, true, false);
-        assertOldNotMainFilesInHome(true, true, true);
-
+        File ff = new File(PathsAndFiles.USER_CONFIG_HOME);
+        try {
+            assertNotMainFilesInHome(true, true, true);
+            assertOldNotMainFilesInHome(true, true, true);
+            createFakeOldHomeCache();
+            removeUnsupportedLegacyFiles();
+            ProcessWrapper pw1 = new ProcessWrapper(server.getJavawsLocation(), null, server.getUrl("simpletest1.jnlp"), (ContentReaderListener) null, null, removeXdgVAlues());
+            ProcessResult pr1 = pw1.execute();
+            Assert.assertTrue(simpletests1Run.toPassingString(), simpletests1Run.evaluate(pr1.stdout));
+            Assert.assertTrue(moving.toPassingString(), moving.evaluate(pr1.stdout));
+            assertMainFilesInHome(true, true, false);
+            assertOldNotMainFilesInHome(true, true, true);
+            fakeExtendedSecurity(ff);
+            ProcessWrapper pw2 = new ProcessWrapper(server.getJavawsLocation(), null, server.getUrl("simpletest1.jnlp"), (ContentReaderListener) null, null, removeXdgVAlues());
+            ProcessResult pr2 = pw2.execute();
+            Assert.assertTrue(simpletests1Run.toPassingString(), simpletests1Run.evaluate(pr2.stdout));
+            Assert.assertTrue(notMoving.toPassingString(), notMoving.evaluate(pr2.stdout));
+            assertMainFilesInHome(true, true, false);
+            assertOldNotMainFilesInHome(true, true, true);
+        } finally {
+            deleteRecursively(ff);
+        }
     }
 
     @Test
     public void runJavawsWithXdg_oldIcedTeaConfigExisted() throws Exception {
         File f = tmpDir();
+        File ff = new File(PathsAndFiles.USER_CONFIG_HOME);
         try {
             assertNotMainFiles(listToString(getContentOfDirectory(f)), true, true, true);
             assertOldNotMainFilesInHome(true, true, true);
             createFakeOldHomeCache();
+            removeUnsupportedLegacyFiles();
             ProcessWrapper pw = new ProcessWrapper(server.getJavawsLocation(), null, server.getUrl("simpletest1.jnlp"), (ContentReaderListener) null, null, setXdgVAlues(f));
             ProcessResult pr = pw.execute();
             Assert.assertTrue(simpletests1Run.toPassingString(), simpletests1Run.evaluate(pr.stdout));
             Assert.assertTrue(moving.toPassingString(), moving.evaluate(pr.stdout));
             assertMainFiles(listToString(getContentOfDirectory(f)), true, true, false);
             assertOldNotMainFilesInHome(true, true, true);
+            fakeExtendedSecurity(ff);
             ProcessWrapper pw2 = new ProcessWrapper(server.getJavawsLocation(), null, server.getUrl("simpletest1.jnlp"), (ContentReaderListener) null, null, removeXdgVAlues());
             ProcessResult pr2 = pw2.execute();
             Assert.assertTrue(simpletests1Run.toPassingString(), simpletests1Run.evaluate(pr2.stdout));
@@ -680,23 +750,27 @@ public class XDGspecificationTests extends BrowserTest {
             assertOldNotMainFilesInHome(true, true, true);
         } finally {
             deleteRecursively(f);
+            deleteRecursively(ff);
         }
     }
 
     @Test
     public void runJavawsWithXdgAndNoParent_oldIcedTeaConfigExisted() throws Exception {
         File f = tmpDir();
+        File ff = new File(PathsAndFiles.USER_CONFIG_HOME);
         try {
             assertNotMainFiles(listToString(getContentOfDirectory(f)), true, true, true);
             assertOldNotMainFilesInHome(true, true, true);
             createFakeOldHomeCache();
             f.delete();
+            removeUnsupportedLegacyFiles();
             ProcessWrapper pw = new ProcessWrapper(server.getJavawsLocation(), null, server.getUrl("simpletest1.jnlp"), (ContentReaderListener) null, null, setXdgVAlues(f));
             ProcessResult pr = pw.execute();
             Assert.assertTrue(simpletests1Run.toPassingString(), simpletests1Run.evaluate(pr.stdout));
             Assert.assertTrue(moving.toPassingString(), moving.evaluate(pr.stdout));
             assertMainFiles(listToString(getContentOfDirectory(f)), true, true, false);
             assertOldNotMainFilesInHome(true, true, true);
+            fakeExtendedSecurity(ff);
             ProcessWrapper pw2 = new ProcessWrapper(server.getJavawsLocation(), null, server.getUrl("simpletest1.jnlp"), (ContentReaderListener) null, null, removeXdgVAlues());
             ProcessResult pr2 = pw2.execute();
             Assert.assertTrue(simpletests1Run.toPassingString(), simpletests1Run.evaluate(pr2.stdout));
@@ -705,6 +779,7 @@ public class XDGspecificationTests extends BrowserTest {
             assertOldNotMainFilesInHome(true, true, true);
         } finally {
             deleteRecursively(f);
+            deleteRecursively(ff);
         }
     }
 
@@ -844,7 +919,8 @@ public class XDGspecificationTests extends BrowserTest {
             pw.setArgs(Arrays.asList(
                     new String[]{
                         new File(server.getJavawsFile().getParentFile(), "itweb-settings").getAbsolutePath(),
-                        "set", "blah", "blah"
+                        //one impl of new parser was unable to handle duplicates
+                        "set", "blah", "differentBlah"
                     }));
             pw.setVars(removeXdgVAlues());
             ProcessResult pr = pw.execute();
@@ -869,7 +945,8 @@ public class XDGspecificationTests extends BrowserTest {
             pw.setArgs(Arrays.asList(
                     new String[]{
                         new File(server.getJavawsFile().getParentFile(), "itweb-settings").getAbsolutePath(),
-                        "set", "blah", "blah"
+                        //one impl of new parser was unable to handle duplicates
+                        "set", "blah", "differentBlah"
                     }));
             pw.setVars(setXdgVAlues(f));
             ProcessResult pr = pw.execute();
@@ -898,7 +975,8 @@ public class XDGspecificationTests extends BrowserTest {
             pw1.setArgs(Arrays.asList(
                     new String[]{
                         new File(server.getJavawsFile().getParentFile(), "itweb-settings").getAbsolutePath(),
-                        "set", "blah", "blah"
+                        //one impl of new parser was unable to handle duplicates
+                        "set", "blah", "differentBlah"
                     }));
             pw1.setVars(removeXdgVAlues());
             ProcessResult pr1 = pw1.execute();
@@ -911,7 +989,8 @@ public class XDGspecificationTests extends BrowserTest {
             pw2.setArgs(Arrays.asList(
                     new String[]{
                         new File(server.getJavawsFile().getParentFile(), "itweb-settings").getAbsolutePath(),
-                        "set", "baf", "baf"
+                        //one impl of new parser was unable to handle duplicates
+                        "set", "baf", "differentBaf"
                     }));
             pw2.setVars(removeXdgVAlues());
             ProcessResult pr2 = pw2.execute();
@@ -938,7 +1017,8 @@ public class XDGspecificationTests extends BrowserTest {
             pw1.setArgs(Arrays.asList(
                     new String[]{
                         new File(server.getJavawsFile().getParentFile(), "itweb-settings").getAbsolutePath(),
-                        "set", "blah", "blah"
+                        //one impl of new parser was unable to handle duplicates
+                        "set", "blah", "differentBlah"
                     }));
             pw1.setVars(setXdgVAlues(f));
             ProcessResult pr = pw1.execute();
@@ -950,7 +1030,8 @@ public class XDGspecificationTests extends BrowserTest {
             pw2.setArgs(Arrays.asList(
                     new String[]{
                         new File(server.getJavawsFile().getParentFile(), "itweb-settings").getAbsolutePath(),
-                        "set", "baf", "baf"
+                        //one impl of new parser was unable to handle duplicates
+                        "set", "baf", "differentBaf"
                     }));
             pw2.setVars(removeXdgVAlues());
             ProcessResult pr2 = pw2.execute();
@@ -969,8 +1050,8 @@ public class XDGspecificationTests extends BrowserTest {
             boolean a = file.mkdirs();
             Assert.assertTrue("creation of directories for " + file + " failed", a);
         }
-        File f = new File(file, "deployment.properties");
-        ServerAccess.saveFile("deployment.security.level = ALLOW_UNSIGNED", f);
+        File f = new File(file, PathsAndFiles.USER_DEPLOYMENT_FILE.getDefaultFile().getName());
+        ServerAccess.saveFile("deployment.security.level=ALLOW_UNSIGNED\ndeployment.manifest.attributes.check=NONE", f);
     }
 
     /*
@@ -981,7 +1062,8 @@ public class XDGspecificationTests extends BrowserTest {
     public void runAppletInCleanSystemWithNoXdg() throws Exception {
         assertNotMainFilesInHome(true, true, true);
         assertOldNotMainFilesInHome(true, true, true);
-        fakeExtendedSecurity(new File(System.getProperty("user.home") + File.separator + ".config" + File.separator + "icedtea-web"));
+        //intentionally hardoced default
+        fakeExtendedSecurity(new File(System.getProperty("user.home") + File.separator + ".config" + File.separator + PathsAndFiles.DEPLOYMENT_SUBDIR_DIR));
         ProcessWrapper pw = new ProcessWrapper();
         pw.setArgs(Arrays.asList(
                 new String[]{
@@ -1004,7 +1086,7 @@ public class XDGspecificationTests extends BrowserTest {
         try {
             assertNotMainFiles(listToString(getContentOfDirectory(f)), true, true, true);
             assertOldNotMainFilesInHome(true, true, true);
-            fakeExtendedSecurity(new File(f.getAbsolutePath() + File.separator + "customConfig" + File.separator + "icedtea-web"));
+            fakeExtendedSecurity(new File(f.getAbsolutePath() + File.separator + "customConfig" + File.separator + PathsAndFiles.DEPLOYMENT_SUBDIR_DIR));
             ProcessWrapper pw = new ProcessWrapper();
             pw.setArgs(Arrays.asList(
                     new String[]{
@@ -1098,6 +1180,35 @@ public class XDGspecificationTests extends BrowserTest {
             Assert.assertTrue(applet1Run.toPassingString(), applet1Run.evaluate(pr.stdout));
         } finally {
             deleteRecursively(f);
+        }
+    }
+
+    @Test
+    //this test is unrelated to XDG, bus it testing issue in new option parser.
+    //when this test was under fixing, it was found, that parser is unable to handle two same params in set
+    //this is reproducing it. 
+    @Bug(id = "http://mail.openjdk.java.net/pipermail/distro-pkg-dev/2015-March/031049.html")
+    public void runItwCmdInCleanSystemWithNoXdgAndWithTwoSameValuesInCMD() throws Exception {
+        long t = ServerAccess.PROCESS_TIMEOUT;
+        ServerAccess.PROCESS_TIMEOUT = 5000;
+        try {
+            assertNotConfigFilesInHome(true, true, true);
+            assertOldNotConfigFilesInHome(true, true, true);
+            ProcessWrapper pw = new ProcessWrapper();
+            pw.setArgs(Arrays.asList(
+                    new String[]{
+                        new File(server.getJavawsFile().getParentFile(), "itweb-settings").getAbsolutePath(),
+                        //one impl of new parser was unable to handle duplicates
+                        "set", "blah", "blah"
+                    }));
+            pw.setVars(removeXdgVAlues());
+            ProcessResult pr = pw.execute();
+            Assert.assertTrue(notMoving.toPassingString(), notMoving.evaluate(pr.stdout));
+            Assert.assertTrue(unknownProperty.toPassingString(), unknownProperty.evaluate(pr.stdout));
+            assertConfigFilesInHome(false, false, true);
+            assertOldNotConfigFilesInHome(true, true, true);
+        } finally {
+            ServerAccess.PROCESS_TIMEOUT = t;
         }
     }
 }

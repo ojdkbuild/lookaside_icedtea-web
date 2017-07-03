@@ -16,12 +16,9 @@
 
 package net.sourceforge.jnlp.cache;
 
-import static net.sourceforge.jnlp.runtime.Translator.R;
-
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FilePermission;
 import java.io.IOException;
@@ -32,10 +29,8 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
-import java.nio.channels.OverlappingFileLockException;
 import java.security.Permission;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map.Entry;
@@ -45,12 +40,15 @@ import javax.jnlp.DownloadServiceListener;
 
 import net.sourceforge.jnlp.Version;
 import net.sourceforge.jnlp.config.DeploymentConfiguration;
+import net.sourceforge.jnlp.config.PathsAndFiles;
 import net.sourceforge.jnlp.runtime.ApplicationInstance;
 import net.sourceforge.jnlp.runtime.JNLPRuntime;
+import static net.sourceforge.jnlp.runtime.Translator.R;
+
+import net.sourceforge.jnlp.security.ConnectionFactory;
 import net.sourceforge.jnlp.util.FileUtils;
-import net.sourceforge.jnlp.util.logging.OutputController;
 import net.sourceforge.jnlp.util.PropertiesFile;
-import net.sourceforge.jnlp.util.UrlUtils;
+import net.sourceforge.jnlp.util.logging.OutputController;
 
 /**
  * Provides static methods to interact with the cache, download
@@ -61,54 +59,8 @@ import net.sourceforge.jnlp.util.UrlUtils;
  */
 public class CacheUtil {
 
-    private static final String setCacheDir = JNLPRuntime.getConfiguration().getProperty(DeploymentConfiguration.KEY_USER_CACHE_DIR);
-    private static final String cacheDir = new File(setCacheDir != null ? setCacheDir : System.getProperty("java.io.tmpdir")).getPath(); // Do this with file to standardize it.
-    private static final CacheLRUWrapper lruHandler = CacheLRUWrapper.getInstance();
-    private static final HashMap<String, FileLock> propertiesLockPool = new HashMap<String, FileLock>();
 
-    /**
-     * Compares a URL using string compare of its protocol, host,
-     * port, path, query, and anchor. This method avoids the host
-     * name lookup that URL.equals does for http: protocol URLs.
-     * It may not return the same value as the URL.equals method
-     * (different hostnames that resolve to the same IP address,
-     * ie sourceforge.net and www.sourceforge.net).
-     */
-    public static boolean urlEquals(URL u1, URL u2) {
-        if (u1 == u2) {
-            return true;
-        }
-        if (u1 == null || u2 == null) {
-            return false;
-        }
 
-        if (notNullUrlEquals(u1, u2)) {
-            return true;
-        }
-        try {
-            URL nu1 = UrlUtils.normalizeUrl(u1);
-            URL nu2 = UrlUtils.normalizeUrl(u2);
-            if (notNullUrlEquals(nu1, nu2)) {
-                return true;
-            }
-        } catch (Exception ex) {
-            //keep silent here and return false
-        }
-        return false;
-    }
-
-    private static boolean notNullUrlEquals(URL u1, URL u2) {
-        if (!compare(u1.getProtocol(), u2.getProtocol(), true)
-                || !compare(u1.getHost(), u2.getHost(), true)
-                || //u1.getDefaultPort() != u2.getDefaultPort() || // only in 1.4
-                !compare(u1.getPath(), u2.getPath(), false)
-                || !compare(u1.getQuery(), u2.getQuery(), false)
-                || !compare(u1.getRef(), u2.getRef(), false)) {
-            return false;
-        } else {
-            return true;
-        }
-    }
     /**
      * Caches a resource and returns a URL for it in the cache;
      * blocks until resource is cached. If the resource location is
@@ -117,55 +69,64 @@ public class CacheUtil {
      *
      * @param location location of the resource
      * @param version the version, or {@code null}
+     * @param policy how to handle update
      * @return either the location in the cache or the original location
      */
-    public static URL getCachedResource(URL location, Version version, UpdatePolicy policy) {
-        ResourceTracker rt = new ResourceTracker();
-        rt.addResource(location, version, null, policy);
+    public static URL getCachedResourceURL(URL location, Version version, UpdatePolicy policy) {
         try {
-            File f = rt.getCacheFile(location);
+            File f = getCachedResourceFile(location, version, policy);
+            //url was ponting to nowhere eg 404
+            if (f == null){
+                //originally  f.toUrl was throwing NPE
+                return null;
+                //returning null seems to be better
+            }
             // TODO: Should be toURI().toURL()
             return f.toURL();
         } catch (MalformedURLException ex) {
             return location;
         }
     }
-
+    
     /**
-     * Compare strings that can be {@code null}.
+     * This is returning File object of cached resource originally from URL
+     * @param location original location of blob
+     * @param version version of resource
+     * @param policy update policy of resource
+     * @return location in ITW cache on filesystem 
      */
-    private static boolean compare(String s1, String s2, boolean ignore) {
-        if (s1 == s2)
-            return true;
-        if (s1 == null || s2 == null)
-            return false;
-
-        if (ignore)
-            return s1.equalsIgnoreCase(s2);
-        else
-            return s1.equals(s2);
+    public static File  getCachedResourceFile(URL location, Version version, UpdatePolicy policy) {
+        ResourceTracker rt = new ResourceTracker();
+        rt.addResource(location, version, null, policy);
+        File f = rt.getCacheFile(location);
+        return f;
     }
 
     /**
      * Returns the Permission object necessary to access the
      * resource, or {@code null} if no permission is needed.
+     * @param location location of the resource
+     * @param version the version, or {@code null}
+     * @return permissions of the location
      */
     public static Permission getReadPermission(URL location, Version version) {
+        Permission result = null;
         if (CacheUtil.isCacheable(location, version)) {
             File file = CacheUtil.getCacheFile(location, version);
-
-            return new FilePermission(file.getPath(), "read");
+            result = new FilePermission(file.getPath(), "read");
         } else {
             try {
                 // this is what URLClassLoader does
-                return location.openConnection().getPermission();
+                URLConnection conn = ConnectionFactory.getConnectionFactory().openConnection(location);
+                result = conn.getPermission();
+                 ConnectionFactory.getConnectionFactory().disconnect(conn);                
             } catch (java.io.IOException ioe) {
                 // should try to figure out the permission
                 OutputController.getLogger().log(ioe);
             }
         }
 
-        return null;
+        return result;
     }
 
     /**
@@ -174,6 +135,7 @@ public class CacheUtil {
      * Note: Because of how our caching system works, deleting jars of another javaws
      * process is using them can be quite disasterous. Hence why Launcher creates lock files
      * and we check for those by calling {@link #okToClearCache()}
+     * @return true if the cache could be cleared and was cleared
      */
     public static boolean clearCache() {
 
@@ -181,8 +143,9 @@ public class CacheUtil {
             OutputController.getLogger().log(OutputController.Level.ERROR_ALL, R("CCannotClearCache"));
             return false;
         }
-
-        File cacheDir = new File(CacheUtil.cacheDir);
+        
+        CacheLRUWrapper lruHandler = CacheLRUWrapper.getInstance();
+        File cacheDir = lruHandler.getCacheDir().getFile();
         if (!(cacheDir.isDirectory())) {
             return false;
         }
@@ -208,7 +171,7 @@ public class CacheUtil {
      * @return true if the cache can be cleared at this time without problems
      */
     private static boolean okToClearCache() {
-        File otherJavawsRunning = new File(JNLPRuntime.getConfiguration().getProperty(DeploymentConfiguration.KEY_USER_NETX_RUNNING_FILE));
+        File otherJavawsRunning = PathsAndFiles.MAIN_LOCK.getFile();
         FileLock locking = null;
         try {
             if (otherJavawsRunning.isFile()) {
@@ -247,23 +210,18 @@ public class CacheUtil {
      *
      * @param source the source {@link URL}
      * @param version the versions to check for
-     * @param connection a connection to the {@link URL}, or {@code null}
+     * @param lastModifed time in milis since epoch of last modfication
      * @return whether the cache contains the version
      * @throws IllegalArgumentException if the source is not cacheable
      */
-    public static boolean isCurrent(URL source, Version version, URLConnection connection) {
+    public static boolean isCurrent(URL source, Version version, long lastModifed) {
 
         if (!isCacheable(source, version))
             throw new IllegalArgumentException(R("CNotCacheable", source));
 
         try {
-            if (connection == null)
-                connection = source.openConnection();
-
-            connection.connect();
-
             CacheEntry entry = new CacheEntry(source, version); // could pool this
-            boolean result = entry.isCurrent(connection);
+            boolean result = entry.isCurrent(lastModifed);
 
             OutputController.getLogger().log("isCurrent: " + source + " = " + result);
 
@@ -299,17 +257,20 @@ public class CacheUtil {
      * Returns whether the resource can be cached as a local file;
      * if not, then URLConnection.openStream can be used to obtain
      * the contents.
+     * @param source the url of resource
+     * @param version version of resource
+     * @return whether this resource can be cached
      */
     public static boolean isCacheable(URL source, Version version) {
         if (source == null)
             return false;
 
-        if (source.getProtocol().equals("file"))
+        if (source.getProtocol().equals("file")){
             return false;
-
-        if (source.getProtocol().equals("jar"))
+        }
+        if (source.getProtocol().equals("jar")){
             return false;
-
+        }
         return true;
     }
 
@@ -331,18 +292,22 @@ public class CacheUtil {
             throw new IllegalArgumentException(R("CNotCacheable", source));
 
         File cacheFile = null;
+        CacheLRUWrapper lruHandler = CacheLRUWrapper.getInstance();
         synchronized (lruHandler) {
-            lruHandler.lock();
+            try {
+                lruHandler.lock();
 
-            // We need to reload the cacheOrder file each time
-            // since another plugin/javaws instance may have updated it.
-            lruHandler.load();
-            cacheFile = getCacheFileIfExist(urlToPath(source, ""));
-            if (cacheFile == null) { // We did not find a copy of it.
-                cacheFile = makeNewCacheFile(source, version);
-            } else
-                lruHandler.store();
-            lruHandler.unlock();
+                // We need to reload the cacheOrder file each time
+                // since another plugin/javaws instance may have updated it.
+                lruHandler.load();
+                cacheFile = getCacheFileIfExist(urlToPath(source, ""));
+                if (cacheFile == null) { // We did not find a copy of it.
+                    cacheFile = makeNewCacheFile(source, version);
+                } else
+                    lruHandler.store();
+            } finally {
+                lruHandler.unlock();
+            }
         }
         return cacheFile;
     }
@@ -354,6 +319,7 @@ public class CacheUtil {
      * @return File if we have searched before, {@code null} otherwise.
      */
     private static File getCacheFileIfExist(File urlPath) {
+        CacheLRUWrapper lruHandler = CacheLRUWrapper.getInstance();
         synchronized (lruHandler) {
             File cacheFile = null;
             List<Entry<String, String>> entries = lruHandler.getLRUSortedEntries();
@@ -376,7 +342,7 @@ public class CacheUtil {
      * Get the path to file minus the cache directory and indexed folder.
      */
     private static String pathToURLPath(String path) {
-        int len = cacheDir.length();
+        int len = CacheLRUWrapper.getInstance().getCacheDir().getFullPath().length();
         int index = path.indexOf(File.separatorChar, len + 1);
         return path.substring(index);
     }
@@ -384,10 +350,12 @@ public class CacheUtil {
     /**
      * Returns the parent directory of the cached resource.
      * @param filePath The path of the cached resource directory.
+     * @return parent dir of cache
      */
     public static String getCacheParentDirectory(String filePath) {
         String path = filePath;
-        String tempPath = "";
+        String tempPath;
+        String cacheDir = CacheLRUWrapper.getInstance().getCacheDir().getFullPath();
 
         while(path.startsWith(cacheDir) && !path.equals(cacheDir)){
                 tempPath = new File(path).getParent();
@@ -410,32 +378,35 @@ public class CacheUtil {
      * @return the file location in the cache.
      */
     public static File makeNewCacheFile(URL source, Version version) {
+        CacheLRUWrapper lruHandler = CacheLRUWrapper.getInstance();
         synchronized (lruHandler) {
-            lruHandler.lock();
-            lruHandler.load();
-
             File cacheFile = null;
-            for (long i = 0; i < Long.MAX_VALUE; i++) {
-                String path = cacheDir + File.separator + i;
-                File cDir = new File(path);
-                if (!cDir.exists()) {
-                    // We can use this directory.
-                    try {
-                        cacheFile = urlToPath(source, path);
-                        FileUtils.createParentDir(cacheFile);
-                        File pf = new File(cacheFile.getPath() + ".info");
-                        FileUtils.createRestrictedFile(pf, true); // Create the info file for marking later.
-                        lruHandler.addEntry(lruHandler.generateKey(cacheFile.getPath()), cacheFile.getPath());
-                    } catch (IOException ioe) {
-                       OutputController.getLogger().log(ioe);
+            try {
+                lruHandler.lock();
+                lruHandler.load();
+                for (long i = 0; i < Long.MAX_VALUE; i++) {
+                    String path = lruHandler.getCacheDir().getFullPath()+ File.separator + i;
+                    File cDir = new File(path);
+                    if (!cDir.exists()) {
+                        // We can use this directory.
+                        try {
+                            cacheFile = urlToPath(source, path);
+                            FileUtils.createParentDir(cacheFile);
+                            File pf = new File(cacheFile.getPath() + ".info");
+                            FileUtils.createRestrictedFile(pf, true); // Create the info file for marking later.
+                            lruHandler.addEntry(lruHandler.generateKey(cacheFile.getPath()), cacheFile.getPath());
+                        } catch (IOException ioe) {
+                            OutputController.getLogger().log(ioe);
+                        }
+
+                        break;
                     }
-
-                    break;
                 }
-            }
 
-            lruHandler.store();
-            lruHandler.unlock();
+                lruHandler.store();
+            } finally {
+                lruHandler.unlock();
+            }
             return cacheFile;
         }
     }
@@ -446,6 +417,8 @@ public class CacheUtil {
      *
      * @param source the remote location
      * @param version the file version to write to
+     * @return the stream to write to resource
+     * @throws java.io.IOException if IO breaks
      */
     public static OutputStream getOutputStream(URL source, Version version) throws IOException {
         File localFile = getCacheFile(source, version);
@@ -458,6 +431,9 @@ public class CacheUtil {
      * Copies from an input stream to an output stream.  On
      * completion, both streams will be closed.  Streams are
      * buffered automatically.
+     * @param is stream to read from
+     * @param os stream to write to
+     * @throws java.io.IOException if copy fails
      */
     public static void streamCopy(InputStream is, OutputStream os) throws IOException {
         if (!(is instanceof BufferedInputStream))
@@ -495,7 +471,7 @@ public class CacheUtil {
             throw new NullPointerException();
         }
 
-        StringBuffer path = new StringBuffer();
+        StringBuilder path = new StringBuilder();
 
         path.append(subdir);
         path.append(File.separatorChar);
@@ -505,6 +481,9 @@ public class CacheUtil {
         path.append(location.getHost());
         path.append(File.separatorChar);
         path.append(location.getPath().replace('/', File.separatorChar));
+        if (location.getQuery() != null && !location.getQuery().trim().isEmpty()) {
+            path.append(".").append(location.getQuery());
+        }
 
         return new File(FileUtils.sanitizePath(path.toString()));
     }
@@ -513,6 +492,7 @@ public class CacheUtil {
      * Waits until the resources are downloaded, while showing a
      * progress indicator.
      *
+     * @param app application instance with context for this resource
      * @param tracker the resource tracker
      * @param resources the resources to wait for
      * @param title name of the download
@@ -533,7 +513,7 @@ public class CacheUtil {
                 return;
 
             // only resources not starting out downloaded are displayed
-            List<URL> urlList = new ArrayList<URL>();
+            List<URL> urlList = new ArrayList<>();
             for (URL url : resources) {
                 if (!tracker.checkResource(url))
                     urlList.add(url);
@@ -581,30 +561,32 @@ public class CacheUtil {
      * This will remove all old cache items.
      */
     public static void cleanCache() {
-
+        CacheLRUWrapper lruHandler = CacheLRUWrapper.getInstance();
         if (okToClearCache()) {
             // First we want to figure out which stuff we need to delete.
-            HashSet<String> keep = new HashSet<String>();
-            HashSet<String> remove = new HashSet<String>();
-            lruHandler.load();
-            
-            long maxSize = -1; // Default
+            HashSet<String> keep = new HashSet<>();
+            HashSet<String> remove = new HashSet<>();
             try {
-                maxSize = Long.parseLong(JNLPRuntime.getConfiguration().getProperty("deployment.cache.max.size"));
-            } catch (NumberFormatException nfe) {
-            }
-            
-            maxSize = maxSize << 20; // Convert from megabyte to byte (Negative values will be considered unlimited.)
-            long curSize = 0;
+                lruHandler.lock();
+                lruHandler.load();
 
-            for (Entry<String, String> e : lruHandler.getLRUSortedEntries()) {
-                // Check if the item is contained in cacheOrder.
-                final String key = e.getKey();
-                final String path = e.getValue();
+                long maxSize = -1; // Default
+                try {
+                    maxSize = Long.parseLong(JNLPRuntime.getConfiguration().getProperty(DeploymentConfiguration.KEY_CACHE_MAX_SIZE));
+                } catch (NumberFormatException nfe) {
+                }
 
-                File file = new File(path);
-                PropertiesFile pf = new PropertiesFile(new File(path + ".info"));
-                boolean delete = Boolean.parseBoolean(pf.getProperty("delete"));
+                maxSize = maxSize << 20; // Convert from megabyte to byte (Negative values will be considered unlimited.)
+                long curSize = 0;
+
+                for (Entry<String, String> e : lruHandler.getLRUSortedEntries()) {
+                    // Check if the item is contained in cacheOrder.
+                    final String key = e.getKey();
+                    final String path = e.getValue();
+
+                    File file = new File(path);
+                    PropertiesFile pf = new PropertiesFile(new File(path + ".info"));
+                    boolean delete = Boolean.parseBoolean(pf.getProperty("delete"));
 
                 /*
                  * This will get me the root directory specific to this cache item.
@@ -614,14 +596,14 @@ public class CacheUtil {
                  *  rStr first becomes: /0/http/www.example.com/subdir/a.jar
                  *  then rstr becomes: /home/user1/.icedtea/cache/0
                  */
-                String rStr = file.getPath().substring(cacheDir.length());
-                rStr = cacheDir + rStr.substring(0, rStr.indexOf(File.separatorChar, 1));
-                long len = file.length();
+                    String rStr = file.getPath().substring(lruHandler.getCacheDir().getFullPath().length());
+                    rStr = lruHandler.getCacheDir().getFullPath()+ rStr.substring(0, rStr.indexOf(File.separatorChar, 1));
+                    long len = file.length();
 
-                if (keep.contains(file.getPath().substring(rStr.length()))) {
-                    lruHandler.removeEntry(key);
-                    continue;
-                }
+                    if (keep.contains(file.getPath().substring(rStr.length()))) {
+                        lruHandler.removeEntry(key);
+                        continue;
+                    }
 
                 /*
                  * we remove entries from our lru if any of the following condition is met.
@@ -631,37 +613,31 @@ public class CacheUtil {
                  *  - maxSize >= 0 && curSize + len > maxSize: If a limit was set and the new size
                  *  on disk would exceed the maximum size.
                  */
-                if (delete || !file.isFile() || (maxSize >= 0 && curSize + len > maxSize)) {
-                    lruHandler.removeEntry(key);
-                    remove.add(rStr);
-                    continue;
-                }
-
-                curSize += len;
-                keep.add(file.getPath().substring(rStr.length()));
-
-                for (File f : file.getParentFile().listFiles()) {
-                    if (!(f.equals(file) || f.equals(pf.getStoreFile()))) {
-                        try {
-                            FileUtils.recursiveDelete(f, f);
-                        } catch (IOException e1) {
-                            OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e1);
-                        }
+                    if (delete || !file.isFile() || (maxSize >= 0 && curSize + len > maxSize)) {
+                        lruHandler.removeEntry(key);
+                        remove.add(rStr);
+                        continue;
                     }
 
+                    curSize += len;
+                    keep.add(file.getPath().substring(rStr.length()));
+
+                    for (File f : file.getParentFile().listFiles()) {
+                        if (!(f.equals(file) || f.equals(pf.getStoreFile()))) {
+                            try {
+                                FileUtils.recursiveDelete(f, f);
+                            } catch (IOException e1) {
+                                OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e1);
+                            }
+                        }
+
+                    }
                 }
+                lruHandler.store();
+            } finally {
+                lruHandler.unlock();
             }
-            lruHandler.store();
-
-            /*
-             * FIXME: if cacheDir is for example $USER_HOME and they have a folder called http
-             * and/or https. These would get removed.
-             */
-            remove.add(cacheDir + File.separator + "http");
-            remove.add(cacheDir + File.separator + "https");
-
             removeSetOfDirectories(remove);
-
         }
     }
 
@@ -672,40 +648,6 @@ public class CacheUtil {
                 FileUtils.recursiveDelete(f, f);
             } catch (IOException e) {
             }
-        }
-    }
-
-    /**
-     * Lock the property file and add it to our pool of locks.
-     * 
-     * @param properties Property file to lock.
-     */
-    public static void lockFile(PropertiesFile properties) {
-        String storeFilePath = properties.getStoreFile().getPath();
-        try {
-            propertiesLockPool.put(storeFilePath, FileUtils.getFileLock(storeFilePath, false, true));
-        } catch (OverlappingFileLockException e) {
-        } catch (FileNotFoundException e) {
-           OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e);
-        }
-    }
-
-    /**
-     * Unlock the property file and remove it from our pool. Nothing happens if
-     * it wasn't locked.
-     * 
-     * @param properties Property file to unlock.
-     */
-    public static void unlockFile(PropertiesFile properties) {
-        File storeFile = properties.getStoreFile();
-        FileLock fl = propertiesLockPool.get(storeFile.getPath());
-        try {
-            if (fl == null) return;
-            fl.release();
-            fl.channel().close();
-            propertiesLockPool.remove(storeFile.getPath());
-        } catch (IOException e) {
-            OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e);
         }
     }
 }

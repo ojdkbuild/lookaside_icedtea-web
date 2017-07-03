@@ -36,8 +36,11 @@ exception statement from your version.
  */
 package net.sourceforge.jnlp.runtime;
 
+import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import net.sourceforge.jnlp.ExtensionDesc;
@@ -59,6 +62,9 @@ import net.sourceforge.jnlp.util.ClasspathMatcher.ClasspathMatchers;
 import net.sourceforge.jnlp.util.UrlUtils;
 import net.sourceforge.jnlp.util.logging.OutputController;
 
+import static net.sourceforge.jnlp.config.BasicValueValidators.splitCombination;
+import static net.sourceforge.jnlp.runtime.Translator.R;
+
 public class ManifestAttributesChecker {
 
     private final SecurityDesc security;
@@ -74,20 +80,101 @@ public class ManifestAttributesChecker {
         this.securityDelegate = securityDelegate;
     }
 
+    public enum MANIFEST_ATTRIBUTES_CHECK {
+        ALL,
+        NONE,
+        PERMISSIONS,
+        CODEBASE,
+        TRUSTED,
+        ALAC,
+        ENTRYPOINT
+    }
+
     void checkAll() throws LaunchException {
-        if (isCheckEnabled()) {
-            checkTrustedOnlyAttribute();
-            checkCodebaseAttribute();
-            checkPermissionsAttribute();
-            checkApplicationLibraryAllowableCodebaseAttribute();
+        List<MANIFEST_ATTRIBUTES_CHECK> attributesCheck = getAttributesCheck();
+        if (attributesCheck.contains(MANIFEST_ATTRIBUTES_CHECK.NONE)) {
+            OutputController.getLogger().log(OutputController.Level.WARNING_ALL, R("MACDisabledMessage"));
         } else {
-            OutputController.getLogger().log("Checking for attributes in manifest is disabled.");
+
+            if (attributesCheck.contains(MANIFEST_ATTRIBUTES_CHECK.TRUSTED) ||
+                    attributesCheck.contains(MANIFEST_ATTRIBUTES_CHECK.ALL)) {
+                checkTrustedOnlyAttribute();
+            } else {
+                OutputController.getLogger().log(OutputController.Level.WARNING_ALL, R("MACCheckSkipped", "Trusted-Only", "TRUSTED"));
+            }
+
+            if (attributesCheck.contains(MANIFEST_ATTRIBUTES_CHECK.CODEBASE) ||
+                    attributesCheck.contains(MANIFEST_ATTRIBUTES_CHECK.ALL)) {
+                checkCodebaseAttribute();
+            } else {
+                OutputController.getLogger().log(OutputController.Level.WARNING_ALL, R("MACCheckSkipped", "Codebase", "CODEBASE"));
+            }
+
+            if (attributesCheck.contains(MANIFEST_ATTRIBUTES_CHECK.PERMISSIONS) ||
+                    attributesCheck.contains(MANIFEST_ATTRIBUTES_CHECK.ALL)) {
+                checkPermissionsAttribute();
+            } else {
+                OutputController.getLogger().log(OutputController.Level.WARNING_ALL, R("MACCheckSkipped", "Permissions", "PERMISSIONS"));
+            }
+
+            if (attributesCheck.contains(MANIFEST_ATTRIBUTES_CHECK.ALAC) ||
+                   attributesCheck.contains(MANIFEST_ATTRIBUTES_CHECK.ALL)) {
+                checkApplicationLibraryAllowableCodebaseAttribute();
+            } else {
+                OutputController.getLogger().log(OutputController.Level.WARNING_ALL, R("MACCheckSkipped", "Application Library Allowable Codebase", "ALAC"));
+            }
+            
+            if (attributesCheck.contains(MANIFEST_ATTRIBUTES_CHECK.ENTRYPOINT)
+                    || attributesCheck.contains(MANIFEST_ATTRIBUTES_CHECK.ALL)) {
+                checkEntryPoint();
+            } else {
+                OutputController.getLogger().log(OutputController.Level.WARNING_ALL, R("MACCheckSkipped", "Entry-Point", "ENTRYPOINT"));
+            }
+
         }
     }
 
-    public static boolean isCheckEnabled() {
-        String value = JNLPRuntime.getConfiguration().getProperty(DeploymentConfiguration.KEY_ENABLE_MANIFEST_ATTRIBUTES_CHECK);
-        return Boolean.parseBoolean(value);
+    public static List<MANIFEST_ATTRIBUTES_CHECK> getAttributesCheck() {
+        final String deploymentProperty = JNLPRuntime.getConfiguration().getProperty(DeploymentConfiguration.KEY_ENABLE_MANIFEST_ATTRIBUTES_CHECK);
+        String[] attributesCheck = splitCombination(deploymentProperty);
+        List<MANIFEST_ATTRIBUTES_CHECK> manifestAttributesCheckList = new ArrayList<>();
+        for (String attribute : attributesCheck) {
+            for (MANIFEST_ATTRIBUTES_CHECK manifestAttribute  : MANIFEST_ATTRIBUTES_CHECK.values()) {
+                if (manifestAttribute.toString().equals(attribute)) {
+                    manifestAttributesCheckList.add(manifestAttribute);
+                }
+            }
+        }
+        return manifestAttributesCheckList;
+    }
+    /*
+     * http://docs.oracle.com/javase/7/docs/technotes/guides/jweb/security/manifest.html#entry_pt
+     */
+    private void checkEntryPoint() throws LaunchException {
+        if (signing == SigningState.NONE) {
+            return; /*when app is not signed at all, then skip this check*/
+        }
+        if (file.getLaunchInfo() == null) {
+            OutputController.getLogger().log(OutputController.Level.MESSAGE_DEBUG, "Entry-Point can not be checked now, because of not existing launch info.");
+            return;
+        }
+        if (file.getLaunchInfo().getMainClass() == null) {
+            OutputController.getLogger().log(OutputController.Level.MESSAGE_DEBUG, "Entry-Point can not be checked now, because of unknown main class.");
+            return;
+        }
+        final String[] eps = file.getManifestsAttributes().getEntryPoints();
+        String mainClass = file.getLaunchInfo().getMainClass();
+        if (eps == null) {
+            OutputController.getLogger().log(OutputController.Level.MESSAGE_DEBUG, "Entry-Point manifest attribute for yours '" + mainClass + "'not found. Continuing.");
+            return;
+        }
+        for (String ep : eps) {
+            if (ep.equals(mainClass)) {
+                OutputController.getLogger().log(OutputController.Level.MESSAGE_DEBUG, "Entry-Point of " + ep + " mathches " + mainClass + " continuing.");
+                return;
+            }
+        }
+        throw new LaunchException("None of the entry points specified: '" + file.getManifestsAttributes().getEntryPointString() + "' matched the main class " + mainClass + " and apelt is signed. This is a security error and the app will not be launched.");
     }
 
     /**
@@ -126,16 +213,16 @@ public class ManifestAttributesChecker {
                 || (isSandboxed && SecurityDesc.SANDBOX_PERMISSIONS.equals(desc));
         final String signedMsg;
         if (isFullySigned && !isSandboxed) {
-            signedMsg = Translator.R("STOAsignedMsgFully");
+            signedMsg = R("STOAsignedMsgFully");
         } else if (isFullySigned && isSandboxed) {
-            signedMsg = Translator.R("STOAsignedMsgAndSandbox");
+            signedMsg = R("STOAsignedMsgAndSandbox");
         } else {
-            signedMsg = Translator.R("STOAsignedMsgPartiall");
+            signedMsg = R("STOAsignedMsgPartiall");
         }
         OutputController.getLogger().log(OutputController.Level.MESSAGE_DEBUG,
                 "Trusted Only manifest attribute is \"true\". " + signedMsg + " and requests permission level: " + securityType);
         if (!(isFullySigned && requestsCorrectPermissions)) {
-            throw new LaunchException(Translator.R("STrustedOnlyAttributeFailure", signedMsg, securityType));
+            throw new LaunchException(R("STrustedOnlyAttributeFailure", signedMsg, securityType));
         }
     }
 
@@ -144,30 +231,30 @@ public class ManifestAttributesChecker {
      */
     private void checkCodebaseAttribute() throws LaunchException {
         if (file.getCodeBase() == null || file.getCodeBase().getProtocol().equals("file")) {
-            OutputController.getLogger().log(OutputController.Level.WARNING_ALL, Translator.R("CBCheckFile"));
+            OutputController.getLogger().log(OutputController.Level.WARNING_ALL, R("CBCheckFile"));
             return;
         }
         final Object securityType = security.getSecurityType();
         final URL codebase = UrlUtils.guessCodeBase(file);
         final ClasspathMatchers codebaseAtt = file.getManifestsAttributes().getCodebase();
         if (codebaseAtt == null) {
-            OutputController.getLogger().log(OutputController.Level.WARNING_ALL, Translator.R("CBCheckNoEntry"));
+            OutputController.getLogger().log(OutputController.Level.WARNING_ALL, R("CBCheckNoEntry"));
             return;
         }
         if (securityType.equals(SecurityDesc.SANDBOX_PERMISSIONS)) {
             if (codebaseAtt.matches(codebase)) {
-                OutputController.getLogger().log(OutputController.Level.MESSAGE_ALL, Translator.R("CBCheckUnsignedPass"));
+                OutputController.getLogger().log(OutputController.Level.MESSAGE_ALL, R("CBCheckUnsignedPass"));
             } else {
-                OutputController.getLogger().log(OutputController.Level.ERROR_ALL, Translator.R("CBCheckUnsignedFail"));
+                OutputController.getLogger().log(OutputController.Level.ERROR_ALL, R("CBCheckUnsignedFail"));
             }
         } else {
             if (codebaseAtt.matches(codebase)) {
-                OutputController.getLogger().log(OutputController.Level.MESSAGE_ALL, Translator.R("CBCheckOkSignedOk"));
+                OutputController.getLogger().log(OutputController.Level.MESSAGE_ALL, R("CBCheckOkSignedOk"));
             } else {
                 if (file instanceof PluginBridge) {
-                    throw new LaunchException(Translator.R("CBCheckSignedAppletDontMatchException", file.getManifestsAttributes().getCodebase().toString(), codebase));
+                    throw new LaunchException(R("CBCheckSignedAppletDontMatchException", file.getManifestsAttributes().getCodebase().toString(), codebase));
                 } else {
-                    OutputController.getLogger().log(OutputController.Level.ERROR_ALL, Translator.R("CBCheckSignedFail"));
+                    OutputController.getLogger().log(OutputController.Level.ERROR_ALL, R("CBCheckSignedFail"));
                 }
             }
         }
@@ -178,15 +265,19 @@ public class ManifestAttributesChecker {
      * http://docs.oracle.com/javase/7/docs/technotes/guides/jweb/security/manifest.html#permissions
      */
     private void checkPermissionsAttribute() throws LaunchException {
-        final ManifestBoolean sandboxForced = file.getManifestsAttributes().isSandboxForced();
-        final AppletSecurityLevel itwSecurityLevel = AppletStartupSecuritySettings.getInstance().getSecurityLevel();
-        if (itwSecurityLevel == AppletSecurityLevel.ALLOW_UNSIGNED || securityDelegate.getRunInSandbox()) {
-            OutputController.getLogger().log(OutputController.Level.WARNING_ALL, "Although 'permissions' attribute of this application is '" + file.getManifestsAttributes().permissionsToString()
-                    + "' Your Extended applets security is at 'low', or you have specifically chosen to run the applet Sandboxed. Continuing");
+        if (securityDelegate.getRunInSandbox()) {
+            OutputController.getLogger().log(OutputController.Level.WARNING_ALL, "The 'Permissions' attribute of this application is '" + file.getManifestsAttributes().permissionsToString()
+                    + "'. You have chosen the Sandbox run option, which overrides the Permissions manifest attribute, or the applet has already been automatically sandboxed.");
             return;
         }
 
+        final ManifestBoolean sandboxForced = file.getManifestsAttributes().isSandboxForced();
+        // If the attribute is not specified in the manifest, prompt the user. Oracle's spec says that the
+        // attribute is required, but this breaks a lot of existing applets. Therefore, when on the highest
+        // security level, we refuse to run these applets. On the standard security level, we ask. And on the
+        // lowest security level, we simply proceed without asking.
         if (sandboxForced == ManifestBoolean.UNDEFINED) {
+            final AppletSecurityLevel itwSecurityLevel = AppletStartupSecuritySettings.getInstance().getSecurityLevel();
             if (itwSecurityLevel == AppletSecurityLevel.DENY_UNSIGNED) {
                 throw new LaunchException("Your Extended applets security is at 'Very high', and this application is missing the 'permissions' attribute in manifest. This is fatal");
             }
@@ -196,9 +287,9 @@ public class ManifestAttributesChecker {
                     throw new LaunchException("Your Extended applets security is at 'high' and this application is missing the 'permissions' attribute in manifest. And you have refused to run it.");
                 } else {
                     OutputController.getLogger().log("Your Extended applets security is at 'high' and this application is missing the 'permissions' attribute in manifest. And you have allowed to run it.");
-                    return;
                 }
             }
+            return;
         }
 
         final RequestedPermissionLevel requestedPermissions = file.getRequestedPermissionLevel();
@@ -206,27 +297,25 @@ public class ManifestAttributesChecker {
         if (file instanceof PluginBridge) { // HTML applet
             if (isNoneOrDefault(requestedPermissions)) {
                 if (sandboxForced == ManifestBoolean.TRUE && signing != SigningState.NONE) {
-                    // http://docs.oracle.com/javase/7/docs/technotes/guides/jweb/security/manifest.html#permissions
-                    // FIXME: attempting to follow the spec, but it is too late now to actually set the applet
-                    // to run in sandbox. If we do this the applet will not be run at all, rather than run sandboxed!
-                    try {
-                        securityDelegate.setRunInSandbox();
-                    } catch (final LaunchException e) {
-                        OutputController.getLogger().log(e);
-                        throw new LaunchException("The applet is signed but its manifest specifies Sandbox permissions. This is not yet supported. Try running the applet again, but choose the Sandbox run option.", e);
-                    }
+                    securityDelegate.setRunInSandbox();
                 }
             }
         } else { // JNLP
             if (isNoneOrDefault(requestedPermissions)) {
                 if (sandboxForced == ManifestBoolean.TRUE && signing != SigningState.NONE) {
-                    throw new LaunchException("The 'permissions' attribute is '" + file.getManifestsAttributes().permissionsToString() + "' and the applet is signed. This is fatal.");
+                    OutputController.getLogger().log(OutputController.Level.WARNING_ALL, "The 'permissions' attribute is '" + file.getManifestsAttributes().permissionsToString() + "' and the applet is signed. Forcing sandbox.");
+                    securityDelegate.setRunInSandbox();
                 }
                 if (sandboxForced == ManifestBoolean.FALSE && signing == SigningState.NONE) {
-                    throw new LaunchException("The 'permissions' attribute is '" + file.getManifestsAttributes().permissionsToString() + "' and the applet is unsigned. This is fatal.");
+                    OutputController.getLogger().log(OutputController.Level.WARNING_ALL, "The 'permissions' attribute is '" + file.getManifestsAttributes().permissionsToString() + "' and the applet is unsigned. Forcing sandbox.");
+                    securityDelegate.setRunInSandbox();
                 }
             }
         }
+    }
+
+    private static boolean isLowSecurity() {
+        return AppletStartupSecuritySettings.getInstance().getSecurityLevel().equals(AppletSecurityLevel.ALLOW_UNSIGNED);
     }
 
     private static boolean isNoneOrDefault(final RequestedPermissionLevel requested) {
@@ -244,9 +333,6 @@ public class ManifestAttributesChecker {
     }
 
     private void checkApplicationLibraryAllowableCodebaseAttribute() throws LaunchException {
-        if (signing == SigningState.NONE) {
-            return; /*when app is not signed at all, then skip this check*/
-        }
         //conditions
         URL codebase = file.getCodeBase();
         URL documentBase = null;
@@ -298,22 +384,34 @@ public class ManifestAttributesChecker {
             return;
         }
 
-        if (usedUrls.size() == 1) {
-            if (UrlUtils.equalsIgnoreLastSlash(usedUrls.toArray(new URL[0])[0], codebase)
-                    && UrlUtils.equalsIgnoreLastSlash(usedUrls.toArray(new URL[0])[0], documentBase)) {
-                //all resoources are from codebase or document base. it is ok to proceeed.
-                OutputController.getLogger().log("All applications resources (" + usedUrls.toArray(new URL[0])[0] + ") are from codebas/documentbase " + codebase + "/" + documentBase + ", skipping Application-Library-Allowable-Codebase Attribute check.");
-                return;
+        boolean allOk = true;
+        for (URL u : usedUrls) {
+            if (UrlUtils.equalsIgnoreLastSlash(u, codebase)
+                    && UrlUtils.equalsIgnoreLastSlash(u, stripDocbase(documentBase))) {
+                OutputController.getLogger().log("OK - "+u.toExternalForm()+" is from codebase/docbase.");
+            } else {
+                allOk = false;
+                OutputController.getLogger().log("Warning! "+u.toExternalForm()+" is NOT from codebase/docbase.");
             }
         }
-        ClasspathMatchers att = file.getManifestsAttributes().getApplicationLibraryAllowableCodebase();
-
+        if (allOk) {
+            //all resoources are from codebase or document base. it is ok to proceeed.
+            OutputController.getLogger().log("All applications resources (" + usedUrls.toArray(new URL[0])[0] + ") are from codebas/documentbase " + codebase + "/" + documentBase + ", skipping Application-Library-Allowable-Codebase Attribute check.");
+            return;
+        }
+        
+        ClasspathMatchers att = null;
+        if (signing == SigningState.NONE) {
+            //for unsigned app we are ignoring value in manifesdt (may be faked)
+        } else {
+            att = file.getManifestsAttributes().getApplicationLibraryAllowableCodebase();
+        }
         if (att == null) {
-            boolean a = SecurityDialogs.showMissingALACAttributePanel(file.getTitle(), documentBase, usedUrls);
-            if (!a) {
+            final boolean userApproved = SecurityDialogs.showMissingALACAttributePanel(file.getTitle(), documentBase, usedUrls);
+            if (!userApproved) {
                 throw new LaunchException("The application uses non-codebase resources, has no Application-Library-Allowable-Codebase Attribute, and was blocked from running by the user");
             } else {
-                OutputController.getLogger().log("The application uses non-codebase resources, has no Application-Library-Allowable-Codebase Attribute, and was allowed to run by the user");
+                OutputController.getLogger().log("The application uses non-codebase resources, has no Application-Library-Allowable-Codebase Attribute, and was allowed to run by the user or user's security settings");
                 return;
             }
         } else {
@@ -325,11 +423,33 @@ public class ManifestAttributesChecker {
                 }
             }
         }
-        boolean a = SecurityDialogs.showMatchingALACAttributePanel(file.getTitle(), documentBase, usedUrls);
-        if (!a) {
+        final boolean userApproved = isLowSecurity() || SecurityDialogs.showMatchingALACAttributePanel(file, documentBase, usedUrls);
+        if (!userApproved) {
             throw new LaunchException("The application uses non-codebase resources, which do match its Application-Library-Allowable-Codebase Attribute, but was blocked from running by the user.");
         } else {
-            OutputController.getLogger().log("The application uses non-codebase resources, which do match its Application-Library-Allowable-Codebase Attribute, and was allowed to run by the user.");
+            OutputController.getLogger().log("The application uses non-codebase resources, which do match its Application-Library-Allowable-Codebase Attribute, and was allowed to run by the user or user's security settings.");
         }
+    }
+    
+    //package private for testing
+    //not perfect but ok for usecase
+    static URL stripDocbase(URL documentBase) {
+        String s = documentBase.toExternalForm();
+        if (s.endsWith("/") || s.endsWith("\\")) {
+            return documentBase;
+        }
+        int i1 = s.lastIndexOf("/");
+        int i2 = s.lastIndexOf("\\");
+        int i = Math.max(i1, i2);
+        if (i <= 8 || i >= s.length()) {
+            return documentBase;
+        }
+        s = s.substring(0, i+1);
+        try {
+            documentBase = new URL(s);
+        } catch (MalformedURLException ex) {
+            OutputController.getLogger().log(ex);
+        }
+        return documentBase;
     }
 }

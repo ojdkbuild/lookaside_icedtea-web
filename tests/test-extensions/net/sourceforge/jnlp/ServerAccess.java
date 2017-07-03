@@ -36,26 +36,18 @@ exception statement from your version.
  */
 package net.sourceforge.jnlp;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.io.Writer;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.ServerSocket;
 import java.net.URL;
+import java.net.URLConnection;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
-import net.sourceforge.jnlp.ProcessResult;
 import net.sourceforge.jnlp.browsertesting.Browser;
 import net.sourceforge.jnlp.browsertesting.BrowserFactory;
 import net.sourceforge.jnlp.browsertesting.Browsers;
@@ -63,7 +55,6 @@ import net.sourceforge.jnlp.closinglisteners.AutoErrorClosingListener;
 import net.sourceforge.jnlp.closinglisteners.AutoOkClosingListener;
 import net.sourceforge.jnlp.util.FileUtils;
 import net.sourceforge.jnlp.util.logging.OutputController;
-import org.junit.Assert;
 
 /**
  *
@@ -117,7 +108,7 @@ public class ServerAccess {
      * timeout in ms to let process to finish, before assassin will kill it.
      * This can be changed in runtime, but will affect all following tasks
      */
-    public static long PROCESS_TIMEOUT = 20 * 1000;//ms
+    public static long PROCESS_TIMEOUT = 10 * 1000;//ms
     /**
      * this flag is indicating whether output of executeProcess should be logged. By default true.
      */
@@ -133,6 +124,8 @@ public class ServerAccess {
      * param "port" prints out the port
      * nothing or number will run server on random(or on number specified)
      * port in -Dtest.server.dir
+     * @param args params from commandline. recognized params are port and randomport 
+     * @throws java.lang.Exception if anything happens
      */
     public static void main(String[] args) throws Exception {
         if (args.length > 0 && args[0].equalsIgnoreCase("port")) {
@@ -167,8 +160,8 @@ public class ServerAccess {
         findPortTestingSocket.close();
         return port;
     }
-    public static final  String HEADLES_OPTION="-headless";
-    public static final  String VERBOSE_OPTION="-verbose";
+    public static final  String HEADLES_OPTION=OptionsDefinitions.OPTIONS.HEADLESS.option;
+    public static final  String VERBOSE_OPTION=OptionsDefinitions.OPTIONS.VERBOSE.option;
 
     /**
      * we would like to have an singleton instance ASAP
@@ -211,6 +204,7 @@ public class ServerAccess {
 
     /**
      *
+     * @param port specific port on which this server is accepting requests
      * @return new not cached iserver instance on random port,
      * useful for testing application loading from different url then base
      */
@@ -225,6 +219,8 @@ public class ServerAccess {
 
     /**
      *
+     * @param dir directory from which server returns resources
+     * @param port specific port on which this server is accepting requests
      * @return new not cached iserver instance on random port upon custom www root directory,
      * useful for testing application loading from different url then base
      */
@@ -271,7 +267,7 @@ public class ServerAccess {
        if (this.currentBrowser==null) return null;
        List<String> l1=this.currentBrowser.getComaptibilitySwitches();
        List<String> l2=this.currentBrowser.getDefaultSwitches();
-       List<String> l= new ArrayList<String>();
+       List<String> l= new ArrayList<>();
        if (l1!=null)l.addAll(l1);
        if (l2!=null)l.addAll(l2);
        return l;
@@ -341,7 +337,9 @@ public class ServerAccess {
 
     /**
      *
-     * @return url pointing to cached server resource. If non singleton instance is running, new is created.
+     * @throws java.net.MalformedURLException if url for this resource can not be constructed
+     * @return complete url for this resource on this server
+     * @param resource relative path  pointing to server resource. If non singleton instance is running, new is created.
      */
     public URL getUrl(String resource) throws MalformedURLException {
         if (server == null) {
@@ -354,6 +352,7 @@ public class ServerAccess {
     /**
      *
      * @return url pointing to cached server . If non singleton instance is running, new is created.
+     * @throws java.net.MalformedURLException
      */
     public URL getUrl() throws MalformedURLException {
         return getUrl("");
@@ -398,7 +397,7 @@ public class ServerAccess {
     /**
      * utility method which can read bytes of any stream
      * 
-     * @param input stream to be read
+     * @param is stream to be read
      * @return individual bytes of resource
      * @throws IOException if connection can't be established or resource does not exist
      */
@@ -416,7 +415,8 @@ public class ServerAccess {
     /**
      * utility method which can read from any stream as one long String
      * 
-     * @param input stream
+     * @param is stream to be read
+     * @param encoding encoding of this stream
      * @return stream as string
      * @throws IOException if connection can't be established or resource does not exist
      */
@@ -427,7 +427,7 @@ public class ServerAccess {
     /**
      * utility method which can read from any stream as one long String
      *
-     * @param input stream
+     * @param is input stream to read from
      * @return stream as string
      * @throws IOException if connection can't be established or resource does not exist
      */
@@ -438,48 +438,74 @@ public class ServerAccess {
     /**
      * utility method which can read bytes of resource from any url
      * 
-     * @param resource to be located on any url
+     * @param u full url to read from
      * @return individual bytes of resource
      * @throws IOException if connection can't be established or resource does not exist
      */
     public static ByteArrayOutputStream getResourceAsBytes(URL u) throws IOException {
-        HttpURLConnection connection = (HttpURLConnection) u.openConnection();
-        connection = (HttpURLConnection) u.openConnection();
-        connection.setRequestMethod("GET");
-        connection.setDoOutput(true);
-        connection.setReadTimeout(READ_TIMEOUT);
-        connection.connect();
-        return getBytesFromStream(connection.getInputStream());
+        URLConnection connection = null;
+        try {
+            connection = u.openConnection();
+            if (connection instanceof HttpURLConnection) {
+                ((HttpURLConnection) connection).setRequestMethod("GET");
+            }
+            connection.setDoOutput(true);
+            connection.setReadTimeout(READ_TIMEOUT);
+            connection.connect();
+            return getBytesFromStream(connection.getInputStream());
+        } finally {
+            if (connection != null && connection instanceof HttpURLConnection) {
+                ((HttpURLConnection) connection).disconnect();
+            }
+        }
 
     }
 
     /**
      * utility method which can read string of resource from any url
-     * 
-     * @param resource to be located on any url
+     *
+     * @param u full url to read from
      * @return resource as string
-     * @throws IOException if connection can't be established or resource does not exist
+     * @throws IOException if connection can't be established or resource does
+     * not exist
      */
     public static String getResourceAsString(URL u) throws IOException {
-        HttpURLConnection connection = (HttpURLConnection) u.openConnection();
-        connection = (HttpURLConnection) u.openConnection();
-        connection.setRequestMethod("GET");
-        connection.setDoOutput(true);
-        connection.setReadTimeout(READ_TIMEOUT);
-        connection.connect();
-        return getContentOfStream(connection.getInputStream());
+        URLConnection connection = null;
+        try {
+            connection = (HttpURLConnection) u.openConnection();
+            if (connection instanceof HttpURLConnection) {
+                ((HttpURLConnection) connection).setRequestMethod("GET");
+            }
+            connection.setDoOutput(true);
+            connection.setReadTimeout(READ_TIMEOUT);
+            connection.connect();
+            return getContentOfStream(connection.getInputStream());
+        } finally {
+            if (connection != null && connection instanceof HttpURLConnection) {
+                ((HttpURLConnection) connection).disconnect();
+            }
+        }
     }
 
     /**
-     * helping dummy  method to save String as file
+     * helping dummy  method to save String as file in UTF-8 encoding.
      * 
-     * @param content
-     * @param f
+     * @param content which will be saved as it is saved in this String
+     * @param f file to be saved. No warnings provided
      * @throws IOException
      */
     public static void saveFile(String content, File f) throws IOException {
         FileUtils.saveFile(content, f);
     }
+    
+    /**
+     * helping dummy  method to save String as file in specified encoding/.
+     * 
+     * @param content which will be saved as it is saved in this String
+     * @param f file to be saved. No warnings provided
+     * @param encoding of output byte representation
+     * @throws IOException
+     */
     public static void saveFile(String content, File f,String encoding) throws IOException {
         FileUtils.saveFile(content, f, encoding);
     }
@@ -497,6 +523,9 @@ public class ServerAccess {
     }
     public ProcessResult executeJavawsHeadless(String resource,ContentReaderListener stdoutl,ContentReaderListener stderrl) throws Exception {
         return executeJavawsHeadless(null, resource,stdoutl,stderrl,null);
+    }
+    public ProcessResult executeJavawsClearCache() throws Exception {
+         return executeProcess(Arrays.asList(new String[]{getJavawsLocation(), OptionsDefinitions.OPTIONS.CLEARCACHE.option,  ServerAccess.HEADLES_OPTION}));
     }
      
     /**
@@ -517,9 +546,9 @@ public class ServerAccess {
 
     public ProcessResult executeJavawsHeadless(List<String> otherargs, String resource,ContentReaderListener stdoutl,ContentReaderListener stderrl,String[] vars) throws Exception {
         if (otherargs == null) {
-            otherargs = new ArrayList<String>(1);
+            otherargs = new ArrayList<>(1);
         }
-        List<String> headlesList = new ArrayList<String>(otherargs);
+        List<String> headlesList = new ArrayList<>(otherargs);
         headlesList.add(HEADLES_OPTION);
         return executeJavaws(headlesList, resource,stdoutl,stderrl,vars);
     }
@@ -551,14 +580,36 @@ public class ServerAccess {
         return executeBrowser(string, outClosing, errClosing);
     }
     
-
+    /**
+     *
+     * @param resource relative resource to be opened in browser for current server instance.
+     * @return result of browser run
+     *
+     */
     public ProcessResult executeBrowser(String resource) throws Exception {
         return executeBrowser(getBrowserParams(), resource);
     }
+
+    /**
+     *
+     * @param resource relative resource to be opened in browser for current server instance.
+     * @param stdoutl listener for stdout
+     * @param stderrl listener for stderr
+     * @return result of browser run
+     *
+     */
     public ProcessResult executeBrowser(String resource,ContentReaderListener stdoutl,ContentReaderListener stderrl) throws Exception {
         return executeBrowser(getBrowserParams(), resource, stdoutl, stderrl);
     }
 
+     /**
+     *
+     * @param resource elative resource to be opened in browser for current server instance.
+     * @param stdoutl listeners for stdout
+     * @param stderrl listeners for stderr
+     * @return result of browser run
+     *
+     */
     public ProcessResult executeBrowser(String resource, List<ContentReaderListener> stdoutl, List<ContentReaderListener> stderrl) throws Exception {
         return executeBrowser(getBrowserParams(), resource, stdoutl, stderrl);
     }
@@ -633,9 +684,10 @@ public class ServerAccess {
     }
 
     /**
-     * Ctreate resource on http, on 'localhost' on port on which this instance is running
-     * @param resource
-     * @return
+     * Create resource on http, on 'localhost' on port on which this instance is running
+     * @param instance of server to return the resource
+     * @param resource relative path to resource to be loaded from specified instance
+     * @return the absolute url
      * @throws MalformedURLException
      */
     public static URL getUrlUponInstance(ServerLauncher instance,String resource) throws MalformedURLException {
@@ -645,8 +697,8 @@ public class ServerAccess {
     /**
      * wrapping method to executeProcess (eg: javaws arg arg arg url)
      * will execute default javaws (@see JAVAWS_BUILD_BIN) upon any server
+     * @param otherargs - commandline arguments  for javaws process
      * @param u url of resource upon any server
-     * @param javaws arguments
      * @return result what left after running this process
      * @throws Exception
      */
@@ -661,8 +713,9 @@ public class ServerAccess {
      * wrapping utility method to executeProcess (eg: any_binary arg arg arg url)
      *
      * will execute  any process upon  url upon any server
+     * @param toBeExecuted - command to lunch javaws program
      * @param u url of resource upon any server
-     * @param javaws arguments
+     * @param otherargs commandline arguments for new process
      * @return result what left after running this process
      * @throws Exception
      */
@@ -691,12 +744,12 @@ public class ServerAccess {
      * utility method to lunch process, get its stdout/stderr, its return value and to kill it if running to long (@see PROCESS_TIMEOUT)
      *
      *
-     * Small bacground:
+     * Small background:
      * This method creates thread inside which exec will be executed. Then creates assassin thread with given timeout to kill the previously created thread if necessary.
      * Starts assassin thread, starts process thread. Wait until process is running, then starts content readers.
      * Closes input of process.
      * Wait until process is running (no matter if it terminate itself (correctly or badly), or is terminated by its assassin.
-     * Construct result from readed stdout, stderr, process return value, assassin successfully
+     * Construct result from read stdout, stderr, process return value, assassin successfully
      *
      * @param args binary with args to be executed
      * @param dir optional, directory where this process will run
@@ -734,8 +787,7 @@ public class ServerAccess {
     static void log(String message, boolean printToOut, boolean printToErr) {
         String idded;
         StackTraceElement ste = getTestMethod();
-        String fullId = ste.getClassName() + "." + ste.getMethodName();
-        fullId = LoggingBottleneck.getDefaultLoggingBottleneck().modifyMethodWithForBrowser(ste.getMethodName(), ste.getClassName());
+        String fullId = LoggingBottleneck.getDefaultLoggingBottleneck().modifyMethodWithForBrowser(ste.getMethodName(), ste.getClassName());
         if (message.contains("\n")) {
             idded = fullId + ": \n" + message + "\n" + fullId + " ---";
         } else {

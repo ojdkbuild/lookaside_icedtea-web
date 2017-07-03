@@ -37,6 +37,8 @@ exception statement from your version.
 
 package net.sourceforge.jnlp.config;
 
+import net.sourceforge.jnlp.runtime.ManifestAttributesChecker;
+
 import java.io.File;
 import static net.sourceforge.jnlp.runtime.Translator.R;
 
@@ -202,6 +204,91 @@ public class BasicValueValidators {
     }
 
     /**
+     * Checks that the value is one of the acceptable single String values
+     * or an acceptable combination of String values
+     */
+    private static class MultipleStringValueValidator implements ValueValidator {
+        private final String[] singleOptions;
+        private final String[] comboOptions;
+
+        public MultipleStringValueValidator(String[] singleOptions, String[] comboOptions) {
+            this.singleOptions = singleOptions;
+            this.comboOptions = comboOptions;
+        }
+
+        @Override
+        public void validate(Object value) throws IllegalArgumentException {
+            Object possibleValue = value;
+            if (!(possibleValue instanceof String)) {
+                throw new IllegalArgumentException("Must be a string");
+            }
+
+            String stringVal = (String) possibleValue;
+            boolean found = false;
+            for (String knownVal : singleOptions) {
+                if (knownVal.equals(stringVal)) {
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found) {
+                String[] possibleCombo = splitCombination(stringVal);
+                for (String val : possibleCombo) {
+                    if (comboOptionsContains(val)) {
+                        found = true;
+                    } else {
+                        throw new IllegalArgumentException();
+                    }
+                }
+            }
+
+            if (!found) {
+                throw new IllegalArgumentException();
+            }
+        }
+
+        private boolean comboOptionsContains(String possibleVal) {
+            for (String value : comboOptions) {
+                if (value.equals(possibleVal)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        @Override
+        public String getPossibleValues() {
+            String message = "(Values that can be used alone only): " + Arrays.toString(singleOptions) +
+                    " (Values that can be used in combination separated by the delimiter \""
+                    + DELIMITER + "\" with no space expected ): " + Arrays.toString(comboOptions);
+            return message;
+        }
+
+    }
+
+    private final static String DELIMITER = ",";
+
+    public static String[] splitCombination(String val) {
+        return val.split(DELIMITER);
+    }
+
+    private static class ManifestAttributeCheckValidator extends MultipleStringValueValidator {
+
+        public ManifestAttributeCheckValidator() {
+            super(new String[] {
+                ManifestAttributesChecker.MANIFEST_ATTRIBUTES_CHECK.ALL.toString(),
+                ManifestAttributesChecker.MANIFEST_ATTRIBUTES_CHECK.NONE.toString()
+            }, new String[] {
+                ManifestAttributesChecker.MANIFEST_ATTRIBUTES_CHECK.ALAC.toString(),
+                ManifestAttributesChecker.MANIFEST_ATTRIBUTES_CHECK.CODEBASE.toString(),
+                ManifestAttributesChecker.MANIFEST_ATTRIBUTES_CHECK.ENTRYPOINT.toString(),
+                ManifestAttributesChecker.MANIFEST_ATTRIBUTES_CHECK.PERMISSIONS.toString(),
+                ManifestAttributesChecker.MANIFEST_ATTRIBUTES_CHECK.TRUSTED.toString()
+            });
+        }
+    }
+    /**
      * Checks that the value is a URL
      */
     private static class UrlValidator implements ValueValidator {
@@ -247,6 +334,7 @@ public class BasicValueValidators {
      * one), within the given range. The values are inclusive.
      * @param low the lowest valid value
      * @param high the highest valid value
+     * @return value validator for given range
      */
     public static ValueValidator getRangedIntegerValidator(int low, int high) {
         return new RangedIntegerValidator(low, high);
@@ -256,9 +344,31 @@ public class BasicValueValidators {
      * Returns a {@link ValueValidator} that checks if an object is a string from
      * one of the provided Strings.
      * @param validValues an array of Strings which are considered valid
+     * @return validator for given strings
      */
     public static ValueValidator getStringValidator(String[] validValues) {
         return new StringValueValidator(validValues);
+    }
+
+    /**
+     * Returns a {@link ValueValidator} that checks if an object is a string from
+     * one of the provided single option Strings or a combination from
+     * the provided combination Strings.
+     * @param singleValues an array of Strings which are considered valid only by themselves
+     * @param comboValues an array of Strings which are considered valid in any combination
+     *                    with themselves
+     * @return validator forgiven strings
+     */
+    public static ValueValidator getMultipleStringValidator(String[] singleValues, String[] comboValues) {
+        return new MultipleStringValueValidator(singleValues, comboValues);
+    }
+
+    /**
+     * @return a {@link ValueValidator} that checks if an object is a string
+     * from the possible single or combination ManifestAttributeCheck values
+     */
+    public static ValueValidator getManifestAttributeCheckValidator() {
+        return new ManifestAttributeCheckValidator();
     }
 
     /**

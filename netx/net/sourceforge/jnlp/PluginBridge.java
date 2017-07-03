@@ -37,7 +37,9 @@ import java.util.Map;
 import java.util.Set;
 
 import net.sourceforge.jnlp.SecurityDesc.RequestedPermissionLevel;
+import net.sourceforge.jnlp.cache.UpdatePolicy;
 import net.sourceforge.jnlp.runtime.JNLPRuntime;
+import net.sourceforge.jnlp.util.StreamUtils;
 import net.sourceforge.jnlp.util.logging.OutputController;
 import net.sourceforge.jnlp.util.replacements.BASE64Decoder;
 
@@ -45,21 +47,30 @@ import net.sourceforge.jnlp.util.replacements.BASE64Decoder;
  * Allows reuse of code that expects a JNLPFile object,
  * while overriding behaviour specific to applets.
  */
-public class PluginBridge extends JNLPFile {
+public final class PluginBridge extends JNLPFile {
 
-    private PluginParameters params;
-    private Set<String> jars = new HashSet<String>();
-    private List<ExtensionDesc> extensionJars = new ArrayList<ExtensionDesc>();
+    private final PluginParameters params;
+    final private Set<String> jars = new HashSet<>();
+    private List<ExtensionDesc> extensionJars = new ArrayList<>();
     //Folders can be added to the code-base through the archive tag
-    private List<String> codeBaseFolders = new ArrayList<String>();
+    final private List<String> codeBaseFolders = new ArrayList<>();
     private String[] cacheJars = new String[0];
     private String[] cacheExJars = new String[0];
-    private boolean usePack;
-    private boolean useVersion;
+    private boolean usePack = false;
+    private boolean useVersion = false;
     private boolean useJNLPHref;
+    private String debugJnlp;
 
     /**
      * Creates a new PluginBridge using a default JNLPCreator.
+     * @param codebase as specified in attribute
+     * @param documentBase as specified in attribute
+     * @param jar jar attribute value
+     * @param main main method attribute value
+     * @param width width of appelt as specified in attribute
+     * @param height height of applet as specified in attribute
+     * @param params parameters as parsed from source html
+     * @throws java.lang.Exception general exception as anything can happen
      */
     public PluginBridge(URL codebase, URL documentBase, String jar, String main,
                         int width, int height, PluginParameters params)
@@ -86,7 +97,7 @@ public class PluginBridge extends JNLPFile {
     }
 
     public PluginBridge(URL codebase, URL documentBase, String archive, String main,
-                        int width, int height, PluginParameters params, JNLPCreator jnlpCreator)
+                        int width, int height, final PluginParameters params, JNLPCreator jnlpCreator)
             throws Exception {
         specVersion = new Version("1.0");
         fileVersion = new Version("1.1");
@@ -100,19 +111,36 @@ public class PluginBridge extends JNLPFile {
             try {
                 // Use codeBase as the context for the URL. If jnlp_href's
                 // value is a complete URL, it will replace codeBase's context.
-                ParserSettings defaultSettings = new ParserSettings();
-                URL jnlp = new URL(codeBase, params.getJNLPHref());
+                final ParserSettings defaultSettings = new ParserSettings();
+                final URL jnlp = new URL(codeBase, params.getJNLPHref());
                 if (fileLocation == null){
                     fileLocation = jnlp;
                 }
-                JNLPFile jnlpFile = null;
+                JNLPFile jnlpFile;
 
                 if (params.getJNLPEmbedded() != null) {
                     InputStream jnlpInputStream = new ByteArrayInputStream(decodeBase64String(params.getJNLPEmbedded()));
                     jnlpFile = new JNLPFile(jnlpInputStream, codeBase, defaultSettings);
+                    debugJnlp = new StreamProvider() {
+
+                        @Override
+                        InputStream getStream() throws Exception {
+                            return new ByteArrayInputStream(decodeBase64String(params.getJNLPEmbedded()));
+                        }
+
+                    }.readStream();
                 } else {
                     jnlpFile = jnlpCreator.create(jnlp, null, defaultSettings, JNLPRuntime.getDefaultUpdatePolicy(), codeBase);
+                    debugJnlp = new StreamProvider() {
+
+                        @Override
+                        InputStream getStream() throws Exception {
+                            return JNLPFile.openURL(jnlp, null, UpdatePolicy.ALWAYS);
+                        }
+                    }.readStream();
                 }
+                OutputController.getLogger().log("Loaded JNLPhref:");
+                OutputController.getLogger().log((debugJnlp == null) ? "null" : debugJnlp);
 
                 if (jnlpFile.isApplet())
                     main = jnlpFile.getApplet().getMainClass();
@@ -130,6 +158,9 @@ public class PluginBridge extends JNLPFile {
                      this.jars.add(fileName);
                  }
 
+                usePack = jnlpFile.getDownloadOptions().useExplicitPack();
+                useVersion = jnlpFile.getDownloadOptions().useExplicitVersion();
+
                 // Store any extensions listed in the JNLP file to be returned later on, namely in getResources()
                 extensionJars = Arrays.asList(jnlpFile.getResources().getExtensions());
             } catch (MalformedURLException e) {
@@ -140,7 +171,7 @@ public class PluginBridge extends JNLPFile {
             }
         } else {
             // Should we populate this list with applet attribute tags?
-            info = new ArrayList<InformationDesc>();
+            info = new ArrayList<>();
             useJNLPHref = false;
         }
 
@@ -156,12 +187,12 @@ public class PluginBridge extends JNLPFile {
                 versions = cacheVersion.split(",");
             }
 
-            String[] jars = cacheArchive.split(",");
-            cacheJars = new String[jars.length];
+            String[] ljars = cacheArchive.split(",");
+            cacheJars = new String[ljars.length];
 
-            for (int i = 0; i < jars.length; i++) {
+            for (int i = 0; i < ljars.length; i++) {
 
-                cacheJars[i] = jars[i].trim();
+                cacheJars[i] = ljars[i].trim();
 
                 if (versions.length > 0) {
                     cacheJars[i] += ";" + versions[i].trim();
@@ -198,17 +229,18 @@ public class PluginBridge extends JNLPFile {
             security = null;
 
         this.uniqueKey = params.getUniqueKey(codebase);
-        usePack = false;
-        useVersion = false;
         String jargs = params.getJavaArguments();
         if (!jargs.isEmpty()) {
             for (String s : jargs.split(" ")) {
                 String[] parts = s.trim().split("=");
                 if (parts.length == 2 && Boolean.valueOf(parts[1])) {
-                    if ("-Djnlp.packEnabled".equals(parts[0])) {
-                        usePack = true;
-                    } else if ("-Djnlp.versionEnabled".equals(parts[0])) {
-                        useVersion = true;
+                    if (null != parts[0]) switch (parts[0]) {
+                        case "-Djnlp.packEnabled":
+                            usePack = true;
+                            break;
+                        case "-Djnlp.versionEnabled":
+                            useVersion = true;
+                            break;
                     }
                 }
             }
@@ -216,7 +248,7 @@ public class PluginBridge extends JNLPFile {
     }
 
     public List<String> getArchiveJars() {
-        return new ArrayList<String>(jars);
+        return new ArrayList<>(jars);
     }
 
     public boolean codeBaseLookup() {
@@ -226,6 +258,12 @@ public class PluginBridge extends JNLPFile {
     public boolean useJNLPHref() {
         return useJNLPHref;
     }
+
+    public PluginParameters getParams() {
+        return params;
+    }
+    
+    
 
     @Override
     public RequestedPermissionLevel getRequestedPermissionLevel() {
@@ -245,6 +283,7 @@ public class PluginBridge extends JNLPFile {
 
     /**
      * {@inheritDoc }
+     * @return  options of download
      */
     @Override
     public DownloadOptions getDownloadOptions() {
@@ -266,6 +305,7 @@ public class PluginBridge extends JNLPFile {
         return params.getAppletTitle();
     }
 
+    @Override
     public ResourcesDesc getResources(final Locale locale, final String os,
                                       final String arch) {
         return new ResourcesDesc(this, new Locale[] { locale }, new String[] { os },
@@ -276,7 +316,7 @@ public class PluginBridge extends JNLPFile {
                 //should this be done to sharedResources on init?
                 if (launchType.equals(JARDesc.class)) {
                     try {
-                        List<JARDesc> jarDescs = new ArrayList<JARDesc>();
+                        List<JARDesc> jarDescs = new ArrayList<>();
                         jarDescs.addAll(sharedResources.getResources(JARDesc.class));
 
                         for (String name : jars) {
@@ -358,6 +398,7 @@ public class PluginBridge extends JNLPFile {
                 return jarDescs.toArray(new JARDesc[jarDescs.size()]);
             }
 
+            @Override
             public void addResource(Object resource) {
                 // todo: honor the current locale, os, arch values
                 sharedResources.addResource(resource);
@@ -367,32 +408,37 @@ public class PluginBridge extends JNLPFile {
     }
 
     /**
-     * Returns the list of folders to be added to the codebase
+     * @return the list of folders to be added to the codebase
      */
     public List<String> getCodeBaseFolders() {
-        return new ArrayList<String>(codeBaseFolders);
+        return new ArrayList<>(codeBaseFolders);
     }
 
     /**
-     * Returns the resources section of the JNLP file for the
+     * @return the resources section of the JNLP file for the
      * specified locale, os, and arch.
      */
+    @Override
     public ResourcesDesc[] getResourcesDescs(final Locale locale, final String os, final String arch) {
         return new ResourcesDesc[] { getResources(locale, os, arch) };
     }
 
+    @Override
     public boolean isApplet() {
         return true;
     }
 
+    @Override
     public boolean isApplication() {
         return false;
     }
 
+    @Override
     public boolean isComponent() {
         return false;
     }
 
+    @Override
     public boolean isInstaller() {
         return false;
     }
@@ -403,5 +449,165 @@ public class PluginBridge extends JNLPFile {
     static byte[] decodeBase64String(String encodedString) throws IOException {
         BASE64Decoder base64 = new BASE64Decoder();
         return base64.decodeBuffer(encodedString);
+    }
+
+    public String getDebugJnlp() {
+        return debugJnlp;
+    }
+
+    public boolean haveDebugJnlp() {
+        return debugJnlp != null;
+    }
+    
+    
+    public String toJnlp(boolean needSecurity, boolean useHref, boolean fix) {
+        if (useJNLPHref && debugJnlp != null && useHref) {
+            OutputController.getLogger().log("Using debugjnlp as return value toJnlp");
+            if (fix) {
+                return fixCommonIsuses(needSecurity, debugJnlp);
+            } else {
+                return debugJnlp;
+            }
+        } else {
+            StringBuilder s = new StringBuilder();
+            s.append("<?xml version='1.0' encoding='UTF-8'?>\n"
+                   + "<jnlp codebase='").append(getCodeBase().toString()).append("'>\n")
+                    .append("  <information>\n"
+                          + "    <title>").append(createJnlpTitle()).append("</title>\n"
+                          + "    <vendor>").append(createJnlpVendor()).append("</vendor>\n"
+                          + "  </information>\n");
+            if (needSecurity) {
+                s.append(getSecurityElement());
+            }
+            s.append("  <resources>\n");
+            for (String i : getArchiveJars()) {
+                s.append("    <jar href='").append(i).append("' />\n");
+            }
+            s.append("  </resources>\n"
+                   + "  <applet-desc\n")
+                    .append("    name='").append(getTitle()).append("'\n"
+                          + "    main-class='").append(getStrippedMain()).append("'\n"
+                          + "    width='").append(getApplet().getWidth()).append("'\n"
+                          + "    height='").append(getApplet().getHeight()).append("'>\n");
+            if (!getApplet().getParameters().isEmpty()) {
+                Set<Map.Entry<String, String>> prms = getApplet().getParameters().entrySet();
+                for (Map.Entry<String, String> entry : prms) {
+                    s.append("    <param name='").append(entry.getKey()).append("' value='").append(entry.getValue()).append("'/>\n");
+                }
+            }
+            s.append("  </applet-desc>\n"
+                        + "</jnlp>\n");
+            OutputController.getLogger().log("toJnlp generated:");
+            OutputController.getLogger().log(s.toString());
+            return s.toString();
+        }
+
+    }
+
+    private String getStrippedMain() {
+        return strippClass(getApplet().getMainClass().trim());
+    }
+
+    public static String strippClass(String s) {
+        if (s.endsWith(".class")) {
+            return s.substring(0, s.length() - ".class".length());
+        } else {
+            return s;
+        }
+    }
+
+    //Those constants are public, because they are tested in PluginBridgeTest
+    static final String SANDBOX_REGEX = toBaseRegex("sandbox", false);
+    static final String CLOSE_INFORMATION_REGEX = toBaseRegex("information", true);
+    static final String SECURITY_REGEX = toBaseRegex("security", false);
+    static final String RESOURCE_REGEX = toBaseRegex("resources", false);
+    static final String TITLE_REGEX = toBaseRegex("title", false);
+    static final String VENDOR_REGEX = toBaseRegex("vendor", false);
+    static final String AP_REGEX = toBaseRegex("all-permissions", false);
+    static final String CODEBASE_REGEX1 = "(?i).*\\s+codebase\\s*=\\s*";
+    static final String CODEBASE_REGEX2 = "(?i)\\s+codebase\\s*=\\s*.\\.{0,1}.((\\s+)|(\\s*>))";// "." '.' '' ""
+
+    static String toMatcher(String regex) {
+        return "(?s).*" + regex + ".*";
+    }
+
+    static String toBaseRegex(String tagName, boolean closing) {
+        return "(?i)<\\s*" + ((closing) ? "/\\s*" : "") + tagName + "\\s*>";
+    }
+
+     private String fixCommonIsuses(boolean needSecurity, String orig) {
+        String codebase = getCodeBase().toString();
+        return fixCommonIsuses(needSecurity, orig, codebase, createJnlpTitle(), createJnlpVendor());
+    }
+     
+    //testing allowing method
+    static String fixCommonIsuses(boolean needSecurity, String orig, String codebase, String title, String vendor) {
+        //no information element at all
+        if (!orig.matches(toMatcher(CLOSE_INFORMATION_REGEX))) {
+            OutputController.getLogger().log("no information element Found. Trying to fix");
+            if (orig.matches(toMatcher(SECURITY_REGEX))) {
+                orig = orig.replaceAll(SECURITY_REGEX, "\n<information>\n</information>\n<security>\n");
+            } else {
+                if (orig.matches(toMatcher(RESOURCE_REGEX))) {
+                    orig = orig.replaceAll(RESOURCE_REGEX, "\n<information>\n</information>\n<resources>\n");
+                }
+            }
+        }
+        //some have missing codebase, thats fatal
+        if (!orig.matches(toMatcher(CODEBASE_REGEX1))) {
+            OutputController.getLogger().log("jnlphref did not had codebase. Fixing");
+            orig = orig.replaceAll("(?i)<\\s*jnlp\\s+", "<jnlp codebase='" + codebase + "' ");
+        } else {
+            //codebase="."
+            if (orig.matches(toMatcher(CODEBASE_REGEX2))) {
+                OutputController.getLogger().log("'.' codebase found. fixing");
+                orig = orig.replaceAll(CODEBASE_REGEX2, " codebase='" + codebase + "'");
+            }
+        }
+        //surprisingly also title or vendor may be misisng
+        if (!orig.matches(toMatcher(TITLE_REGEX))) {
+            OutputController.getLogger().log("Missing title. Fixing");
+            orig = orig.replaceAll(CLOSE_INFORMATION_REGEX, "\n<title>" + title + "</title>\n</information>\n");
+        }
+        if (!orig.matches(toMatcher(VENDOR_REGEX))) {
+            OutputController.getLogger().log("Missing vendor. Fixing");
+            orig = orig.replaceAll(CLOSE_INFORMATION_REGEX, "\n<vendor>" + vendor + "</vendor>\n</information>\n");
+        }
+        //also all-security is not enforced via jnlpHref
+        if (needSecurity && !orig.matches(toMatcher(AP_REGEX))) {
+            OutputController.getLogger().log("all-permissions not found and app is signed.");
+            if (orig.matches(SANDBOX_REGEX)) {
+                OutputController.getLogger().log("Replacing sandbox by all-permissions");
+                orig = orig.replaceAll(SANDBOX_REGEX, getAllPermissionsElement());
+            } else {
+                OutputController.getLogger().log("adding security element");
+                orig = orig.replaceAll(CLOSE_INFORMATION_REGEX, "</information>\n" + getSecurityElement());
+            }
+        }
+        return orig;
+    }
+
+    private static String getSecurityElement() {
+        return "  <security>\n" + getAllPermissionsElement() + "  </security>\n";
+    }
+
+    private static String getAllPermissionsElement() {
+        return "    <all-permissions/>\n";
+    }
+    
+    
+    private abstract class StreamProvider {
+
+        abstract InputStream getStream() throws Exception;
+
+        String readStream() {
+            try {
+                return StreamUtils.readStreamAsString(getStream());
+            } catch (Exception ex) {
+                OutputController.getLogger().log(ex);
+            }
+            return null;
+        }
+
     }
 }

@@ -24,9 +24,7 @@ import java.awt.Container;
 import java.awt.SplashScreen;
 import java.io.File;
 import java.lang.reflect.Method;
-import java.net.InetAddress;
 import java.net.URL;
-import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
@@ -83,7 +81,7 @@ public class Launcher {
 
     private ParserSettings parserSettings = new ParserSettings();
 
-    private Map<String, String[]> extra = null;
+    private Map<String, List<String>> extra = null;
 
     /**
      * Create a launcher with the runtime's default update policy
@@ -141,6 +139,7 @@ public class Launcher {
 
     /**
      * Sets the update policy used by launched applications.
+     * @param policy to be used for resources
      */
     public void setUpdatePolicy(UpdatePolicy policy) {
         if (policy == null) {
@@ -151,7 +150,7 @@ public class Launcher {
     }
 
     /**
-     * Returns the update policy used when launching applications.
+     * @return the update policy used when launching applications.
      */
     public UpdatePolicy getUpdatePolicy() {
         return updatePolicy;
@@ -162,13 +161,14 @@ public class Launcher {
      * (a separate event queue, look and feel, etc).  If the
      * sun.awt.SunToolkit class is not present then this method
      * has no effect.  The default value is true.
+     * @param context appcontext to be set
      */
     public void setCreateAppContext(boolean context) {
         this.context = context;
     }
 
     /**
-     * Returns whether applications are launched in their own
+     * @return whether applications are launched in their own
      * AppContext.
      */
     public boolean isCreateAppContext() {
@@ -176,9 +176,8 @@ public class Launcher {
     }
 
     /**
-     * Set the parser settings to use when the Launcher initiates parsing of
+     * @param settings  the parser settings to use when the Launcher initiates parsing of
      * a JNLP file.
-     * @param settings
      */
     public void setParserSettings(ParserSettings settings) {
         parserSettings = settings;
@@ -191,7 +190,7 @@ public class Launcher {
      * the values for keys "arguments", "parameters", and "properties" are
      * used.
      */
-    public void setInformationToMerge(Map<String, String[]> input) {
+    public void setInformationToMerge(Map<String, List<String>> input) {
         this.extra = input;
     }
 
@@ -224,13 +223,21 @@ public class Launcher {
 
         JNLPRuntime.markNetxRunning();
 
-        //First checks whether offline-allowed tag is specified inside the jnlp
-        //file.
-        if (!file.getInformation().isOfflineAllowed()) {
-            //offline status should be already known from jnlp downloading
-            if (!JNLPRuntime.isOnlineDetected()) {
-                OutputController.getLogger().log(OutputController.Level.ERROR_ALL, "File cannot be launched because offline-allowed tag not specified and system currently offline.");
-                return null;
+        if (!JNLPRuntime.isOfflineForced()) {
+            //Xoffline NOT specified
+            //First checks whether offline-allowed tag is specified inside the jnlp file.
+            if (!file.getInformation().isOfflineAllowed() && !JNLPRuntime.isOnlineDetected()) {
+                {
+                    OutputController.getLogger().log(OutputController.Level.ERROR_ALL, "Remote systems unreachable, and client application is not able to run offline. Exiting.");
+                    return null;
+                }
+            }
+        } else {
+            //Xoffline IS specified
+            if (!file.getInformation().isOfflineAllowed() && !JNLPRuntime.isOnlineDetected()) {
+                {
+                    OutputController.getLogger().log(OutputController.Level.ERROR_ALL, "Remote systems unreachable, and client application is not able to run offline. However, you specified -Xoffline argument. Attmpting to run.");
+                }
             }
         }
 
@@ -287,22 +294,22 @@ public class Launcher {
      * @throws LaunchException if an exception occurs while extracting
      * extra information
      */
-    private void mergeExtraInformation(JNLPFile file, Map<String, String[]> extra) throws LaunchException {
+    private void mergeExtraInformation(JNLPFile file, Map<String, List<String>> extra) throws LaunchException {
         if (extra == null) {
             return;
         }
 
-        String[] properties = extra.get("properties");
+        List<String> properties = extra.get("properties");
         if (properties != null) {
             addProperties(file, properties);
         }
 
-        String[] arguments = extra.get("arguments");
+        List<String> arguments = extra.get("arguments");
         if (arguments != null && file.isApplication()) {
             addArguments(file, arguments);
         }
 
-        String[] parameters = extra.get("parameters");
+        List<String> parameters = extra.get("parameters");
         if (parameters != null && file.isApplet()) {
             addParameters(file, parameters);
         }
@@ -313,11 +320,11 @@ public class Launcher {
      * @throws LaunchException if an exception occurs while extracting
      * extra information
      */
-    private void addProperties(JNLPFile file, String[] props) throws LaunchException {
+    private void addProperties(JNLPFile file, List<String> props) throws LaunchException {
         ResourcesDesc resources = file.getResources();
-        for (String prop : props) {
+        for (String input : props) {
             try{
-                resources.addResource(PropertyDesc.fromString(prop, R("BBadProp", prop)));
+                resources.addResource(PropertyDesc.fromString(input));
             }catch (LaunchException ex){
                 throw launchError(ex);
             }
@@ -330,18 +337,18 @@ public class Launcher {
      * @throws LaunchException if an exception occurs while extracting
      * extra information
      */
-    private void addParameters(JNLPFile file, String[] params) throws LaunchException {
+    private void addParameters(JNLPFile file, List<String> params) throws LaunchException {
         AppletDesc applet = file.getApplet();
 
-        for (int i = 0; i < params.length; i++) {
+        for (String input : params) {
             // allows empty param, not sure about validity of that.
-            int equals = params[i].indexOf("=");
+            int equals = input.indexOf("=");
             if (equals == -1) {
-                throw launchError(new LaunchException(R("BBadParam", params[i])));
+                throw launchError(new LaunchException(R("BBadParam", input)));
             }
 
-            String name = params[i].substring(0, equals);
-            String value = params[i].substring(equals + 1, params[i].length());
+            String name = input.substring(0, equals);
+            String value = input.substring(equals + 1, input.length());
 
             applet.addParameter(name, value);
         }
@@ -351,11 +358,11 @@ public class Launcher {
      * Add the arguments to the JNLP file; only call if file is
      * actually an application (not installer).
      */
-    private void addArguments(JNLPFile file, String[] args) {
+    private void addArguments(JNLPFile file, List<String> args) {
         ApplicationDesc app = file.getApplication();
 
-        for (int i = 0; i < args.length; i++) {
-            app.addArgument(args[i]);
+        for (String input : args ) {
+            app.addArgument(input);
         }
     }
 
@@ -488,6 +495,9 @@ public class Launcher {
    /**
      * Launches a JNLP application.  This method should be called
      * from a thread in the application's thread group.
+     * @param file jnlpfile - source of application
+     * @return application to be launched
+     * @throws net.sourceforge.jnlp.LaunchException if launch fails on unrecoverable exception
      */
     protected ApplicationInstance launchApplication(JNLPFile file) throws LaunchException {
         if (!file.isApplication()) {
@@ -616,6 +626,9 @@ public class Launcher {
      *
      * @param file the JNLP file
      * @param enableCodeBase whether to add the codebase URL to the classloader
+     * @param cont container where to put application
+     * @return application
+     * @throws net.sourceforge.jnlp.LaunchException if deploy unrecoverably die
      */
     protected ApplicationInstance launchApplet(JNLPFile file, boolean enableCodeBase, Container cont) throws LaunchException {
         if (!file.isApplet()) {
@@ -657,6 +670,11 @@ public class Launcher {
 
     /**
      * Gets an ApplicationInstance, but does not launch the applet.
+     * @param file the JNLP file
+     * @param enableCodeBase whether to add the codebase URL to the classloader
+     * @param cont container where to put applet
+     * @return applet
+     * @throws net.sourceforge.jnlp.LaunchException if deploy unrecoverably die
      */
     protected ApplicationInstance getApplet(JNLPFile file, boolean enableCodeBase, Container cont) throws LaunchException {
         if (!file.isApplet()) {
@@ -682,6 +700,9 @@ public class Launcher {
     /**
      * Launches a JNLP installer.  This method should be called from
      * a thread in the application's thread group.
+     * @param file jnlp file to read installer from
+     * @return  application
+     * @throws net.sourceforge.jnlp.LaunchException if deploy unrecoverably die
      */
     protected ApplicationInstance launchInstaller(JNLPFile file) throws LaunchException {
         // TODO Check for an existing single instance once implemented.
@@ -692,7 +713,11 @@ public class Launcher {
     /**
      * Create an AppletInstance.
      *
-     * @param enableCodeBase whether to add the code base URL to the classloader
+     * @param file the JNLP file
+     * @param enableCodeBase whether to add the codebase URL to the classloader
+     * @param cont container where to put applet
+     * @return applet
+     * @throws net.sourceforge.jnlp.LaunchException if deploy unrecoverably die
      */
      //FIXME - when multiple applets are on one page, this method is visited simultaneously
     //and then appelts creates in little bit strange manner. This issue is visible with
@@ -745,6 +770,9 @@ public class Launcher {
      * gcjwebplugin.
      * @param file the PluginBridge to be used.
      * @param enableCodeBase whether to add the code base URL to the classloader.
+     * @param cont container where to put applet
+     * @return applet
+     * @throws net.sourceforge.jnlp.LaunchException if deploy unrecoverably dien
      */
     protected Applet createAppletObject(JNLPFile file, boolean enableCodeBase, Container cont) throws LaunchException {
         try {
@@ -768,6 +796,9 @@ public class Launcher {
 
     /**
      * Creates an Application.
+     * @param file the JNLP file
+     * @return application
+     * @throws net.sourceforge.jnlp.LaunchException if deploy unrecoverably die
      */
     protected ApplicationInstance createApplication(JNLPFile file) throws LaunchException {
         try {
@@ -785,10 +816,11 @@ public class Launcher {
 
     /**
      * Create a thread group for the JNLP file.
-     *
+     * @param file the JNLP file
      * Note: if the JNLPFile is an applet (ie it is a subclass of PluginBridge)
      * then this method simply returns the existing ThreadGroup. The applet
      * ThreadGroup has to be created at an earlier point in the applet code.
+     * @return  ThreadGroup for this app/applet
      */
     protected ThreadGroup createThreadGroup(JNLPFile file) {
         final ThreadGroup tg;

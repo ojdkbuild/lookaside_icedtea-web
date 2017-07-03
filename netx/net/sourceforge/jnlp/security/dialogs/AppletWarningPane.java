@@ -48,6 +48,7 @@ import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import net.sourceforge.jnlp.runtime.Translator;
 import net.sourceforge.jnlp.security.CertVerifier;
 import net.sourceforge.jnlp.security.SecurityDialog;
 
@@ -87,15 +88,9 @@ public class AppletWarningPane extends SecurityDialogPanel {
         //run and cancel buttons
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
 
-        JButton yes = new JButton("Yes");
-        JButton no = new JButton("No");
-        JButton cancel = new JButton("Cancel");
-        int buttonWidth = cancel.getMinimumSize().width;
-        int buttonHeight = cancel.getMinimumSize().height;
-        Dimension d = new Dimension(buttonWidth, buttonHeight);
-        yes.setPreferredSize(d);
-        no.setPreferredSize(d);
-        cancel.setPreferredSize(d);
+        JButton yes = new JButton(Translator.R("ButYes"));
+        JButton no = new JButton(Translator.R("ButNo"));
+        JButton cancel = new JButton(Translator.R("ButCancel"));
         yes.addActionListener(createSetValueListener(parent, 0));
         no.addActionListener(createSetValueListener(parent, 1));
         cancel.addActionListener(createSetValueListener(parent, 2));

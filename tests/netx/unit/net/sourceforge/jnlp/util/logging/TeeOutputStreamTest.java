@@ -9,9 +9,6 @@ import java.io.PrintStream;
 
 import static org.junit.Assert.assertTrue;
 
-/**
- * Created by jkang on 15/07/14.
- */
 public class TeeOutputStreamTest {
 
     private PrintStream teePrintStream;

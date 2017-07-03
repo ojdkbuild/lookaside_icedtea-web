@@ -18,7 +18,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 package net.sourceforge.jnlp.controlpanel;
 
 import java.awt.Container;
-import java.awt.Dimension;
 import java.awt.Frame;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
@@ -46,12 +45,12 @@ public class CacheViewer extends JDialog {
 
     private boolean initialized = false;
     private static final String dialogTitle = Translator.R("CVCPDialogTitle");
-    private DeploymentConfiguration config; // Configuration file which contains all the settings.
+    private final DeploymentConfiguration config; // Configuration file which contains all the settings.
     CachePane topPanel;
 
     /**
      * Creates a new instance of the cache viewer.
-     * 
+     *
      * @param config Deployment configuration file.
      */
     public CacheViewer(DeploymentConfiguration config) {
@@ -61,7 +60,6 @@ public class CacheViewer extends JDialog {
             throw new IllegalArgumentException("config: " + config);
         }
         setIconImages(ImageResources.INSTANCE.getApplicationImages());
-
         /* Prepare for adding components to dialog box */
         Container contentPane = getContentPane();
         contentPane.setLayout(new GridBagLayout());
@@ -125,7 +123,7 @@ public class CacheViewer extends JDialog {
 
     /**
      * Display the cache viewer.
-     * 
+     *
      * @param config Configuration file.
      */
     public static void showCacheDialog(final DeploymentConfiguration config) {

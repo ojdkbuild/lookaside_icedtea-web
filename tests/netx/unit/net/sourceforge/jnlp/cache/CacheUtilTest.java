@@ -36,11 +36,13 @@ exception statement from your version.
  */
 package net.sourceforge.jnlp.cache;
 
+import java.io.File;
 import java.net.URL;
+import net.sourceforge.jnlp.util.UrlUtils;
+
 import org.junit.Assert;
 import org.junit.Test;
 
-/** Test various corner cases of the parser */
 public class CacheUtilTest {
 
     @Test
@@ -48,8 +50,32 @@ public class CacheUtilTest {
         URL[] u = ResourceTrackerTest.getUrls();
         URL[] n = ResourceTrackerTest.getNormalizedUrls();
         for (int i = 0; i < u.length; i++) {
-            Assert.assertTrue("url " + i + " must CacheUtil.urlEquals to its normalized form " + i, CacheUtil.urlEquals(u[i], n[i]));
-            Assert.assertTrue("normalized form " + i + " must CacheUtil.urlEquals to its original " + i, CacheUtil.urlEquals(n[i], u[i]));
+            Assert.assertTrue("url " + i + " must CacheUtil.urlEquals to its normalized form " + i, UrlUtils.urlEquals(u[i], n[i]));
+            Assert.assertTrue("normalized form " + i + " must CacheUtil.urlEquals to its original " + i, UrlUtils.urlEquals(n[i], u[i]));
         }
+    }
+
+    @Test
+    public void testUrlToPath() throws Exception {
+        final URL u = new URL("https://example.com/applet/some:weird*applet?.jar");
+        //stuf behind querry is kept
+        final File expected = new File("/tmp/https/example.com/applet/some_weird_applet..jar");
+        Assert.assertEquals(expected, CacheUtil.urlToPath(u, "/tmp"));
+    }
+    
+    
+    @Test
+    public void testUrlToPathWithQuery() throws Exception {
+        final URL u = new URL("https://example.com/applet/applet.php?id=applet5");
+        //querry is kept and sanitized
+        final File expected = new File("/tmp/https/example.com/applet/applet.php.id_applet5");
+        Assert.assertEquals(expected, CacheUtil.urlToPath(u, "/tmp"));
+    }
+    @Test
+    public void testUrlToPathWithoutQuery() throws Exception {
+        final URL u = new URL("https://example.com/applet/applet.php");
+        //no doubledot is caused by patch adding query to file
+        final File expected = new File("/tmp/https/example.com/applet/applet.php");
+        Assert.assertEquals(expected, CacheUtil.urlToPath(u, "/tmp"));
     }
 }

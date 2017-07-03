@@ -48,8 +48,6 @@ import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.OutputStream;
 import java.security.KeyStore;
 import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
@@ -61,7 +59,6 @@ import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.JPopupMenu;
 import javax.swing.SwingConstants;
 
 import net.sourceforge.jnlp.JNLPFile;
@@ -76,7 +73,6 @@ import net.sourceforge.jnlp.security.KeyStores.Type;
 import net.sourceforge.jnlp.security.SecurityDialog;
 import net.sourceforge.jnlp.security.SecurityDialogs.AccessType;
 import net.sourceforge.jnlp.security.SecurityUtil;
-import net.sourceforge.jnlp.security.policyeditor.PolicyEditor.PolicyEditorWindow;
 import net.sourceforge.jnlp.util.FileUtils;
 import net.sourceforge.jnlp.util.logging.OutputController;
 
@@ -95,14 +91,12 @@ public class CertWarningPane extends SecurityDialogPanel {
     private final Certificate cert;
     private JCheckBox alwaysTrust;
     private final CertVerifier certVerifier;
-    private SecurityDelegate securityDelegate;
-    private JPopupMenu policyMenu;
+    private final SecurityDelegate securityDelegate;
     private JPanel topPanel, infoPanel, buttonPanel, bottomPanel;
     private JLabel topLabel, nameLabel, publisherLabel, fromLabel, bottomLabel;
     private JButton run, sandbox, advancedOptions, cancel, moreInfo;
     private boolean alwaysTrustSelected;
     private String bottomLabelWarningText;
-    private PolicyEditorWindow policyEditor = null;
 
     public CertWarningPane(SecurityDialog x, CertVerifier certVerifier, SecurityDelegate securityDelegate) {
         super(x, certVerifier);
@@ -264,17 +258,7 @@ public class CertWarningPane extends SecurityDialogPanel {
         }
 
         alwaysTrust.addActionListener(new ButtonDisableListener(sandbox));
-        int buttonWidth = Math.max(run.getMinimumSize().width,
-                sandbox.getMinimumSize().width);
-        buttonWidth = Math.max(buttonWidth, cancel.getMinimumSize().width);
-        int buttonHeight = run.getMinimumSize().height;
-        Dimension d = new Dimension(buttonWidth, buttonHeight);
-
-        run.setPreferredSize(d);
-        sandbox.setPreferredSize(d);
-        advancedOptions.setPreferredSize(new Dimension(advancedOptions.getMinimumSize().width, buttonHeight));
-        cancel.setPreferredSize(d);
-
+ 
         sandbox.setEnabled(!alwaysTrust.isSelected());
 
         run.addActionListener(createSetValueListener(parent, 0));
@@ -353,17 +337,11 @@ public class CertWarningPane extends SecurityDialogPanel {
                     KeyStore ks = KeyStores.getKeyStore(Level.USER, Type.CERTS);
                     X509Certificate c = (X509Certificate) parent.getCertVerifier().getPublisher(null);
                     CertificateUtils.addToKeyStore(c, ks);
-                    File keyStoreFile = new File(KeyStores.getKeyStoreLocation(Level.USER, Type.CERTS));
+                    File keyStoreFile = KeyStores.getKeyStoreLocation(Level.USER, Type.CERTS).getFile();
                     if (!keyStoreFile.isFile()) {
                         FileUtils.createRestrictedFile(keyStoreFile, true);
                     }
-
-                    OutputStream os = new FileOutputStream(keyStoreFile);
-                    try {
-                        ks.store(os, KeyStores.getPassword());
-                    } finally {
-                        os.close();
-                    }
+                    SecurityUtil.storeKeyStore(ks, keyStoreFile);
                     OutputController.getLogger().log("certificate is now permanently trusted");
                 } catch (Exception ex) {
                     // TODO: Let NetX show a dialog here notifying user

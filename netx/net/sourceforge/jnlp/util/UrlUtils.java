@@ -56,10 +56,8 @@ public class UrlUtils {
             String[] urlParts = url.toString().split("\\?");
             URL strippedUrl = new URL(urlParts[0]); 
             return normalizeUrl(strippedUrl, encodeFileUrls);
-        } catch (IOException e) {
-            OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e);
-        } catch (URISyntaxException e) {
-            OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e);
+        } catch (IOException | URISyntaxException e) {
+            OutputController.getLogger().log(e);
         }
         return url;
     }
@@ -135,11 +133,7 @@ public class UrlUtils {
     public static URL normalizeUrlQuietly(URL url, boolean encodeFileUrls) {
         try {
             return normalizeUrl(url, encodeFileUrls);
-        } catch (MalformedURLException e) {
-            OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e);
-        } catch (UnsupportedEncodingException e) {
-            OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e);
-        } catch (URISyntaxException e) {
+        } catch (MalformedURLException | UnsupportedEncodingException | URISyntaxException e) {
             OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e);
         }
         return url;
@@ -167,8 +161,8 @@ public class UrlUtils {
      * You can use sanitizeLastSlash and see also unittests
      * Both unix and windows salshes are supported
      * 
-     * @param src
-     * @return 
+     * @param src src to be stripped
+     * @return  src without file
      */
     public static URL removeFileName(final URL src) {
         URL nsrc = normalizeUrlAndStripParams(src);
@@ -190,8 +184,8 @@ public class UrlUtils {
 
     /**
      * Small utility function creating li list from collection of urls
-     * @param remoteUrls
-     * @return 
+     * @param remoteUrls list of urls
+     * @return String containing html item list of those urls
      */
     public static String setOfUrlsToHtmlList(Iterable<URL> remoteUrls) {
         StringBuilder sb = new StringBuilder();
@@ -213,9 +207,9 @@ public class UrlUtils {
      * 
      * 
      * When input is like 
-     * @param in
-     * @return
-     * @throws MalformedURLException 
+     * @param in url t be sanitized
+     * @return url without trailing slash (if any)
+     * @throws MalformedURLException if original url was wrong 
      */
     public static URL sanitizeLastSlash(URL in) throws MalformedURLException {
         if (in == null) {
@@ -241,9 +235,9 @@ public class UrlUtils {
      * So protcol://som.url/some/path/ is same as protcol://som.url/some/path.
      * Even protcol://som.url/some/path\ is same as protcol://som.url/some/path/
      * 
-     * @param u1
-     * @param u2
-     * @return 
+     * @param u1 first url to comapre
+     * @param u2 second
+     * @return  true if urls are equals no matter of trailing slash
      */
     public static boolean equalsIgnoreLastSlash(URL u1, URL u2) {
         try {
@@ -271,4 +265,74 @@ public class UrlUtils {
             return file.getResources().getMainJAR().getLocation();
         }
     }
+     
+     
+     /**
+     * Compares a URL using string compareNullableStrings of its protocol, host, port, path,
+ query, and anchor. This method avoids the host name lookup that
+     * URL.equals does for http: protocol URLs. It may not return the same value
+     * as the URL.equals method (different hostnames that resolve to the same IP
+     * address, ie sourceforge.net and www.sourceforge.net).
+     *
+     * @param u1 first url to compareNullableStrings
+     * @param u2 second url to compareNullableStrings
+     * @return whether the u1 and u2 points to same resource or not
+     */
+    public static boolean urlEquals(URL u1, URL u2) {
+        if (u1 == u2) {
+            return true;
+        }
+        if (u1 == null || u2 == null) {
+            return false;
+        }
+
+        if (notNullUrlEquals(u1, u2)) {
+            return true;
+        }
+        try {
+            URL nu1 = UrlUtils.normalizeUrl(u1);
+            URL nu2 = UrlUtils.normalizeUrl(u2);
+            if (notNullUrlEquals(nu1, nu2)) {
+                return true;
+            }
+        } catch (Exception ex) {
+            OutputController.getLogger().log(ex);
+        }
+        return false;
+    }
+
+    static boolean notNullUrlEquals(URL u1, URL u2) {
+        return compareNullableStrings(u1.getProtocol(), u2.getProtocol(), true) 
+                && compareNullableStrings(u1.getHost(), u2.getHost(), true) 
+                && compareNullableStrings(u1.getPath(), u2.getPath(), false) 
+                && compareNullableStrings(u1.getQuery(), u2.getQuery(), false) 
+                && compareNullableStrings(u1.getRef(), u2.getRef(), false);
+                // && u1.getPort() ==  u2.getPort(); errornous?
+    }
+    
+    
+    /**
+     * Compare strings that can be {@code null}.
+     * @param s1 first string to compareNullableStrings with s2
+     * @param s2 second string to compareNullableStrings with s1
+     * @param ignore switch to ignore case
+     */
+    static boolean compareNullableStrings(String s1, String s2, boolean ignore) {
+        //this check is need to evaluate two nulls correctly
+        if (s1 == s2) {
+            return true;
+        }
+        if (s1 == null || s2 == null) {
+            return false;
+        }
+        if (ignore) {
+            return s1.equalsIgnoreCase(s2);
+        } else {
+            return s1.equals(s2);
+        }
+    }
+    
+
+
+
 }

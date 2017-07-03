@@ -37,12 +37,13 @@
 
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 import net.sourceforge.jnlp.JNLPFile;
 import net.sourceforge.jnlp.ProcessResult;
+import net.sourceforge.jnlp.runtime.Translator;
 import org.junit.Assert;
 import org.junit.Test;
-
-;
 
 public class RemoteApplicationSettings {
 
@@ -65,6 +66,8 @@ public class RemoteApplicationSettings {
         public URL getUrl();
 
         public void evaluate(ProcessResult pr);
+        
+        public List<String> modifyParams(List<String> global);
     }
 
     public static abstract class StringBasedURL implements RemoteApplicationTestcaseSettings {
@@ -72,7 +75,12 @@ public class RemoteApplicationSettings {
         URL u;
 
         public String clean(String s){
-            return s.replaceAll("\\s*" + JNLPFile.TITLE_NOT_FOUND + "\\s*", "").trim();
+            s = s.replace(Translator.R("MACDisabledMessage"),"");
+            s = s.replace(Translator.R("MACCheckSkipped", ".*", ".*"), "");
+            s = s.replace(JNLPFile.TITLE_NOT_FOUND, "");
+            s = s.replaceAll("Fontconfig warning.*", "");
+            return  s.replaceAll("\\s*" + JNLPFile.TITLE_NOT_FOUND + "\\s*", "").trim();
+            
         }
         @Override
         public URL getUrl() {
@@ -82,6 +90,13 @@ public class RemoteApplicationSettings {
         public StringBasedURL(String r) {
             this.u = createCatchedUrl(r);
         }
+
+        @Override
+        public List<String> modifyParams(List<String> global) {
+            return global;
+        }
+        
+        
     }
 
     public static class FourierTransform extends StringBasedURL {
@@ -110,6 +125,14 @@ public class RemoteApplicationSettings {
             Assert.assertTrue(clean(pr.stderr).length() == 0 || pr.stderr.contains("Cannot grant permissions to unsigned jars. Application requested security permissions, but jars are not signed"));
 
         }
+
+        @Override
+        public List<String> modifyParams(List<String> global) {
+            List l = new ArrayList(global);
+            l.add("-J-Dhttps.protocols=TLSv1,SSLv3,SSLv2Hello");
+            return l;
+        }
+        
     }
 
     public static class GnattProject extends StringBasedURL {
@@ -135,8 +158,9 @@ public class RemoteApplicationSettings {
 
         @Override
         public void evaluate(ProcessResult pr) {
-            Assert.assertTrue(pr.stdout.length() == 0);
-            Assert.assertTrue(pr.stderr.length() == 0);
+            //some debug coords are appearing
+            Assert.assertTrue(pr.stdout.toLowerCase().contains("geogebra"));
+            Assert.assertFalse(pr.stderr.toLowerCase().contains("exception"));
 
         }
     }
@@ -168,8 +192,42 @@ public class RemoteApplicationSettings {
 
         }
     }
+     
+     public abstract static class NearlyNoOutputsOnWrongJRE extends NearlyNoOutputs {
 
-    public static class Arbores extends NearlyNoOutputs {
+        public NearlyNoOutputsOnWrongJRE(String r) {
+            super(r);
+        }
+
+        
+        
+        @Override
+        public void evaluate(ProcessResult pr) {
+            Assert.assertTrue(stdoutEmpty, removeJreVersionWarning(clean(pr.stdout)).length() == 0);
+            Assert.assertTrue(stderrEmpty, removeJreVersionWarning(clean(pr.stderr)).length() == 0);
+
+        }
+
+    }
+
+    private static final String pattern = ".*" + Translator.R("JREversionDontMatch", ".*", ".*") + ".*";
+     
+
+    private static String removeJreVersionWarning(String clean) {
+        return clean.replaceAll(pattern, "");
+    }
+
+     @Test
+     public void testJREversionDontMatchRemoval(){
+         Assert.assertTrue(removeJreVersionWarning(Translator.R("JREversionDontMatch", "1.8.0-pre.whatever", "{0}")).isEmpty());
+         Assert.assertTrue(removeJreVersionWarning(Translator.R("JREversionDontMatch", "{0}", "{1}")).isEmpty());
+         Assert.assertTrue(removeJreVersionWarning(Translator.R("JREversionDontMatch", "1.3.0-pre-pac", "1.8.0-pre.whatever}")).isEmpty());
+         Assert.assertTrue(removeJreVersionWarning(Translator.R("JREversionDontMatch", "", "")).isEmpty());
+         Assert.assertTrue(removeJreVersionWarning(Translator.R("JREversionDontMatch", " - - - - ", " - - - ")).isEmpty());
+         Assert.assertFalse(removeJreVersionWarning("AA\n"+Translator.R("JREversionDontMatch", "1.3+", "1.7")+"\nBB").equals("AA\nBB"));
+     }
+
+    public static class Arbores extends NearlyNoOutputsOnWrongJRE {
 
         public Arbores() {
             super("http://www.arbores.ca/AnnuityCalc.jnlp");
@@ -197,7 +255,7 @@ public class RemoteApplicationSettings {
         }
     }
 
-    public static class ArboresDeposit extends NearlyNoOutputs {
+    public static class ArboresDeposit extends NearlyNoOutputsOnWrongJRE {
 
         public ArboresDeposit() throws MalformedURLException {
             super("http://www.arbores.ca/Deposit.jnlp");

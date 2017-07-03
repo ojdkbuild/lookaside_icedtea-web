@@ -58,10 +58,10 @@ import javax.swing.table.TableModel;
 import javax.swing.table.TableRowSorter;
 
 import net.sourceforge.jnlp.cache.CacheDirectory;
-import net.sourceforge.jnlp.cache.CacheLRUWrapper;
 import net.sourceforge.jnlp.cache.CacheUtil;
 import net.sourceforge.jnlp.cache.DirectoryNode;
 import net.sourceforge.jnlp.config.DeploymentConfiguration;
+import net.sourceforge.jnlp.config.PathsAndFiles;
 import net.sourceforge.jnlp.runtime.Translator;
 import net.sourceforge.jnlp.util.FileUtils;
 import net.sourceforge.jnlp.util.PropertiesFile;
@@ -69,9 +69,9 @@ import net.sourceforge.jnlp.util.logging.OutputController;
 import net.sourceforge.jnlp.util.ui.NonEditableTableModel;
 
 public class CachePane extends JPanel {
-    JDialog parent;
-    DeploymentConfiguration config;
-    private String location;
+    final JDialog parent;
+    final DeploymentConfiguration config;
+    private final String location;
     private JComponent defaultFocusComponent;
     DirectoryNode root;
     String[] columns = {
@@ -88,13 +88,13 @@ public class CachePane extends JPanel {
      * Creates a new instance of the CachePane.
      * 
      * @param parent The parent dialog that uses this pane.
-     * @param config The DeploymentConfiguration file.
+     * @param config configuration tobe worked on
      */
     public CachePane(JDialog parent, DeploymentConfiguration config) {
         super(new BorderLayout());
         this.parent = parent;
         this.config = config;
-        location = config.getProperty(DeploymentConfiguration.KEY_USER_CACHE_DIR);
+        location = PathsAndFiles.CACHE_DIR.getFullPath(config);
 
         addComponents();
     }
@@ -128,7 +128,7 @@ public class CachePane extends JPanel {
         cacheTable.setFillsViewportHeight(true);
         JScrollPane scrollPane = new JScrollPane(cacheTable);
 
-        TableRowSorter<TableModel> tableSorter = new TableRowSorter<TableModel>(model);
+        TableRowSorter<TableModel> tableSorter = new TableRowSorter<>(model);
         final Comparator<Comparable<?>> comparator = new Comparator<Comparable<?>>() { // General purpose Comparator
             @Override
             @SuppressWarnings("unchecked")
@@ -188,7 +188,7 @@ public class CachePane extends JPanel {
         JPanel leftPanel = new JPanel(new FlowLayout(FlowLayout.LEADING));
         JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.TRAILING));
 
-        List<JButton> buttons = new ArrayList<JButton>();
+        List<JButton> buttons = new ArrayList<>();
 
         this.deleteButton = new JButton(Translator.R("CVCPButDelete"));
         deleteButton.addActionListener(new ActionListener() {
@@ -272,7 +272,7 @@ public class CachePane extends JPanel {
             public void run() {
                 try {
                     FileLock fl = null;
-                    File netxRunningFile = new File(config.getProperty(DeploymentConfiguration.KEY_USER_NETX_RUNNING_FILE));
+                    File netxRunningFile = new File(PathsAndFiles.MAIN_LOCK.getFullPath(config));
                     if (!netxRunningFile.exists()) {
                         try {
                             FileUtils.createParentDir(netxRunningFile);
@@ -323,7 +323,7 @@ public class CachePane extends JPanel {
             }
 
             private void updateRecentlyUsed(File f) {
-                File recentlyUsedFile = new File(location + File.separator + CacheLRUWrapper.CACHE_INDEX_FILE_NAME);
+                File recentlyUsedFile = new File(PathsAndFiles.getRecentlyUsedFile().getFullPath(config));
                 PropertiesFile pf = new PropertiesFile(recentlyUsedFile);
                 pf.load();
                 Enumeration<Object> en = pf.keys();
@@ -419,7 +419,7 @@ public class CachePane extends JPanel {
     private ArrayList<Object[]> generateData(DirectoryNode root) {
         root = new DirectoryNode("Root", location, null);
         CacheDirectory.getDirStructure(root);
-        ArrayList<Object[]> data = new ArrayList<Object[]>();
+        ArrayList<Object[]> data = new ArrayList<>();
 
         for (DirectoryNode identifier : root.getChildren()) {
             for (DirectoryNode type : identifier.getChildren()) {

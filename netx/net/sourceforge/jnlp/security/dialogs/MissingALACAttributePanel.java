@@ -129,11 +129,6 @@ public class MissingALACAttributePanel extends SecurityDialogPanel {
 
         JButton yes = new JButton(Translator.R("ButYes"));
         JButton no = new JButton(Translator.R("ButNo"));
-        int buttonWidth = yes.getMinimumSize().width;
-        int buttonHeight = yes.getMinimumSize().height;
-        Dimension d = new Dimension(buttonWidth, buttonHeight);
-        yes.setPreferredSize(d);
-        no.setPreferredSize(d);
         yes.addActionListener(createSetValueListener(parent, 0));
         no.addActionListener(createSetValueListener(parent, 1));
         initialFocusComponent = no;

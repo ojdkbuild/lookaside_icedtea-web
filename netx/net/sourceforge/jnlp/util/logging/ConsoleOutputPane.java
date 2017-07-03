@@ -17,6 +17,7 @@ import java.util.Observable;
 import java.util.Observer;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
+
 import javax.swing.ButtonGroup;
 import javax.swing.DefaultComboBoxModel;
 import javax.swing.GroupLayout;
@@ -41,6 +42,7 @@ import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Document;
 import javax.swing.text.PlainDocument;
 import javax.swing.text.html.HTMLDocument;
+
 import net.sourceforge.jnlp.runtime.JNLPRuntime;
 import net.sourceforge.jnlp.runtime.Translator;
 import net.sourceforge.jnlp.util.logging.headers.ObservableMessagesProvider;
@@ -104,7 +106,7 @@ public class ConsoleOutputPane extends JPanel implements Observer {
         showPreInit = new JCheckBox();
         sortByLabel = new JLabel();
         regExLabel = new JCheckBox();
-        sortBy = new JComboBox();
+        sortBy = new JComboBox<>();
         searchLabel = new JLabel();
         autorefresh = new JCheckBox();
         refresh = new JButton();
@@ -137,9 +139,10 @@ public class ConsoleOutputPane extends JPanel implements Observer {
         insertChars = new JPopupMenu();
         initComponents();
         regExFilter.setText(ConsoleOutputPaneModel.defaultPattern.pattern());
-        if (!LogConfig.getLogConfig().isEnableHeaders()) {
-            showHeaders.setSelected(false);
-        }
+        showHeaders.setSelected(LogConfig.getLogConfig().isEnableHeaders());
+        setHeadersCheckBoxesEnabled(showHeaders.isSelected());
+        setMessagesCheckBoxesEnabled(showMessage.isSelected());
+        refresh.setEnabled(!autorefresh.isSelected());
         if (JNLPRuntime.isWebstartApplication()) {
             showPlugin.setSelected(false);
             showPreInit.setSelected(false);
@@ -214,10 +217,10 @@ public class ConsoleOutputPane extends JPanel implements Observer {
 
                     @Override
                     public final void run() {
-                        try{
-                        insertChars.setLocation(regExFilter.getLocationOnScreen());
-                        insertChars.setVisible(!insertChars.isVisible());
-                             } catch (Exception ex) {
+                        try {
+                            insertChars.setLocation(regExFilter.getLocationOnScreen());
+                            insertChars.setVisible(!insertChars.isVisible());
+                        } catch (Exception ex) {
                             OutputController.getLogger().log(ex);
                         }
                     }
@@ -238,6 +241,16 @@ public class ConsoleOutputPane extends JPanel implements Observer {
 
             @Override
             public final void actionPerformed(final ActionEvent evt) {
+                if (evt == null) return;
+
+                final Object source;
+                if ((source = evt.getSource()) == showHeaders) {
+                    setHeadersCheckBoxesEnabled(showHeaders.isSelected());
+                } else if (source == showMessage) {
+                    setMessagesCheckBoxesEnabled(showMessage.isSelected());
+                } else if (source == autorefresh) {
+                    refresh.setEnabled(!autorefresh.isSelected());
+                }
                 refreshAction();
             }
         };
@@ -313,8 +326,7 @@ public class ConsoleOutputPane extends JPanel implements Observer {
         statistics.setText(model.createStatisticHint());
     }
 
-    @SuppressWarnings("unchecked")
-    private void initComponents() {
+    private final void initComponents() {
         //this is crucial, otherwie PlainDocument implementatin is repalcing all \n by space
         ((PlainDocument)regExFilter.getDocument()).getDocumentProperties().remove("filterNewlines");
 
@@ -380,7 +392,7 @@ public class ConsoleOutputPane extends JPanel implements Observer {
         regExLabel.setText(Translator.R("COPregex") + ":");
         regExLabel.addActionListener(getDefaultActionSingleton());
 
-        sortBy.setModel(new DefaultComboBoxModel(new String[] {
+        sortBy.setModel(new DefaultComboBoxModel<>(new String[] {
             Translator.R("COPAsArrived"),
             Translator.R("COPuser"),
             Translator.R("COPorigin"),
@@ -389,14 +401,14 @@ public class ConsoleOutputPane extends JPanel implements Observer {
             Translator.R("COPcode"),
             Translator.R("COPthread1"),
             Translator.R("COPthread2"),
-            Translator.R("COPmessage")
-        }));
+            Translator.R("COPmessage")}));
         sortBy.addActionListener(getDefaultActionSingleton());
 
         searchLabel.setText(Translator.R("COPSearch") + ":");
 
         autorefresh.setSelected(true);
         autorefresh.setText(Translator.R("COPautoRefresh"));
+        autorefresh.addActionListener(getDefaultActionSingleton());
 
         refresh.setText(Translator.R("COPrefresh"));
         refresh.addActionListener(getDefaultActionSingleton());
@@ -742,6 +754,27 @@ public class ConsoleOutputPane extends JPanel implements Observer {
         validate();
     }
 
+    private final void setHeadersCheckBoxesEnabled(final boolean enable) {
+        showUser.setEnabled(enable);
+        showOrigin.setEnabled(enable);
+        showLevel.setEnabled(enable);
+        showDate.setEnabled(enable);
+        showCode.setEnabled(enable);
+        showThread1.setEnabled(enable);
+        showThread2.setEnabled(enable);
+    }
+
+    private final void setMessagesCheckBoxesEnabled(final boolean enable) {
+        showOut.setEnabled(enable);
+        showErr.setEnabled(enable);
+        showJava.setEnabled(enable);
+        showPlugin.setEnabled(enable);
+        showDebug.setEnabled(enable);
+        showInfo.setEnabled(enable);
+        showItw.setEnabled(enable);
+        showApp.setEnabled(enable);
+    }
+
     private final void refreshAction() {
         updateModel();
         refreshPane();
@@ -961,7 +994,7 @@ public class ConsoleOutputPane extends JPanel implements Observer {
     private final JCheckBox showThread2;
     private final JCheckBox showUser;
     private final JCheckBox sortCopyAll;
-    private final JComboBox sortBy;
+    private final JComboBox<String> sortBy;
     private final JLabel sortByLabel;
     private final JLabel statistics;
     private final JCheckBox wordWrap;
