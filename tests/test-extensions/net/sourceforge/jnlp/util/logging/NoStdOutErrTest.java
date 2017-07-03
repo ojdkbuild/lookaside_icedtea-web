@@ -34,41 +34,67 @@ this exception to your version of the library, but you are not
 obligated to do so.  If you do not wish to do so, delete this
 exception statement from your version.
  */
+
 package net.sourceforge.jnlp.util.logging;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import net.sourceforge.jnlp.ServerAccess;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
-import java.io.*;
-import java.lang.*;
 
+/**
+ * It is crucial that BeforeClass inits logging subsystem.
+ * If  logging subsytem of itw is enabled from itw, then junit's classloader do not
+ * see it. And so when is junit manipualting with logging, then it creates new (second!)
+ * static instance. On opposite, if junit creates the instance, then itw see this one.
+ *
+ * Explanation is that junit classloader (fresh for each test-class)  is creating
+ * special classlaoder for itw (or better itw is creating its own one). The itw 
+ * classlaoder is then branch...or leaf of junit classlaoder. So any class loaded
+ * by junit classlaoder is visible from itw, but not vice verse.
+ */
 public class NoStdOutErrTest {
-    
-    private static PrintStream origOut;
-    private static PrintStream origErr;
-    private static ByteArrayOutputStream nwOut;
-    private static ByteArrayOutputStream nwErr;
-    
-    
-     @BeforeClass
-    public static void disableStds() throws Exception {
-        nwOut = new ByteArrayOutputStream();
-		origOut = System.out;
-        nwErr = new ByteArrayOutputStream();
-		origErr = System.err;
-        System.setOut(new PrintStream(nwOut));
-        System.setErr(new PrintStream(nwErr));
-    }
-    
-    @AfterClass
-    public static void restoreStds() throws Exception {
-        System.setOut(new PrintStream(origOut));
-        System.setErr(new PrintStream(origErr));
+
+    private static boolean origialStds;
+    private static final String setLogToStreams = "setLogToStreams";
+    /*
+     * "printed" exceptions are otherwise  consumed via junit if thrown :-/
+     */
+
+    @BeforeClass
+    public static synchronized void disableStds() {
+        try {
+            //init logger and log and flush message
+            //it is crucial for junit to grip it
+            OutputController.getLogger().log("initialising");
+            //one more times: if TESTED class is the first which creates instance of logger
+            //then when junit can not access this class, and creates its own for its purposes
+            //when junit creates this class, then also TESTED class have access to it and so it behaves as expected
+            OutputController.getLogger().flush();
+            origialStds = LogConfig.getLogConfig().isLogToStreams();
+            invokeSetLogToStreams(false);
+        } catch (Exception ex) {
+            ServerAccess.logException(ex);
+        }
     }
 
-  
-    
-    
+    @AfterClass
+    public static synchronized void restoreStds() {
+        try {
+            OutputController.getLogger().flush();
+            invokeSetLogToStreams(origialStds);
+        } catch (Exception ex) {
+            ServerAccess.logException(ex);
+        }
+    }
+
+    private static synchronized void invokeSetLogToStreams(boolean state) {
+        try {
+            Method lcs = LogConfig.class.getDeclaredMethod(setLogToStreams, boolean.class);
+            lcs.setAccessible(true);
+            lcs.invoke(LogConfig.getLogConfig(), state);
+        } catch (Exception ex) {
+            ServerAccess.logException(ex);
+        }
+    }
 }

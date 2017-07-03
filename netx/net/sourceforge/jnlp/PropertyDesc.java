@@ -24,11 +24,30 @@ package net.sourceforge.jnlp;
  */
 public class PropertyDesc {
 
+    /**
+     * 
+     * @param prop - the property to be parsed from format key=value
+     * @param errorMEssage - the message for error. We do not wont to bother PropertyDesc with localization overhead
+     * @return new PropertyDesc based on parsed key=value, though composed from key and value
+     */
+    public static PropertyDesc fromString(String prop, String errorMEssage) throws LaunchException {
+        // allows empty property, not sure about validity of that.
+        int equals = prop.indexOf("=");
+        if (equals == -1) {
+            throw new LaunchException(errorMEssage);
+        }
+        String key = prop.substring(0, equals);
+        String value = prop.substring(equals + 1, prop.length());
+
+        return new PropertyDesc(key, value);
+
+    }
+
     /** the key name */
-    private String key;
+    final private String key;
 
     /** the value */
-    private String value;
+    final private String value;
 
     /**
      * Creates a property descriptor.

@@ -50,7 +50,7 @@ exception statement from your version. */
 
 
 #include "IcedTeaPluginUtils.h"
-
+#include "IcedTeaNPPlugin.h"
 #include "IcedTeaParseProperties.h"
 /*
  The public api is nearly impossible to test due to "hardcoded paths"
@@ -75,7 +75,9 @@ bool  read_deploy_property_value(string user_file, string system_file,  bool use
 //for passing two dummy files
 bool  find_custom_jre(string user_file, string main_file,string& dest);
 //end of non-public IcedTeaParseProperties api
-
+const std::string default_file_ITW_deploy_props_name = "deployment.properties";
+const std::string default_itw_log_dir_name = "log";
+const std::string custom_jre_key = "deployment.jre.dir";
 
 void remove_all_spaces(string& str)
 {
@@ -105,11 +107,55 @@ bool starts_with(string c1, string c2){
 string  user_properties_file(){
 	int myuid = getuid();
 	struct passwd *mypasswd = getpwuid(myuid);
-	return string(mypasswd->pw_dir)+"/.icedtea/"+default_file_ITW_deploy_props_name;
+	// try pre 1.5  file location
+	string old_name = string(mypasswd->pw_dir)+"/.icedtea/"+default_file_ITW_deploy_props_name;
+	//exists? then itw was not yet migrated. Use it
+	if (IcedTeaPluginUtilities::file_exists(old_name)) {
+		PLUGIN_ERROR("IcedTea-Web plugin is using out-dated configuration\n");
+		return old_name;
+	}
+	//we are probably  on XDG specification now
+	//is specified custom value?
+	if (getenv ("XDG_CONFIG_HOME") != NULL){
+		return string(getenv ("XDG_CONFIG_HOME"))+"/icedtea-web/"+default_file_ITW_deploy_props_name;
+	}
+	//if not then use default
+	return string(mypasswd->pw_dir)+"/.config/icedtea-web/"+default_file_ITW_deploy_props_name;
 }
 
+string get_log_dir(){
+	string value;
+	if (!read_deploy_property_value("deployment.user.logdir", value)) {
+		string config_dir;
+		if (getenv ("XDG_CONFIG_HOME") != NULL){
+			config_dir = string(getenv("XDG_CONFIG_HOME"));
+		} else {
+			int myuid = getuid();
+			struct passwd *mypasswd = getpwuid(myuid);
+			config_dir = string(mypasswd->pw_dir) + "/.config";
+		}
+		string itw_dir = config_dir+"/icedtea-web";
+		string log_dir = itw_dir+"/"+default_itw_log_dir_name;
+		mkdir_checked(itw_dir);
+		mkdir_checked(log_dir);
+		return log_dir;
+	}
+	return value;
+}
 
-string  main_properties_file(){
+void mkdir_checked(string dir){
+	if (!IcedTeaPluginUtilities::file_exists(dir))
+	{
+		const int PERMISSIONS_MASK = S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH; // 0755
+		int stat = g_mkdir(dir.c_str(), PERMISSIONS_MASK);
+		if (stat != 0)
+		{
+			PLUGIN_DEBUG("WARNING: Creation of directory %s failed: %s\n", dir.c_str(), strerror(errno));
+		}
+	}
+}
+
+string main_properties_file(){
 	return "/etc/.java/deployment/"+default_file_ITW_deploy_props_name;
 }
 
@@ -134,6 +180,48 @@ bool find_system_config_file(string& dest){
 	}
 	return find_system_config_file(main_properties_file(), jdest, found, default_java_properties_file(), dest);
 }
+
+bool  is_java_console_enabled(){
+	string value;
+	if (!read_deploy_property_value("deployment.console.startup.mode", value)) {
+		return true;
+	}
+	if (value == "DISABLE") {
+		return false;
+	} else {
+		return true;
+	}
+}
+
+bool  read_bool_property(string key, bool defaultValue){
+	string value;
+	if (!read_deploy_property_value(key, value)) {
+		return defaultValue;
+	}
+	if (value == "true") {
+		return true;
+	} else {
+		return false;
+	}
+}	
+
+bool  is_debug_on(){
+	return 	read_bool_property("deployment.log",false);
+}
+bool  is_debug_header_on(){
+	return 	read_bool_property("deployment.log.headers",false);
+}
+bool  is_logging_to_file(){
+	return 	read_bool_property("deployment.log.file",false);
+}
+bool  is_logging_to_stds(){
+	return 	read_bool_property("deployment.log.stdstreams",true);
+}
+bool  is_logging_to_system(){
+	return 	read_bool_property("deployment.log.system",true);
+}
+
+
 //abstraction for testing purposes
 bool find_system_config_file(string main_file, string custom_jre_file, bool usecustom_jre, string default_java_file, string& dest){
 	if (IcedTeaPluginUtilities::file_exists(main_file)) {

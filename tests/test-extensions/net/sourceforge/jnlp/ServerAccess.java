@@ -55,11 +55,14 @@ import java.net.ServerSocket;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import net.sourceforge.jnlp.ProcessResult;
 import net.sourceforge.jnlp.browsertesting.Browser;
 import net.sourceforge.jnlp.browsertesting.BrowserFactory;
 import net.sourceforge.jnlp.browsertesting.Browsers;
 import net.sourceforge.jnlp.closinglisteners.AutoErrorClosingListener;
 import net.sourceforge.jnlp.closinglisteners.AutoOkClosingListener;
+import net.sourceforge.jnlp.util.FileUtils;
+import net.sourceforge.jnlp.util.logging.OutputController;
 import org.junit.Assert;
 
 /**
@@ -268,7 +271,7 @@ public class ServerAccess {
        if (this.currentBrowser==null) return null;
        List<String> l1=this.currentBrowser.getComaptibilitySwitches();
        List<String> l2=this.currentBrowser.getDefaultSwitches();
-       List<String> l= new ArrayList();
+       List<String> l= new ArrayList<String>();
        if (l1!=null)l.addAll(l1);
        if (l2!=null)l.addAll(l2);
        return l;
@@ -417,23 +420,8 @@ public class ServerAccess {
      * @return stream as string
      * @throws IOException if connection can't be established or resource does not exist
      */
-    public static String getContentOfStream(InputStream is,String encoding) throws IOException {
-        try {
-            BufferedReader br = new BufferedReader(new InputStreamReader(is, encoding));
-            StringBuilder sb = new StringBuilder();
-            while (true) {
-                String s = br.readLine();
-                if (s == null) {
-                    break;
-                }
-                sb.append(s).append("\n");
-
-            }
-            return sb.toString();
-        } finally {
-            is.close();
-        }
-
+    public static String getContentOfStream(InputStream is, String encoding) throws IOException {
+        return FileUtils.getContentOfStream(is, encoding);
     }
 
     /**
@@ -444,8 +432,7 @@ public class ServerAccess {
      * @throws IOException if connection can't be established or resource does not exist
      */
     public static String getContentOfStream(InputStream is) throws IOException {
-        return getContentOfStream(is, "UTF-8");
-
+        return FileUtils.getContentOfStream(is);
     }
 
     /**
@@ -491,13 +478,10 @@ public class ServerAccess {
      * @throws IOException
      */
     public static void saveFile(String content, File f) throws IOException {
-        saveFile(content, f, "utf-8");
+        FileUtils.saveFile(content, f);
     }
     public static void saveFile(String content, File f,String encoding) throws IOException {
-        Writer output = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(f),encoding));
-        output.write(content);
-        output.flush();
-        output.close();
+        FileUtils.saveFile(content, f, encoding);
     }
 
     /**
@@ -774,16 +758,7 @@ public class ServerAccess {
         logException(t, true);
     }
     public static void logException(Throwable t, boolean print){
-        try{
-        StringWriter sw = new StringWriter();
-        PrintWriter pw = new PrintWriter(sw);
-        t.printStackTrace(pw);
-        log(sw.toString(), false, print);
-        pw.close();
-        sw.close();
-        }catch(Exception ex){
-           throw new RuntimeException(ex);
-        }
+        log(OutputController.exceptionToString(t), false, print);
     }
 
     private static StackTraceElement getTestMethod() {
@@ -858,15 +833,4 @@ public class ServerAccess {
         return new ProcessWrapper(args, dir, stdoutl, stderrl, vars).execute();
     }
 
-    /**
-     * this is temprary solution until refactoring is fully done
-     * Use  net.sourceforge.jnlp.ProcessResult instead
-     */
-    @Deprecated
-    public static class ProcessResult extends net.sourceforge.jnlp.ProcessResult {
-
-        public ProcessResult(String stdout, String stderr, Process process, boolean wasTerminated, Integer r, Throwable deadlyException) {
-            super(stdout, stderr, process, wasTerminated, r, deadlyException);
-        }
-    }
-    }
+}

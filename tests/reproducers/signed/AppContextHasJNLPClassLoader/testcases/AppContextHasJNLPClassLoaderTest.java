@@ -71,6 +71,7 @@ public class AppContextHasJNLPClassLoaderTest extends BrowserTest {
     }
 
     @Test
+    @KnownToFail
     @Bug(id="PR1251")
     public void testJNLPApplicationAppContext() throws Exception {
         ProcessResult pr = server.executeJavawsHeadless("/AppContextHasJNLPClassLoader.jnlp");
@@ -87,6 +88,7 @@ public class AppContextHasJNLPClassLoaderTest extends BrowserTest {
 
     @Test
     @TestInBrowsers(testIn={Browsers.one})
+    @KnownToFail
     @Bug(id="PR1251")
     public void testAppletAppContext() throws Exception {
         ProcessResult pr = server.executeBrowser("/AppContextHasJNLPClassLoader.html", AutoClose.CLOSE_ON_CORRECT_END);

@@ -82,8 +82,6 @@ import java.awt.print.Printable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
-import java.lang.reflect.InvocationTargetException;
-import java.net.MalformedURLException;
 import java.net.SocketPermission;
 import java.net.URI;
 import java.net.URL;
@@ -114,13 +112,13 @@ import net.sourceforge.jnlp.security.appletextendedsecurity.AppletStartupSecurit
 import net.sourceforge.jnlp.splashscreen.SplashController;
 import net.sourceforge.jnlp.splashscreen.SplashPanel;
 import net.sourceforge.jnlp.splashscreen.SplashUtils;
-import netscape.javascript.JSObject;
 import sun.awt.AppContext;
 import sun.awt.SunToolkit;
 import sun.awt.X11.XEmbeddedFrame;
-import sun.misc.Ref;
 
 import com.sun.jndi.toolkit.url.UrlUtil;
+import net.sourceforge.jnlp.runtime.JNLPRuntime;
+import net.sourceforge.jnlp.util.logging.OutputController;
 
 /*
  */
@@ -270,7 +268,7 @@ public class PluginAppletViewer extends XEmbeddedFrame
         try {
             SwingUtilities.invokeAndWait(new SplashCreator(fPanel));
         } catch (Exception e) {
-            e.printStackTrace(); // Not much we can do other than  print
+            OutputController.getLogger().log(OutputController.Level.ERROR_ALL,e); // Not much we can do other than  print
         }
 
     }
@@ -302,7 +300,7 @@ public class PluginAppletViewer extends XEmbeddedFrame
                 }
             });
         } catch (Exception e) {
-            e.printStackTrace(); // Not much we can do other than print
+            OutputController.getLogger().log(OutputController.Level.ERROR_ALL,e); // Not much we can do other than print
         }
     }
 
@@ -330,7 +328,7 @@ public class PluginAppletViewer extends XEmbeddedFrame
                 }
             });
         } catch (Exception e) {
-            e.printStackTrace(); // Not much we can do other than print
+            OutputController.getLogger().log(OutputController.Level.ERROR_ALL,e); // Not much we can do other than print
         }
     }
 
@@ -469,6 +467,7 @@ public class PluginAppletViewer extends XEmbeddedFrame
                             "Height = ", height, "\n",
                             "DocumentBase = ", documentBase, "\n",
                             "Params = ", paramString);
+        JNLPRuntime.saveHistory(documentBase);
 
         PluginAppletPanelFactory factory = new PluginAppletPanelFactory();
         AppletMessageHandler amh = new AppletMessageHandler("appletviewer");
@@ -560,7 +559,7 @@ public class PluginAppletViewer extends XEmbeddedFrame
             }
         } catch (Exception e) {
 
-            e.printStackTrace();
+            OutputController.getLogger().log(OutputController.Level.ERROR_ALL,e);
 
             // If an exception happened during pre-init, we need to update status
             updateStatus(identifier, PAV_INIT_STATUS.INACTIVE);
@@ -642,7 +641,7 @@ public class PluginAppletViewer extends XEmbeddedFrame
             pav.dispose();
 
             // If panel is already disposed, return
-            if (pav.panel.applet == null) {
+            if (pav.panel.getApplet() == null) {
                 PluginDebug.debug(identifier, " panel inactive. Returning.");
                 return;
             }
@@ -689,54 +688,63 @@ public class PluginAppletViewer extends XEmbeddedFrame
         PluginDebug.debug("Applet panel ", panel, " initialized");
     }
 
+    /* Resizes an applet panel, waiting for the applet to initialze. 
+     * Should be done asynchronously to avoid the chance of deadlock. */
+    private void resizeAppletPanel(final int width, final int height) {
+        // Wait for panel to come alive
+        waitForAppletInit(panel);
+
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                panel.updateSizeInAtts(height, width);
+
+                setSize(width, height);
+
+                // There is a rather odd drawing bug whereby resizing
+                // the panel makes no difference on initial call
+                // because the panel thinks that it is already the
+                // right size. Validation has no effect there either.
+                // So we work around by setting size to 1, validating,
+                // and then setting to the right size and validating
+                // again. This is not very efficient, and there is
+                // probably a better way -- but resizing happens
+                // quite infrequently, so for now this is how we do it
+
+                panel.setSize(1, 1);
+                panel.validate();
+
+                panel.setSize(width, height);
+                panel.validate();
+
+                panel.getApplet().resize(width, height);
+                panel.getApplet().validate();
+            }
+        });
+    }
+
     public void handleMessage(int reference, String message) {
         if (message.startsWith("width")) {
-
-            // Wait for panel to come alive
-            waitForAppletInit(panel);
 
             // 0 => width, 1=> width_value, 2 => height, 3=> height_value
             String[] dimMsg = message.split(" ");
 
-            final int height = Integer.parseInt(dimMsg[3]);
             final int width = Integer.parseInt(dimMsg[1]);
+            final int height = Integer.parseInt(dimMsg[3]);
 
-            panel.updateSizeInAtts(height, width);
+            /* Resize the applet asynchronously, to avoid the chance of 
+             * deadlock while waiting for the applet to initialize. 
+             * 
+             * In general, worker threads should spawn new threads for any blocking operations. */
+            Thread resizeAppletThread = new Thread("resizeAppletThread") {
+                @Override
+                public void run() {
+                    resizeAppletPanel(width, height);
+                }
+            };
 
-            try {
-                SwingUtilities.invokeAndWait(new Runnable() {
-                    @Override
-                    public void run() {
-
-                        setSize(width, height);
-
-                        // There is a rather odd drawing bug whereby resizing
-                        // the panel makes no difference on initial call
-                        // because the panel thinks that it is already the
-                        // right size. Validation has no effect there either.
-                        // So we work around by setting size to 1, validating,
-                        // and then setting to the right size and validating
-                        // again. This is not very efficient, and there is
-                        // probably a better way -- but resizing happens
-                        // quite infrequently, so for now this is how we do it
-
-                        panel.setSize(1, 1);
-                        panel.validate();
-
-                        panel.setSize(width, height);
-                        panel.validate();
-
-                        panel.applet.resize(width, height);
-                        panel.applet.validate();
-                    }
-                });
-            } catch (InterruptedException e) {
-                // do nothing
-                e.printStackTrace();
-            } catch (InvocationTargetException e) {
-                // do nothing
-                e.printStackTrace();
-            }
+            /* Let it eventually complete */
+            resizeAppletThread.start();
 
         } else if (message.startsWith("GetJavaObject")) {
 
@@ -806,7 +814,7 @@ public class PluginAppletViewer extends XEmbeddedFrame
     /**
      * Get an image ref.
      */
-    private synchronized Ref getCachedImageRef(URL url) {
+    private synchronized AppletImageRef getCachedImageRef(URL url) {
         PluginDebug.debug("getCachedImageRef() searching for ", url);
 
         try {
@@ -820,14 +828,16 @@ public class PluginAppletViewer extends XEmbeddedFrame
                 PluginDebug.debug("getCachedImageRef() plugin codebase = ", codeBase);
 
                 String resourceName = originalURL.substring(codeBase.length());
-                JNLPClassLoader loader = (JNLPClassLoader) panel.getAppletClassLoader();
+                if (panel.getAppletClassLoader() instanceof JNLPClassLoader) {
+                    JNLPClassLoader loader = (JNLPClassLoader) panel.getAppletClassLoader();
 
-                URL localURL = null;
-                if (loader.resourceAvailableLocally(resourceName)) {
-                    url = loader.getResource(resourceName);
+                    URL localURL = null;
+                    if (loader.resourceAvailableLocally(resourceName)) {
+                        url = loader.getResource(resourceName);
+                    }
+
+                    url = localURL != null ? localURL : url;
                 }
-
-                url = localURL != null ? localURL : url;
             }
 
             PluginDebug.debug("getCachedImageRef() getting img from URL = ", url);
@@ -841,8 +851,8 @@ public class PluginAppletViewer extends XEmbeddedFrame
                 return ref;
             }
         } catch (Exception e) {
-            System.err.println("Error occurred when trying to fetch image:");
-            e.printStackTrace();
+            OutputController.getLogger().log(OutputController.Level.ERROR_ALL, "Error occurred when trying to fetch image:");
+            OutputController.getLogger().log(e);
             return null;
         }
     }
@@ -1226,7 +1236,7 @@ public class PluginAppletViewer extends XEmbeddedFrame
                             " " + encodedURI, reference);
 
         } catch (UnsupportedEncodingException e) {
-            e.printStackTrace();
+            OutputController.getLogger().log(OutputController.Level.ERROR_ALL,e);
             return null;
         }
 
@@ -1250,32 +1260,18 @@ public class PluginAppletViewer extends XEmbeddedFrame
         return request.getObject();
     }
 
-    public static Object requestPluginProxyInfo(URI uri) {
-
-        String requestURI = null;
+    /**
+     * Obtain information about the proxy from the browser.
+     *
+     * @param uri a String in url-encoded form
+     * @return a {@link URI} that indicates a proxy.
+     */
+    public static Object requestPluginProxyInfo(String uri) {
         Long reference = getRequestIdentifier();
-
-        try {
-
-            // there is no easy way to get SOCKS proxy info. So, we tell mozilla that we want proxy for
-            // an HTTP uri in case of non http/ftp protocols. If we get back a SOCKS proxy, we can
-            // use that, if we get back an http proxy, we fallback to DIRECT connect
-
-            String scheme = uri.getScheme();
-            String port = uri.getPort() != -1 ? ":" + uri.getPort() : "";
-            if (!uri.getScheme().startsWith("http") && !uri.getScheme().equals("ftp"))
-                scheme = "http";
-
-            requestURI = UrlUtil.encode(scheme + "://" + uri.getHost() + port + "/" + uri.getPath(), "UTF-8");
-        } catch (Exception e) {
-            PluginDebug.debug("Cannot construct URL from ", uri.toString(), " ... falling back to DIRECT proxy");
-            e.printStackTrace();
-            return null;
-        }
 
         PluginCallRequest request = requestFactory.getPluginCallRequest("proxyinfo",
                 "plugin PluginProxyInfo reference " + reference + " " +
-                        requestURI, reference);
+                        uri, reference);
 
         PluginMessageConsumer.registerPriorityWait(reference);
         streamhandler.postCallRequest(request);
@@ -1426,8 +1422,8 @@ public class PluginAppletViewer extends XEmbeddedFrame
          * at the same time.
          */
         try {
-            ((AppletViewerPanel)panel).joinAppletThread();
-            ((AppletViewerPanel)panel).release();
+            ((AppletViewerPanelAccess)panel).joinAppletThread();
+            ((AppletViewerPanelAccess)panel).release();
         } catch (InterruptedException e) {
             return; // abort the reload
         }
@@ -1435,7 +1431,7 @@ public class PluginAppletViewer extends XEmbeddedFrame
         AccessController.doPrivileged(new PrivilegedAction<Void>() {
             @Override
             public Void run() {
-                ((AppletViewerPanel)panel).createAppletThread();
+                ((AppletViewerPanelAccess)panel).createAppletThread();
                 return null;
             }
         });
@@ -1505,7 +1501,9 @@ public class PluginAppletViewer extends XEmbeddedFrame
                 appletPanels.removeElement(p);
                 
                 // Mark classloader unusable
-                ((JNLPClassLoader) cl).decrementLoaderUseCount();
+                if (cl instanceof JNLPClassLoader) {
+                    ((JNLPClassLoader) cl).decrementLoaderUseCount();
+                }
 
                 try {
                     SwingUtilities.invokeAndWait(new Runnable() {

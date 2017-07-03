@@ -73,10 +73,16 @@ public class FileTestUtils {
     }
 
     /* Check the amount of file descriptors before and after a Runnable */
-    static public void assertNoFileLeak(Runnable runnable) {
+    static public void assertNoFileLeak(Runnable runnable) throws InterruptedException {
+        Thread.sleep(10);
         long filesOpenBefore = getOpenFileDescriptorCount();
         runnable.run();
+        Thread.sleep(10);
         long filesLeaked = getOpenFileDescriptorCount() - filesOpenBefore;
+        //how come? Appearently can...
+        if (filesLeaked<0){
+            return;
+        }
         assertEquals(0, filesLeaked);
     }
 
@@ -89,13 +95,25 @@ public class FileTestUtils {
     }
 
     /* Creates a jar in a temporary directory, with the given name & file contents */
+    static public void createJarWithoutManifestContents(File jarFile, File... fileContents) throws Exception{
+        createJarWithContents(jarFile, null, fileContents);
+    }
+    
+    /* Creates a jar in a temporary directory, with the given name & file contents */
     static public void createJarWithContents(File jarFile, Manifest manifestContents, File... fileContents)
             throws Exception {
         /* Manifest quite evilly ignores all attributes if we don't specify a version! 
          * Make sure it's set here. */
-        manifestContents.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
+        if (manifestContents != null){
+            manifestContents.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
+        }
 
-        JarOutputStream jarWriter = new JarOutputStream(new FileOutputStream(jarFile), manifestContents);
+        JarOutputStream jarWriter;
+        if (manifestContents == null){
+            jarWriter = new JarOutputStream(new FileOutputStream(jarFile));
+        } else {
+            jarWriter = new JarOutputStream(new FileOutputStream(jarFile), manifestContents);
+        }
         for (File file : fileContents) {
             jarWriter.putNextEntry(new JarEntry(file.getName()));
             FileInputStream fileReader = new FileInputStream(file);

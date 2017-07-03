@@ -21,7 +21,7 @@ import java.net.*;
 import java.util.*;
 
 /**
- * The information element.<p>
+ * The information element.
  *
  * @author <a href="mailto:jmaxwell@users.sourceforge.net">Jon A. Maxwell (JAM)</a> - initial author
  * @version $Revision: 1.9 $
@@ -60,13 +60,6 @@ public class InformationDesc {
      */
     public InformationDesc(Locale locales[]) {
         this.locales = locales;
-    }
-
-   /**
-    * 1.4 comaptibility
-    */
-    public InformationDesc(JNLPFile jnlpFile, Locale locales[]) {
-        this(locales);
     }
 
     /**

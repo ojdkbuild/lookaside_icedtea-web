@@ -39,9 +39,9 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import junit.framework.Assert;
 import net.sourceforge.jnlp.ProcessResult;
 import net.sourceforge.jnlp.ServerAccess;
+import org.junit.Assert;
 import org.junit.Test;
 
 public class GeneratedIdTest {
@@ -150,13 +150,12 @@ public class GeneratedIdTest {
 
     //remote
     //have href
-    //should NOT be redownloaded
-    //href is different file
+    //should be redownloaded as href is different file
     @Test
     public void launchRemoteChangedFileWithHref() throws Exception {
         File f = prepareChangedFileWithHref();
         ProcessResult pr = server.executeJavawsHeadless("/" + f.getName());
-        Assert.assertTrue("Stdout should contain '" + okBase2 + "', but did not.", pr.stdout.contains(okBase2));
+        Assert.assertTrue("Stdout should contain '" + okBase1 + "', but did not.", pr.stdout.contains(okBase1));
     }
 
     @Test

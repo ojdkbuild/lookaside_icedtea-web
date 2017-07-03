@@ -16,6 +16,7 @@
 
 package net.sourceforge.jnlp.runtime;
 
+import net.sourceforge.jnlp.util.logging.OutputController;
 import java.applet.*;
 import java.awt.*;
 import java.awt.event.*;
@@ -91,7 +92,7 @@ public class AppletEnvironment implements AppletContext, AppletStub {
             @Override
             public void windowClosing(WindowEvent event) {
                 appletInstance.destroy();
-                System.exit(0);
+                JNLPRuntime.exit(0);
             }
         };
         frame.addWindowListener(closer);
@@ -137,9 +138,12 @@ public class AppletEnvironment implements AppletContext, AppletStub {
      * container must be SplashContoler
      * 
      */
-    public SplashController getSplashControler() {
-        
-        return (SplashController)cont;
+    public SplashController getSplashController() {
+        if (cont instanceof SplashController) {
+            return (SplashController) cont;
+        } else {
+            return null;
+        }
     }
 
     /**
@@ -200,8 +204,7 @@ public class AppletEnvironment implements AppletContext, AppletStub {
 
             }
         } catch (Exception ex) {
-            if (JNLPRuntime.isDebug())
-                ex.printStackTrace();
+            OutputController.getLogger().log(ex);
 
             // should also kill the applet?
         }
@@ -229,10 +232,7 @@ public class AppletEnvironment implements AppletContext, AppletStub {
      */
     public void setApplet(Applet applet) {
         if (this.applet != null) {
-            if (JNLPRuntime.isDebug()) {
-                Exception ex = new IllegalStateException("Applet can only be set once.");
-                ex.printStackTrace();
-            }
+            OutputController.getLogger().log(new IllegalStateException("Applet can only be set once."));
             return;
         }
         this.applet = applet;

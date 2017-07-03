@@ -38,7 +38,6 @@ package net.sourceforge.jnlp.resources;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Enumeration;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.MissingResourceException;
@@ -147,7 +146,7 @@ public class MessagesPropertiesTest {
         //get default by non existing language and country
         main = LocalesIdentifier.DEFAULT;
         assertNotNull(main);
-        secondary= new LocalesIdentifier[] {LocalesIdentifier.CZ,LocalesIdentifier.DE,LocalesIdentifier.PL};
+        secondary= new LocalesIdentifier[] {LocalesIdentifier.CZ, LocalesIdentifier.DE, LocalesIdentifier.PL};
         assertNotNull(secondary);
         for (int i = 0; i < secondary.length; i++) {
             assertNotNull(secondary[i]);
@@ -159,14 +158,12 @@ public class MessagesPropertiesTest {
     public void allResourcesAreReallyDifferent() {
         List<LocalesIdentifier> bundles = new ArrayList<LocalesIdentifier>(secondary.length + 1);
         String detailResults="";
-        bundles.add(main);
         int errors = 0;
         bundles.addAll(Arrays.asList(secondary));
         for (int i = 0; i < bundles.size(); i++) {
             LocalesIdentifier resourceBundle1 = bundles.get(i);
             Enumeration<String> keys1 = resourceBundle1.getBundle().getKeys();
-            for (int j = 0; j < bundles.size(); j++) {
-                LocalesIdentifier resourceBundle2 = bundles.get(j);
+                LocalesIdentifier resourceBundle2 = main;
                 if (resourceBundle1.getLanguage().equals(resourceBundle2.getLanguage())) {
                     //do not compare same language groups
                     allLog("Skipping same language " + resourceBundle1.getLocale() + " x " + resourceBundle2.getLocale() + " (should be " + resourceBundle1.getIdentifier() + " x " + resourceBundle2.getIdentifier() + ")");
@@ -177,13 +174,23 @@ public class MessagesPropertiesTest {
                 while (keys1.hasMoreElements()) {
                     String key = keys1.nextElement();
                     String val1 = getMissingResourceAsEmpty(resourceBundle1.getBundle(), key);
+                    if (val1.length() > 1000) {
+                        errLog("Skipping check of: " + key + " too long. (" + val1.length() + ")"); 
+                        continue;
+                     }
                     String val2 = getMissingResourceAsEmpty(resourceBundle2.getBundle(), key);
                     outLog("\""+val1+"\" x \""+val2);
                     if (val1.trim().equalsIgnoreCase(val2.trim())) {
                         if (val1.trim().length() <= 5 /* short words like"ok", "", ...*/
                                 || val1.toLowerCase().contains("://") /*urls...*/
                                 || !val1.trim().contains(" ") /*one word*/
-                                || val1.replaceAll("\\{\\d\\}", "").trim().length()<5 /*only vars and short words*/) {
+                                || val1.replaceAll("\\{\\d\\}", "").trim().length()<5 /*only vars and short words*/
+                                //white list
+                                || (val1.trim().equals("std. err"))
+                                || (val1.trim().equals("std. out"))
+                                || (val1.trim().equals("Policy Editor"))
+                                || (val1.trim().equals("Java Reflection")))
+                        {
                             errLog("Warning! Items equals for: " + key + " = " + val1 + " but are in allowed subset");
                         } else {
                             errors++;
@@ -196,8 +203,6 @@ public class MessagesPropertiesTest {
                     detailResults+=resourceBundle1.getIdentifier()+" x "+resourceBundle2.getIdentifier()+": "+localErrors+";";
                 }
                 errLog(localErrors+" errors allResourcesAreReallyDifferent fo "+resourceBundle1.getIdentifier()+" x "+resourceBundle2.getIdentifier());
-
-            }
         }
         assertTrue("Several - " + errors + " - items are same in  bundles. See error logs for details: "+detailResults, errors == 0);
     }

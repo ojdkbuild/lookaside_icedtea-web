@@ -39,6 +39,7 @@
 #ifndef CHECKED_ALLOCATIONS_H_
 #define CHECKED_ALLOCATIONS_H_
 
+#include <string>
 #include <set>
 #include <cstdio>
 #include <exception>
@@ -46,8 +47,9 @@
 #include <cstdlib>
 #include <ext/malloc_allocator.h> //GNU extension
 
-// Plays nice with custom-defined operator new
-typedef std::set<void*, std::less<void*>, __gnu_cxx::malloc_allocator<void*> > AllocationSet;
+// Classes that play nice with custom-defined operator new by using 'vanilla' malloc
+typedef __gnu_cxx::malloc_allocator<void*> SafeAllocator;
+typedef std::set<void*, std::less<void*>, SafeAllocator> AllocationSet;
 
 int cpp_unfreed_allocations();
 

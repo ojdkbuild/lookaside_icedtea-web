@@ -49,7 +49,6 @@ import org.junit.Test;
 public class AppletTestTests extends BrowserTest {
 
     private final String s7 = "Aplet killing himself after 2000 ms of life";
-    private final String ss = "xception";
     private final String s2 = "value2";
     private final String s1 = "value1";
     private final String s0 = "applet was started";
@@ -59,9 +58,6 @@ public class AppletTestTests extends BrowserTest {
 
         @Override
         protected boolean isAlowedToFinish(String s) {
-            if (s.contains(ss)) {
-                return true;
-            }
             return (s.contains(s0) && s.contains(s1) && s.contains(s2) && s.contains(s3) && s.contains(s7));
         }
     }
@@ -87,7 +83,7 @@ public class AppletTestTests extends BrowserTest {
             Assert.assertTrue(pr1.wasTerminated);
             //System.out.println("connecting AppletInFirefoxTest request in " + getBrowser().toString());
             // just verify loging is recording browser
-            ServerAccess.ProcessResult pr = server.executeBrowser("/appletAutoTests2.html", new CountingClosingListenerImpl(), new CountingClosingListenerImpl());
+            ProcessResult pr = server.executeBrowser("/appletAutoTests2.html", new CountingClosingListenerImpl(), new CountingClosingListenerImpl());
             evaluateApplet(pr, false);
             Assert.assertTrue(pr.wasTerminated);
         } finally {
@@ -109,7 +105,6 @@ public class AppletTestTests extends BrowserTest {
         Assert.assertTrue("AppletTest stdout should contains " + s0 + " bud didn't", pr.stdout.contains(s0));
         Assert.assertTrue("AppletTest stdout should contains " + s1 + " bud didn't", pr.stdout.contains(s1));
         Assert.assertTrue("AppletTest stdout should contains " + s2 + " bud didn't", pr.stdout.contains(s2));
-        Assert.assertFalse("AppletTest stderr should not contains " + ss + " but did", pr.stderr.contains(ss));
         Assert.assertTrue("AppletTest stdout should contains " + s7 + " bud didn't", pr.stdout.contains(s7));
         if (!javawsApplet) {
             /*this is working correctly in most browser, but not in all. temporarily disabling

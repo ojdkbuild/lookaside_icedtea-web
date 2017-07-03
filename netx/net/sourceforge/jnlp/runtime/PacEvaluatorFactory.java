@@ -37,12 +37,12 @@ exception statement from your version.
 
 package net.sourceforge.jnlp.runtime;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
 import java.util.Properties;
+import net.sourceforge.jnlp.util.logging.OutputController;
 
 
 public class PacEvaluatorFactory {
@@ -59,17 +59,15 @@ public class PacEvaluatorFactory {
         try {
             properties = new Properties();
             properties.load(in);
-        } catch (IOException e) {
-            if (JNLPRuntime.isDebug()) {
-                e.printStackTrace();
-            }
+        } catch (Exception e) {
+            OutputController.getLogger().log(OutputController.Level.WARNING_ALL, "PAC provider is broken or don't exists. This is ok unless your application is using JavaScript.");
+            OutputController.getLogger().log(e);
         } finally {
             try {
                 in.close();
-            } catch (IOException e) {
-                if (JNLPRuntime.isDebug()) {
-                    e.printStackTrace();
-                }
+            } catch (Exception e) {
+                OutputController.getLogger().log(OutputController.Level.WARNING_ALL, "PAC provider is broken or don't exists. This is ok unless your application is using JavaScript.");
+                OutputController.getLogger().log(e);
             }
         }
 
@@ -88,16 +86,16 @@ public class PacEvaluatorFactory {
             } catch (ClassNotFoundException e) {
                 // ignore
             } catch (InstantiationException e) {
-                e.printStackTrace();
+                OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e);
             } catch (IllegalAccessException e) {
-                e.printStackTrace();
+                OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e);
             } catch (NoSuchMethodException e) {
-                e.printStackTrace();
+                OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e);
             } catch (IllegalArgumentException e) {
-                e.printStackTrace();
+                OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e);
             } catch (InvocationTargetException e) {
                 if (e.getCause() != null) {
-                    e.getCause().printStackTrace();
+                    OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e.getCause());
                 }
             }
         }

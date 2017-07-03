@@ -171,7 +171,10 @@ public class SplashScreenTest extends JDialog {
             app.remove(panel.getSplashComponent());
             r.setPercentage(panel.getPercentage());
             r.adjustForSize();
+            r.setLoadingException(new RuntimeException(":)"));
             panel = r;
+            panel.setVersion("1.2-re45fdg");
+
             app.add(panel.getSplashComponent());
             app.validate();
             app.pack();

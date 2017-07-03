@@ -80,6 +80,7 @@ import net.sourceforge.jnlp.security.SecurityUtil;
 import net.sourceforge.jnlp.security.SecurityDialog;
 import net.sourceforge.jnlp.security.KeyStores.Level;
 import net.sourceforge.jnlp.util.FileUtils;
+import net.sourceforge.jnlp.util.logging.OutputController;
 
 public class CertificatePane extends JPanel {
 
@@ -150,7 +151,7 @@ public class CertificatePane extends JPanel {
         try {
             keyStore = KeyStores.getKeyStore(currentKeyStoreLevel, currentKeyStoreType);
         } catch (Exception e) {
-            e.printStackTrace();
+            OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e);
         }
     }
 
@@ -279,7 +280,7 @@ public class CertificatePane extends JPanel {
             }
         } catch (Exception e) {
             //TODO
-            e.printStackTrace();
+           OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e);
         }
     }
 
@@ -410,7 +411,7 @@ public class CertificatePane extends JPanel {
                     repopulateTables();
                 } catch (Exception ex) {
                     // TODO: handle exception
-                    ex.printStackTrace();
+                    OutputController.getLogger().log(OutputController.Level.ERROR_ALL, ex);
                 }
             }
         }
@@ -454,8 +455,7 @@ public class CertificatePane extends JPanel {
                     }
                 }
             } catch (Exception ex) {
-                // TODO
-                ex.printStackTrace();
+                OutputController.getLogger().log(OutputController.Level.ERROR_ALL, ex);
             }
         }
     }
@@ -500,8 +500,7 @@ public class CertificatePane extends JPanel {
                     repopulateTables();
                 }
             } catch (Exception ex) {
-                // TODO
-                ex.printStackTrace();
+                OutputController.getLogger().log(OutputController.Level.ERROR_ALL, ex);
             }
 
         }

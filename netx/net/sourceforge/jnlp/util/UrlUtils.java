@@ -37,6 +37,7 @@ exception statement from your version.
 
 package net.sourceforge.jnlp.util;
 
+import net.sourceforge.jnlp.util.logging.OutputController;
 import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -45,6 +46,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLDecoder;
+import net.sourceforge.jnlp.JNLPFile;
 
 public class UrlUtils {
     private static final String UTF8 = "utf-8";
@@ -55,9 +57,9 @@ public class UrlUtils {
             URL strippedUrl = new URL(urlParts[0]); 
             return normalizeUrl(strippedUrl, encodeFileUrls);
         } catch (IOException e) {
-            e.printStackTrace();
+            OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e);
         } catch (URISyntaxException e) {
-            e.printStackTrace();
+            OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e);
         }
         return url;
     }
@@ -81,7 +83,7 @@ public class UrlUtils {
         try {
             return new URL(URLDecoder.decode(url.toString(), UTF8));
         } catch (IOException e) {
-            e.printStackTrace();
+            OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e);
             return url;
         }
     }
@@ -134,11 +136,11 @@ public class UrlUtils {
         try {
             return normalizeUrl(url, encodeFileUrls);
         } catch (MalformedURLException e) {
-            e.printStackTrace();
+            OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e);
         } catch (UnsupportedEncodingException e) {
-            e.printStackTrace();
+            OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e);
         } catch (URISyntaxException e) {
-            e.printStackTrace();
+            OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e);
         }
         return url;
     }
@@ -151,5 +153,122 @@ public class UrlUtils {
     /* Decode a URL as a file, being tolerant of URLs with mixed encoded & decoded portions. */
     public static File decodeUrlAsFile(URL url) {
         return new File(decodeUrlQuietly(url).getFile());
+    }
+  
+    /**
+     * This function i striping part behind last path delimiter.
+     * 
+     * Expected is input like protcol://som.url/some/path/file.suff
+     * Then output will bee protcol://som.url/some/path
+     * 
+     * Be aware of input like  protcol://som.url/some/path/
+     * then input will be just  protcol://som.url/some/path
+     * 
+     * You can use sanitizeLastSlash and see also unittests
+     * Both unix and windows salshes are supported
+     * 
+     * @param src
+     * @return 
+     */
+    public static URL removeFileName(final URL src) {
+        URL nsrc = normalizeUrlAndStripParams(src);
+        String s = nsrc.getPath();
+        int i1 = s.lastIndexOf("/");
+        int i2 = s.lastIndexOf("\\");
+        int i = Math.max(i1, i2);
+        if (i < 0) {
+            return src;
+        }
+        s = s.substring(0, i);
+        try {
+            return sanitizeLastSlash(new URL(src.getProtocol(), src.getHost(), src.getPort(), s));
+        } catch (MalformedURLException ex) {
+            OutputController.getLogger().log(ex);
+            return nsrc;
+        }
+    }
+
+    /**
+     * Small utility function creating li list from collection of urls
+     * @param remoteUrls
+     * @return 
+     */
+    public static String setOfUrlsToHtmlList(Iterable<URL> remoteUrls) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("<ul>");
+        for (URL url : remoteUrls) {
+            sb.append("<li>").append(url.toExternalForm()).append("</li>");
+        }
+        sb.append("</ul>");
+        return sb.toString();
+    }
+
+    /**
+     * This function is removing all tailing slashes of url and 
+     * both unix and windows salshes are supported.
+     * See tests for valid and invalid inputs/outputs
+     * Shortly   protcol://som.url/some/path/ or  protcol://som.url/some/path////
+     * (and same for windows  protcol://som.url/some\path\\) will become  protcol://som.url/some/path
+     * Even  protcol://som.url/ is reduced to  protcol://som.url
+     * 
+     * 
+     * When input is like 
+     * @param in
+     * @return
+     * @throws MalformedURLException 
+     */
+    public static URL sanitizeLastSlash(URL in) throws MalformedURLException {
+        if (in == null) {
+            return null;
+        }
+        String s = sanitizeLastSlash(in.toExternalForm());
+        return new URL(s);
+    }
+
+    public static String sanitizeLastSlash(final String in) {
+        if (in == null) {
+            return null;
+        }
+        String s = in;
+        while (s.endsWith("/") || s.endsWith("\\")) {
+            s = s.substring(0, s.length() - 1);
+        }
+        return s;
+    }
+
+    /**
+     * both urls are processed by sanitizeLastSlash before actual equals.
+     * So protcol://som.url/some/path/ is same as protcol://som.url/some/path.
+     * Even protcol://som.url/some/path\ is same as protcol://som.url/some/path/
+     * 
+     * @param u1
+     * @param u2
+     * @return 
+     */
+    public static boolean equalsIgnoreLastSlash(URL u1, URL u2) {
+        try {
+            if (u1 == null && u2 == null) {
+                return true;
+            }
+            if (u1 == null && u2 != null) {
+                return false;
+            }
+            if (u1 != null && u2 == null) {
+                return false;
+            }
+            return sanitizeLastSlash(u1).equals(sanitizeLastSlash(u2));
+        } catch (MalformedURLException ex) {
+            throw new RuntimeException(ex);
+        }
+    }
+
+     public static URL guessCodeBase(JNLPFile file) {
+        if (file.getCodeBase() != null) {
+            return file.getCodeBase();
+        } else {
+            //Fixme: codebase should be the codebase of the Main Jar not
+            //the location. Although, it still works in the current state.
+            return file.getResources().getMainJAR().getLocation();
+        }
     }
 }

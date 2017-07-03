@@ -56,24 +56,28 @@ public class ProcessWrapper {
 
     private List<String> args;
     private File dir;
-    private final List<ContentReaderListener> stdoutl = new ArrayList(1);
-    private final List<ContentReaderListener> stderrl = new ArrayList(1);
+    private final List<ContentReaderListener> stdoutl = new ArrayList<ContentReaderListener>(1);
+    private final List<ContentReaderListener> stderrl = new ArrayList<ContentReaderListener>(1);
     private String[] vars;
     private ReactingProcess reactingProcess;
 
     public ProcessWrapper() {
     }
 
-    public ProcessWrapper(String toBeExecuted, List<String> otherargs, URL u){
-        Assert.assertNotNull(u);
+    public ProcessWrapper(String toBeExecuted, List<String> otherargs, URL u) {
+        this(toBeExecuted, otherargs, u.toString());
+    }
+
+    public ProcessWrapper(String toBeExecuted, List<String> otherargs, String s) {
+        Assert.assertNotNull(s);
         Assert.assertNotNull(toBeExecuted);
         Assert.assertTrue(toBeExecuted.trim().length() > 1);
         if (otherargs == null) {
-            otherargs = new ArrayList(1);
+            otherargs = new ArrayList<String>(1);
         }
-        List<String> urledArgs = new ArrayList(otherargs);
+        List<String> urledArgs = new ArrayList<String>(otherargs);
         urledArgs.add(0, toBeExecuted);
-        urledArgs.add(u.toString());
+        urledArgs.add(s);
         this.args = urledArgs;
         this.vars=null;
     }
@@ -197,7 +201,7 @@ public class ProcessWrapper {
         this.vars = vars;
     }
 
-    public ServerAccess.ProcessResult execute() throws Exception {
+    public ProcessResult execute() throws Exception {
         if (reactingProcess !=null ){
             reactingProcess.beforeProcess("");
         };
@@ -218,7 +222,7 @@ public class ProcessWrapper {
         }
         if (t.deadlyException != null) {
             pa.setCanRun(false);
-            return new ServerAccess.ProcessResult("", "", null, true, Integer.MIN_VALUE, t.deadlyException);
+            return new ProcessResult("", "", null, true, Integer.MIN_VALUE, t.deadlyException);
         }
         ContentReader crs = new ContentReader(t.getP().getInputStream(), stdoutl);
         ContentReader cre = new ContentReader(t.getP().getErrorStream(), stderrl);
@@ -240,7 +244,7 @@ public class ProcessWrapper {
         pa.setCanRun(false);
         // ServerAccess.logOutputReprint(t.getP().exitValue()); when process is killed, this throws exception
 
-        ServerAccess.ProcessResult pr = new ServerAccess.ProcessResult(crs.getContent(), cre.getContent(), t.getP(), pa.wasTerminated(), t.getExitCode(), null);
+        ProcessResult pr = new ProcessResult(crs.getContent(), cre.getContent(), t.getP(), pa.wasTerminated(), t.getExitCode(), null);
         if (ServerAccess.PROCESS_LOG) {
             ServerAccess.log(pr.stdout, true, false);
             ServerAccess.log(pr.stderr, false, true);

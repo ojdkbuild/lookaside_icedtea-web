@@ -33,6 +33,7 @@ import javax.management.InstanceAlreadyExistsException;
 import net.sourceforge.jnlp.JNLPFile;
 import net.sourceforge.jnlp.PluginBridge;
 import net.sourceforge.jnlp.runtime.JNLPRuntime;
+import net.sourceforge.jnlp.util.logging.OutputController;
 
 /**
  * This class implements SingleInstanceService
@@ -63,9 +64,7 @@ public class XSingleInstanceService implements ExtendedSingleInstanceService {
                 listeningSocket = new ServerSocket(0);
                 lockFile.createWithPort(listeningSocket.getLocalPort());
 
-                if (JNLPRuntime.isDebug()) {
-                    System.out.println("Starting SingleInstanceServer on port" + listeningSocket);
-                }
+                OutputController.getLogger().log("Starting SingleInstanceServer on port" + listeningSocket);
 
                 while (true) {
                     try {
@@ -76,19 +75,19 @@ public class XSingleInstanceService implements ExtendedSingleInstanceService {
                         notifySingleInstanceListeners(arguments);
                     } catch (Exception exception) {
                         // not much to do here...
-                        exception.printStackTrace();
+                        OutputController.getLogger().log(OutputController.Level.ERROR_ALL, exception);
                     }
 
                 }
             } catch (IOException e) {
-                e.printStackTrace();
+                OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e);
             } finally {
                 if (listeningSocket != null) {
                     try {
                         listeningSocket.close();
                     } catch (IOException e) {
                         // Give up.
-                        e.printStackTrace();
+                        OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e);
                     }
                 }
             }
@@ -104,7 +103,7 @@ public class XSingleInstanceService implements ExtendedSingleInstanceService {
     /**
      * Initialize the new SingleInstanceService
      *
-     * @throws InstanceAlreadyExistsException if the instance already exists
+     * @throws InstanceExistsException if the instance already exists
      */
     public void initializeSingleInstance() {
         // this is called after the application has started. so safe to use
@@ -136,9 +135,7 @@ public class XSingleInstanceService implements ExtendedSingleInstanceService {
         SingleInstanceLock lockFile = new SingleInstanceLock(jnlpFile);
         if (lockFile.isValid()) {
             int port = lockFile.getPort();
-            if (JNLPRuntime.isDebug()) {
-                System.out.println("Lock file is valid (port=" + port + "). Exiting.");
-            }
+            OutputController.getLogger().log("Lock file is valid (port=" + port + "). Exiting.");
 
             String[] args = null;
             if (jnlpFile.isApplet()) {
@@ -204,9 +201,7 @@ public class XSingleInstanceService implements ExtendedSingleInstanceService {
             serverCommunicationSocket.close();
 
         } catch (UnknownHostException unknownHost) {
-            if (JNLPRuntime.isDebug()) {
-                System.out.println("Unable to find localhost");
-            }
+            OutputController.getLogger().log("Unable to find localhost");
             throw new RuntimeException(unknownHost);
         }
     }
@@ -227,7 +222,7 @@ public class XSingleInstanceService implements ExtendedSingleInstanceService {
     /**
      * Add the specified SingleInstanceListener
      *
-     * @throws InstanceExistsException, which is likely to terminate the
+     * @throws InstanceExistsException which is likely to terminate the
      *         application but not guaranteed to
      */
     public void addSingleInstanceListener(SingleInstanceListener sil) {

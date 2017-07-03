@@ -38,14 +38,7 @@ exception statement from your version.
  -->
 <xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="1.0">
   <xsl:output method="text" omit-xml-declaration="yes" indent="no"/>
-  <xsl:template match="/"><!--
-when parameter is mentioned (no matter of value) eg:
-<xsl:param name="logs">none</xsl:param>
-then xsltproc is not able to change its value since 2008
-This parameter is providing relative path to file with logs which is then linked from this index
-Bad luck that xsltproc is not able to use default values.
-If there is no need for linking, please use value "none" for this variable
--->Date:<xsl:value-of select="/testsuite/date"/>
+  <xsl:template match="/">Date:<xsl:value-of select="/testsuite/date"/>
 
 Result: (In brackets are KnownToFail values if any)
 

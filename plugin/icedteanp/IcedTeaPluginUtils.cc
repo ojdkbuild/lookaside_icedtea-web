@@ -54,9 +54,40 @@ int IcedTeaPluginUtilities::reference = -1;
 pthread_mutex_t IcedTeaPluginUtilities::reference_mutex = PTHREAD_MUTEX_INITIALIZER;
 std::map<void*, NPP>* IcedTeaPluginUtilities::instance_map = new std::map<void*, NPP>();
 std::map<std::string, NPObject*>* IcedTeaPluginUtilities::object_map = new std::map<std::string, NPObject*>();
+std::queue<std::string> pre_jvm_message;
 
 /* Plugin async call queue */
 static std::vector< PluginThreadCall* >* pendingPluginThreadRequests = new std::vector< PluginThreadCall* >();
+
+void *flush_pre_init_messages(void* data) {
+  while (true){
+    struct timespec ts;
+    ts.tv_sec = 1;
+    ts.tv_nsec = 0;
+    nanosleep(&ts ,0);
+    if (jvm_up) {
+      while (!pre_jvm_message.empty()) {
+        pthread_mutex_lock(&debug_pipe_lock);
+        std::string message = pre_jvm_message.front();
+        pre_jvm_message.pop();
+        pthread_mutex_unlock(&debug_pipe_lock);
+        plugin_send_message_to_appletviewer_console(message.c_str());
+      }
+      flush_plugin_send_message_to_appletviewer_console();
+    }
+  }
+  return NULL;
+}
+
+void push_pre_init_messages(char * ldm){
+  pthread_mutex_lock(&debug_pipe_lock);
+  pre_jvm_message.push(std::string(ldm));
+  pthread_mutex_unlock(&debug_pipe_lock);
+}
+
+void reset_pre_init_messages(){
+    pre_jvm_message = std::queue<std::string>();
+  }
 
 /**
  * Given a context number, constructs a message prefix to send to Java
@@ -399,7 +430,7 @@ IcedTeaPluginUtilities::getUTF16LEString(int length, int begin, std::vector<std:
 
 	wchar_t c;
 
-	PLUGIN_DEBUG("Converted UTF-16LE string: ");
+	PLUGIN_DEBUG("Converted UTF-16LE string: \n");
 
 	result_unicode_str->clear();
 	for (int i = begin; i < begin+length; i+=2)
@@ -413,7 +444,7 @@ IcedTeaPluginUtilities::getUTF16LEString(int length, int begin, std::vector<std:
         	(c >= 'A' && c <= 'Z') ||
         	(c >= '0' && c <= '9'))
         {
-        	PLUGIN_DEBUG("%c", c);
+        	PLUGIN_DEBUG("%c\n", c);
         }
 
         result_unicode_str->push_back(c);
@@ -496,6 +527,14 @@ IcedTeaPluginUtilities::removeInstanceID(void* member_ptr)
 {
     PLUGIN_DEBUG("Removing key %p from instance map\n", member_ptr);
     instance_map->erase(member_ptr);
+}
+
+/* Clear instance_map. Useful for tests. */
+void
+IcedTeaPluginUtilities::clearInstanceIDs()
+{
+    delete instance_map;
+    instance_map = new std::map<void*, NPP>();
 }
 
 /**
@@ -601,6 +640,18 @@ IcedTeaPluginUtilities::removeObjectMapping(std::string key)
 {
     PLUGIN_DEBUG("Removing key %s from object map\n", key.c_str());
     object_map->erase(key);
+}
+
+/* Clear object_map. Useful for tests. */
+void
+IcedTeaPluginUtilities::clearObjectMapping()
+{
+    std::map<std::string, NPObject*>::iterator iter = object_map->begin();
+    for (; iter != object_map->end(); ++iter) {
+        browser_functions.releaseobject(iter->second);
+    }
+    delete object_map;
+    object_map = new std::map<std::string, NPObject*>();
 }
 
 /*
@@ -802,11 +853,11 @@ javaObjectResultToNPVariant(NPP instance, const std::string& jobject_id, NPVaria
     NPObject* obj;
     if (jclass_id.at(0) == '[') // array
     {
-        obj = IcedTeaScriptableJavaPackageObject::get_scriptable_java_object(instance, jclass_id,
+        obj = IcedTeaScriptableJavaObject::get_scriptable_java_object(instance, jclass_id,
                 jobject_id, true);
     } else
     {
-        obj = IcedTeaScriptableJavaPackageObject::get_scriptable_java_object(instance, jclass_id,
+        obj = IcedTeaScriptableJavaObject::get_scriptable_java_object(instance, jclass_id,
                 jobject_id, false);
     }
 
@@ -1067,11 +1118,90 @@ void IcedTeaPluginUtilities::trim(std::string& str) {
 	str = str.substr(start, end - start + 1);
 }
 
+std::string IcedTeaPluginUtilities::NPIdentifierAsString(NPIdentifier id) {
+    NPUTF8* cstr = browser_functions.utf8fromidentifier(id);
+    if (cstr == NULL) {
+        /* Treat not-existing strings as empty. To tell if it was a valid string,
+         * use browser_functions.identifierisstring. */
+        return std::string();
+    }
+    std::string str = cstr;
+    browser_functions.memfree(cstr);
+    return str;
+}
+
 bool IcedTeaPluginUtilities::file_exists(std::string filename)
 {
     std::ifstream infile(filename.c_str());
     return infile.good();
 }
+
+void IcedTeaPluginUtilities::initFileLog(){
+    if (plugin_file_log != NULL ) {
+        //reusing
+        return;
+    }
+    plugin_file_log_name = get_log_dir() + "/" + IcedTeaPluginUtilities::generateLogFileName();
+    int plugin_file_log_fd = open(plugin_file_log_name.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0600);
+    if (plugin_file_log_fd <=0 ) {
+        plugin_debug_to_file = false;
+    } else {
+        plugin_file_log = fdopen(plugin_file_log_fd, "w");
+    }
+    if (plugin_file_log == NULL ) {
+        plugin_debug_to_file = false;
+    }
+}
+
+
+
+std::string IcedTeaPluginUtilities::generateLogFileName(){
+    char times[96];
+    char result[100];
+    time_t t = time(NULL);
+    struct tm  p;
+    localtime_r(&t, &p);
+    struct timeval current_time;   \
+    gettimeofday (&current_time, NULL);\
+    strftime(times, 96, "%Y-%m-%d_%H:%M:%S", &p);
+    snprintf(result, 100, "%s.%i",times, current_time.tv_usec/1000);
+    return "itw-cplugin-"+std::string(result)+".log";
+}
+
+void IcedTeaPluginUtilities::printDebugStatus(){
+      if (plugin_debug){
+        PLUGIN_DEBUG("plugin_debug: true, initialised\n");
+        if (plugin_debug_headers){
+          PLUGIN_DEBUG("plugin_debug_headers: true\n");
+        } else {
+          PLUGIN_DEBUG("plugin_debug_headers: false\n");
+        } 
+        if (plugin_debug_to_file){
+          PLUGIN_DEBUG("plugin_debug_to_file: true, using %s\n", plugin_file_log_name.c_str());
+        } else {
+          PLUGIN_DEBUG("plugin_debug_to_file: false\n");
+        } 
+        if (plugin_debug_to_streams){ 
+          PLUGIN_DEBUG("plugin_debug_to_streams: true\n");
+        } else {
+          PLUGIN_DEBUG("plugin_debug_to_streams: false\n"); 
+        } 
+        if (plugin_debug_to_system){
+          PLUGIN_DEBUG("plugin_debug_to_system: true\n"); 
+        } else {
+          PLUGIN_DEBUG("plugin_debug_to_system: false\n");
+        } 
+        if (plugin_debug_to_console){ 
+          if (debug_pipe_name){
+            PLUGIN_DEBUG("plugin_debug_to_console: true, pipe %s\n", debug_pipe_name);
+          } else {
+            PLUGIN_DEBUG("plugin_debug_to_console: true, pipe not yet known or broken\n");
+          }
+        } else {
+          PLUGIN_DEBUG("plugin_debug_to_console: false\n"); 
+        } 
+      } 
+    } 
 
 
 std::string IcedTeaPluginUtilities::getTmpPath(){

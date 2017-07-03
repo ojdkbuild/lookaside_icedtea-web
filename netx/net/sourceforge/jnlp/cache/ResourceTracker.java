@@ -25,9 +25,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
+import java.net.InetAddress;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
+import java.net.UnknownHostException;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.ArrayList;
@@ -46,21 +48,23 @@ import net.sourceforge.jnlp.event.DownloadEvent;
 import net.sourceforge.jnlp.event.DownloadListener;
 import net.sourceforge.jnlp.runtime.JNLPRuntime;
 import net.sourceforge.jnlp.util.HttpUtils;
+import net.sourceforge.jnlp.util.logging.OutputController;
 import net.sourceforge.jnlp.util.UrlUtils;
 import net.sourceforge.jnlp.util.WeakList;
 
 /**
  * This class tracks the downloading of various resources of a
- * JNLP file to local files in the cache.  It can be used to
+ * JNLP file to local files in the cache. It can be used to
  * download icons, jnlp and extension files, jars, and jardiff
  * files using the version based protocol or any file using the
  * basic download protocol (jardiff and version not implemented
- * yet).<p>
- *
+ * yet).
+ * <p>
  * The resource tracker can be configured to prefetch resources,
  * which are downloaded in the order added to the media
- * tracker.<p>
- *
+ * tracker.
+ * </p>
+ * <p>
  * Multiple threads are used to download and cache resources that
  * are actively being waited for (blocking a caller) or those that
  * have been started downloading by calling the startDownload
@@ -68,7 +72,8 @@ import net.sourceforge.jnlp.util.WeakList;
  * time and only if no other trackers have requested downloads.
  * This allows the tracker to start downloading many items without
  * using many system resources, but still quickly download items
- * as needed.<p>
+ * as needed.
+ * </p>
  *
  * @author <a href="mailto:jmaxwell@users.sourceforge.net">Jon A. Maxwell (JAM)</a> - initial author
  * @version $Revision: 1.22 $
@@ -183,8 +188,8 @@ public class ResourceTracker {
         try {
             location = UrlUtils.normalizeUrl(location);
         } catch (Exception ex) {
-            System.err.println("Normalization of " + location.toString() + " have failed");
-            ex.printStackTrace();
+            OutputController.getLogger().log(OutputController.Level.ERROR_ALL, "Normalization of " + location.toString() + " have failed");
+            OutputController.getLogger().log(ex);
         }
         Resource resource = Resource.getResource(location, version, updatePolicy);
         boolean downloaded = false;
@@ -237,7 +242,7 @@ public class ResourceTracker {
 
     /**
      * Check the cache for a resource, and initialize the resource
-     * as already downloaded if found. <p>
+     * as already downloaded if found.
      *
      * @param updatePolicy whether to check for updates if already in cache
      * @return whether the resource are already downloaded
@@ -258,8 +263,7 @@ public class ResourceTracker {
             CacheEntry entry = new CacheEntry(resource.location, resource.downloadVersion);
 
             if (entry.isCached() && !updatePolicy.shouldUpdate(entry)) {
-                if (JNLPRuntime.isDebug())
-                    System.out.println("not updating: " + resource.location);
+                OutputController.getLogger().log("not updating: " + resource.location);
 
                 synchronized (resource) {
                     resource.localFile = CacheUtil.getCacheFile(resource.location, resource.downloadVersion);
@@ -285,7 +289,7 @@ public class ResourceTracker {
 
     /**
      * Adds the listener to the list of objects interested in
-     * receivind DownloadEvents.<p>
+     * receivind DownloadEvents.
      *
      * @param listener the listener to add.
      */
@@ -339,10 +343,11 @@ public class ResourceTracker {
     /**
      * Returns a URL pointing to the cached location of the
      * resource, or the resource itself if it is a non-cacheable
-     * resource.<p>
-     *
+     * resource.
+     * <p>
      * If the resource has not downloaded yet, the method will block
-     * until it has been transferred to the cache.<p>
+     * until it has been transferred to the cache.
+     * </p>
      *
      * @param location the resource location
      * @return the resource, or null if it could not be downloaded
@@ -356,8 +361,7 @@ public class ResourceTracker {
                 // TODO: Should be toURI().toURL()
                 return f.toURL();
         } catch (MalformedURLException ex) {
-            if (JNLPRuntime.isDebug())
-                ex.printStackTrace();
+            OutputController.getLogger().log(ex);
         }
 
         return location;
@@ -366,10 +370,11 @@ public class ResourceTracker {
     /**
      * Returns a file containing the downloaded resource.  If the
      * resource is non-cacheable then null is returned unless the
-     * resource is a local file (the original file is returned).<p>
-     *
+     * resource is a local file (the original file is returned).
+     * <p>
      * If the resource has not downloaded yet, the method will block
-     * until it has been transferred to the cache.<p>
+     * until it has been transferred to the cache.
+     * </p>
      *
      * @param location the resource location
      * @return a local file containing the resource, or null
@@ -390,45 +395,28 @@ public class ResourceTracker {
 
             if (location.getProtocol().equalsIgnoreCase("file")) {
                 File file = UrlUtils.decodeUrlAsFile(location);
-                if (file.exists())
+                if (file.exists()) {
                     return file;
+                }
+                // try plain, not decoded file now
+                // sometimes the jnlp app developers are encoding for us
+                // so we end up encoding already encoded file. See RH1154177
+                file = new File(location.getPath());
+                if (file.exists()) {
+                    return file;
+                }
+                // have it sense to try also filename with whole query here?
+                // => location.getFile() ?
             }
 
             return null;
         } catch (InterruptedException ex) {
-            if (JNLPRuntime.isDebug())
-                ex.printStackTrace();
-
+            OutputController.getLogger().log(ex);
             return null; // need an error exception to throw
         }
     }
 
-    /**
-     * Returns an input stream that reads the contents of the
-     * resource.  For non-cacheable resources, an InputStream that
-     * reads from the source location is returned.  Otherwise the
-     * InputStream reads the cached resource.<p>
-     *
-     * This method will block while the resource is downloaded to
-     * the cache.
-     *
-     * @throws IOException if there was an error opening the stream
-     * @throws IllegalResourceDescriptorException if the resource is not being tracked
-     */
-    public InputStream getInputStream(URL location) throws IOException {
-        try {
-            Resource resource = getResource(location);
-            if (!resource.isSet(DOWNLOADED | ERROR))
-                waitForResource(location, 0);
 
-            if (resource.localFile != null)
-                return new FileInputStream(resource.localFile);
-
-            return resource.location.openStream();
-        } catch (InterruptedException ex) {
-            throw new IOException("wait was interrupted");
-        }
-    }
 
     /**
      * Wait for a group of resources to be downloaded and made
@@ -553,9 +541,10 @@ public class ResourceTracker {
 
     /**
      * Start a new download thread if there are not too many threads
-     * already running.<p>
-     *
+     * already running.
+     * <p>
      * Calls to this method should be synchronized on lock.
+     * </p>
      */
     protected void startThread() {
         if (threads < maxThreads) {
@@ -567,9 +556,10 @@ public class ResourceTracker {
     }
 
     /**
-     * A thread is ending, called by the thread itself.<p>
-     *
+     * A thread is ending, called by the thread itself.
+     * <p>
      * Calls to this method should be synchronized.
+     * </p>
      */
     private void endThread() {
         threads--;
@@ -664,11 +654,8 @@ public class ResourceTracker {
 
             String contentEncoding = con.getContentEncoding();
 
-            if (JNLPRuntime.isDebug()) {
-                System.err.println("Downloading" + resource.location + " using " +
+            OutputController.getLogger().log(OutputController.Level.ERROR_DEBUG, "Downloading" + resource.location + " using " +
                         realLocation + " (encoding : " + contentEncoding + ")");
-
-            }
 
             boolean packgz = "pack200-gzip".equals(contentEncoding) ||
                                 realLocation.getPath().endsWith(".pack.gz");
@@ -759,9 +746,7 @@ public class ResourceTracker {
             }
             resource.fireDownloadEvent(); // fire DOWNLOADED
         } catch (Exception ex) {
-            if (JNLPRuntime.isDebug())
-                ex.printStackTrace();
-
+            OutputController.getLogger().log(ex);
             resource.changeStatus(0, ERROR);
             synchronized (lock) {
                 lock.notifyAll(); // wake up wait's to check for completion
@@ -777,6 +762,10 @@ public class ResourceTracker {
      * fields.
      */
     private void initializeResource(Resource resource) {
+        //verify connection
+        if(!JNLPRuntime.isOfflineForced()){
+            JNLPRuntime.detectOnline(resource.getLocation()/*or doenloadLocation*/);
+        }
         resource.fireDownloadEvent(); // fire CONNECTING
 
         CacheEntry entry = new CacheEntry(resource.location, resource.requestVersion);
@@ -784,31 +773,41 @@ public class ResourceTracker {
 
         try {
             File localFile = CacheUtil.getCacheFile(resource.location, resource.downloadVersion);
-
-            // connect
-            URL finalLocation = findBestUrl(resource);
-
-            if (finalLocation == null) {
-                System.err.println("Attempted to download " + resource.location + ", but failed to connect!");
-                throw new NullPointerException("finalLocation == null"); // Caught below
+            long size = 0;
+            boolean current = true;
+            //this can be null, as it is always filled in online mode, and never read in offline mode
+            URLConnection connection = null;
+            if (localFile != null) {
+                size = localFile.length();
+            } else if (!JNLPRuntime.isOnline()) {
+                OutputController.getLogger().log(OutputController.Level.ERROR_ALL, "You are trying to get resource " + resource.getLocation().toExternalForm() + " but you are in offline mode, and it is not in cache. Attempting to continue, but you may expect failure");
             }
+            if (JNLPRuntime.isOnline()) {
+                // connect
+                URL finalLocation = findBestUrl(resource);
 
-            resource.setDownloadLocation(finalLocation);
-            URLConnection connection = finalLocation.openConnection(); // this won't change so should be okay unsynchronized
-            connection.addRequestProperty("Accept-Encoding", "pack200-gzip, gzip");
+                if (finalLocation == null) {
+                    OutputController.getLogger().log(OutputController.Level.ERROR_ALL, "Attempted to download " + resource.location + ", but failed to connect!");
+                    throw new NullPointerException("finalLocation == null"); // Caught below
+                }
 
-            int size = connection.getContentLength();
-            boolean current = CacheUtil.isCurrent(resource.location, resource.requestVersion, connection) && resource.getUpdatePolicy() != UpdatePolicy.FORCE;
-            if (!current) {
-                if (entry.isCached()) {
-                    entry.markForDelete();
-                    entry.store();
-                    // Old entry will still exist. (but removed at cleanup)
-                    localFile = CacheUtil.makeNewCacheFile(resource.location, resource.downloadVersion);
-                    CacheEntry newEntry = new CacheEntry(resource.location, resource.requestVersion);
-                    newEntry.lock();
-                    entry.unlock();
-                    entry = newEntry;
+                resource.setDownloadLocation(finalLocation);
+                connection = finalLocation.openConnection(); // this won't change so should be okay unsynchronized
+                connection.addRequestProperty("Accept-Encoding", "pack200-gzip, gzip");
+
+                size = connection.getContentLength();
+                current = CacheUtil.isCurrent(resource.location, resource.requestVersion, connection) && resource.getUpdatePolicy() != UpdatePolicy.FORCE;
+                if (!current) {
+                    if (entry.isCached()) {
+                        entry.markForDelete();
+                        entry.store();
+                        // Old entry will still exist. (but removed at cleanup)
+                        localFile = CacheUtil.makeNewCacheFile(resource.location, resource.downloadVersion);
+                        CacheEntry newEntry = new CacheEntry(resource.location, resource.requestVersion);
+                        newEntry.lock();
+                        entry.unlock();
+                        entry = newEntry;
+                    }
                 }
             }
 
@@ -824,7 +823,7 @@ public class ResourceTracker {
             }
 
             // update cache entry
-            if (!current)
+            if (!current && JNLPRuntime.isOnline())
                 entry.initialize(connection);
 
             entry.setLastUpdated(System.currentTimeMillis());
@@ -839,9 +838,7 @@ public class ResourceTracker {
             if (connection instanceof HttpURLConnection)
                 ((HttpURLConnection) connection).disconnect();
         } catch (Exception ex) {
-            if (JNLPRuntime.isDebug())
-                ex.printStackTrace();
-
+            OutputController.getLogger().log(ex);
             resource.changeStatus(0, ERROR);
             synchronized (lock) {
                 lock.notifyAll(); // wake up wait's to check for completion
@@ -852,21 +849,55 @@ public class ResourceTracker {
         }
     }
     /**
-     * Connects to the given URL, and grabs a response code if the URL uses
-     * the HTTP protocol, or returns an arbitrary valid HTTP response code.
-     * 
-     * @return the response code if HTTP connection, or HttpURLConnection.HTTP_OK if not.
+     * testing wrapper
+     *
+     * @param url
+     * @param requestProperties
+     * @param requestMethod
+     * @return
      * @throws IOException
      */
-     static int getUrlResponseCode(URL url, Map<String, String> requestProperties, String requestMethod) throws IOException {
+    static int getUrlResponseCode(URL url, Map<String, String> requestProperties, String requestMethod) throws IOException {
+        return getUrlResponseCodeWithRedirectonResult(url, requestProperties, requestMethod).result;
+    }
+
+    private static class CodeWithRedirect {
+
+        int result = HttpURLConnection.HTTP_OK;
+        URL URL;
+
+        public boolean shouldRedirect() {
+            return (result == 301
+                    || result == 302
+                    || result == 303/*?*/
+                    || result == 307
+                    || result == 308);
+        }
+
+        public boolean isInvalid() {
+            return (result < 200 || result >= 300);
+        }
+    }
+
+    /**
+     * Connects to the given URL, and grabs a response code and redirecton if
+     * the URL uses the HTTP protocol, or returns an arbitrary valid HTTP
+     * response code.
+     *
+     * @return the response code if HTTP connection and redirection value, or
+     * HttpURLConnection.HTTP_OK and null if not.
+     * @throws IOException
+     */
+    static CodeWithRedirect getUrlResponseCodeWithRedirectonResult(URL url, Map<String, String> requestProperties, String requestMethod) throws IOException {
+        CodeWithRedirect result = new CodeWithRedirect();
         URLConnection connection = url.openConnection();
 
-        for (Map.Entry<String, String> property : requestProperties.entrySet()){
+        for (Map.Entry<String, String> property : requestProperties.entrySet()) {
             connection.addRequestProperty(property.getKey(), property.getValue());
         }
 
         if (connection instanceof HttpURLConnection) {
-            HttpURLConnection httpConnection = (HttpURLConnection)connection;
+            HttpURLConnection httpConnection = (HttpURLConnection) connection;
             httpConnection.setRequestMethod(requestMethod);
 
             int responseCode = httpConnection.getResponseCode();
@@ -875,10 +906,24 @@ public class ResourceTracker {
              * See http://docs.oracle.com/javase/1.5.0/docs/guide/net/http-keepalive.html */
             HttpUtils.consumeAndCloseConnectionSilently(httpConnection);
 
-            return responseCode;
+            result.result = responseCode;
         }
 
-        return HttpURLConnection.HTTP_OK /* return a valid response code */;
+        Map<String, List<String>> header = connection.getHeaderFields();
+        for (Map.Entry<String, List<String>> entry : header.entrySet()) {
+            OutputController.getLogger().log("Key : " + entry.getKey() + " ,Value : " + entry.getValue());
+        }
+        /*
+         * Do this only on 301,302,303(?)307,308>
+         * Now setting value for all, and lets upper stack to handle it
+         */
+        String possibleRedirect = connection.getHeaderField("Location");
+        if (possibleRedirect != null && possibleRedirect.trim().length() > 0) {
+            result.URL = new URL(possibleRedirect);
+        }
+
+        return result;
+
     }
 
 
@@ -897,35 +942,37 @@ public class ResourceTracker {
         }
 
         List<URL> urls = new ResourceUrlCreator(resource, options).getUrls();
-        if (JNLPRuntime.isDebug()) {
-            System.err.println("All possible urls for " +
-                    resource.toString() + " : " + urls);
-        }
-
+         OutputController.getLogger().log(OutputController.Level.ERROR_DEBUG, "All possible urls for "
+                 + resource.toString() + " : " + urls);
+        
          for (String requestMethod : requestMethods) {
-             for (URL url : urls) {
+             for (int i = 0; i < urls.size(); i++) {
+                 URL url = urls.get(i);
                  try {
                      Map<String, String> requestProperties = new HashMap<String, String>();
                      requestProperties.put("Accept-Encoding", "pack200-gzip, gzip");
 
-                     int responseCode = getUrlResponseCode(url, requestProperties, requestMethod);
-
-                     if (responseCode < 200 || responseCode >= 300) {
-                         if (JNLPRuntime.isDebug()) {
-                             System.err.println("For "+resource.toString()+" the server returned " + responseCode + " code for "+requestMethod+" request for " + url.toExternalForm());
+                     CodeWithRedirect response = getUrlResponseCodeWithRedirectonResult(url, requestProperties, requestMethod);
+                     if (response.shouldRedirect()){
+                         if (response.URL == null) {
+                             OutputController.getLogger().log(OutputController.Level.ERROR_DEBUG, "Although " + resource.toString() + " got redirect " + response.result + " code for " + requestMethod + " request for " + url.toExternalForm() + " the target was null. Not following");
+                         } else {
+                             OutputController.getLogger().log(OutputController.Level.MESSAGE_DEBUG, "Resource " + resource.toString() + " got redirect " + response.result + " code for " + requestMethod + " request for " + url.toExternalForm() + " adding " + response.URL.toExternalForm()+" to list of possible urls");
+                             if (!JNLPRuntime.isAllowRedirect()){
+                                 throw new RedirectionException("The resource " + url.toExternalForm() + " is being redirected (" + response.result + ") to " + response.URL.toExternalForm() + ". This is disabled by default. If you wont to allow it, run javaws with -allowredirect parameter.");
+                             }
+                             urls.add(response.URL);
                          }
-                     }else {
-                         if (JNLPRuntime.isDebug()) {
-                             System.err.println("best url for " + resource.toString() + " is " + url.toString() + " by " + requestMethod);
-                         }
+                     } else if (response.isInvalid()) {
+                         OutputController.getLogger().log(OutputController.Level.ERROR_DEBUG, "For " + resource.toString() + " the server returned " + response.result + " code for " + requestMethod + " request for " + url.toExternalForm());
+                     } else {
+                         OutputController.getLogger().log(OutputController.Level.ERROR_DEBUG, "best url for " + resource.toString() + " is " + url.toString() + " by " + requestMethod);
                          return url; /* This is the best URL */
                      } 
                  } catch (IOException e) {
                      // continue to next candidate
-                     if (JNLPRuntime.isDebug()) {
-                         System.err.println("While processing " + url.toString() + " by " + requestMethod + " for resource " + resource.toString() + " got " + e + ": ");
-                         e.printStackTrace();
-                     }
+                     OutputController.getLogger().log(OutputController.Level.ERROR_DEBUG, "While processing " + url.toString() + " by " + requestMethod + " for resource " + resource.toString() + " got " + e + ": ");
+                     OutputController.getLogger().log(e);
                  }
              }
          }
@@ -935,16 +982,18 @@ public class ResourceTracker {
     }
 
     /**
-     * Pick the next resource to download or initialize.  If there
+     * Pick the next resource to download or initialize. If there
      * are no more resources requested then one is taken from a
-     * resource tracker with prefetch enabled.<p>
-     *
+     * resource tracker with prefetch enabled.
+     * <p>
      * The resource state is advanced before it is returned
-     * (CONNECT-&gt;CONNECTING).<p>
+     * (CONNECT-&gt;CONNECTING).
+     * </p>
+     * <p>
+     * Calls to this method should be synchronized on lock.
+     * </p>
      *
-     * Calls to this method should be synchronized on lock.<p>
-     *
-     * @return the resource to initialize or download, or null
+     * @return the resource to initialize or download, or {@code null}
      */
     private static Resource selectNextResource() {
         Resource result;
@@ -982,9 +1031,10 @@ public class ResourceTracker {
 
     /**
      * Returns the next resource to be prefetched before
-     * requested.<p>
-     *
-     * Calls to this method should be synchronized on lock.<p>
+     * requested.
+     * <p>
+     * Calls to this method should be synchronized on lock.
+     * </p>
      */
     private static Resource getPrefetch() {
         Resource result = null;
@@ -1030,10 +1080,11 @@ public class ResourceTracker {
 
     /**
      * Selects a resource from the source list that has the
-     * specified flag set.<p>
-     *
+     * specified flag set.
+     * <p>
      * Calls to this method should be synchronized on lock and
-     * source list.<p>
+     * source list.
+     * </p>
      */
     private static Resource selectByFlag(List<Resource> source, int flag,
                                          int notflag) {
@@ -1088,12 +1139,12 @@ public class ResourceTracker {
      * Wait for some resources.
      *
      * @param resources the resources to wait for
-     * @param timeout the timeout, or 0 to wait until completed
-     * @returns true if the resources were downloaded or had errors,
-     * false if the timeout was reached
+     * @param timeout the timeout, or {@code 0} to wait until completed
+     * @return {@code true} if the resources were downloaded or had errors,
+     * {@code false} if the timeout was reached
      * @throws InterruptedException if another thread interrupted the wait
      */
-    private boolean wait(Resource resources[], long timeout) throws InterruptedException {
+    private boolean wait(Resource[] resources, long timeout) throws InterruptedException {
         long startTime = System.currentTimeMillis();
 
         // start them downloading / connecting in background
@@ -1132,6 +1183,18 @@ public class ResourceTracker {
                 lock.wait(waitTime);
             }
         }
+    }
+
+    private static class RedirectionException extends RuntimeException {
+
+        public RedirectionException(String string) {
+            super(string);
+        }
+
+        public RedirectionException(Throwable cause) {
+            super(cause);
+        }
+        
     }
 
     // inner classes
@@ -1175,8 +1238,7 @@ public class ResourceTracker {
                     });
 
                 } catch (Exception ex) {
-                    if (JNLPRuntime.isDebug())
-                        ex.printStackTrace();
+                    OutputController.getLogger().log(ex);
                 }
             }
             // should have a finally in case some exception is thrown by

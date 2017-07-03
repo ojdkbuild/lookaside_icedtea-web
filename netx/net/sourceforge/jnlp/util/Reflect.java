@@ -17,21 +17,24 @@
 package net.sourceforge.jnlp.util;
 
 import java.lang.reflect.Method;
+import net.sourceforge.jnlp.util.logging.OutputController;
 
 
 /**
  * Provides simply, convenient methods to invoke methods by
- * name.  This class is used to consolidate reflection needed to
+ * name. This class is used to consolidate reflection needed to
  * access methods specific to Sun's JVM or to remain backward
- * compatible while supporting method in newer JVMs.<p>
- *
+ * compatible while supporting method in newer JVMs.
+ * <p>
  * Most methods of this class invoke the first method on the
  * specified object that matches the name and number of
- * parameters.  The type of the parameters are not considered, so
+ * parameters. The type of the parameters are not considered, so
  * do not attempt to use this class to invoke overloaded
- * methods.<p>
- *
- * Instances of this class are not synchronized.<p>
+ * methods.
+ * </p>
+ * <p>
+ * Instances of this class are not synchronized.
+ * </p>
  *
  * @author <a href="mailto:jon.maxwell@acm.org">Jon A. Maxwell (JAM)</a> - initial author
  * @version $Revision: 1.1 $
@@ -110,7 +113,7 @@ public class Reflect {
 
             return m.invoke(object, args);
         } catch (Exception ex) { // eat
-            ex.printStackTrace();
+            OutputController.getLogger().log(OutputController.Level.ERROR_ALL, ex);
             return null;
         }
     }
@@ -135,7 +138,7 @@ public class Reflect {
                 }
             }
         } catch (Exception ex) { // eat
-            ex.printStackTrace();
+            OutputController.getLogger().log(OutputController.Level.ERROR_ALL, ex);
         }
 
         return null;

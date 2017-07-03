@@ -156,6 +156,10 @@ public class PluginParameters {
         return Integer.valueOf(heightStr);
     }
 
+    public String getPermissions() {
+        return get("permissions");
+    }
+
     public void updateSize(int width, int height) {
         parameters.put("width", Integer.toString(width));
         parameters.put("height", Integer.toString(height));
@@ -192,8 +196,7 @@ public class PluginParameters {
      * Creates the underlying hash table with the proper overrides. Ensure all
      * keys are lowercase consistently.
      * 
-     * @param params
-     *            the properties, before parameter aliasing rules.
+     * @param rawParams the properties, before parameter aliasing rules.
      * @return the resulting parameter table
      */
     static Hashtable<String, String> createParameterTable(

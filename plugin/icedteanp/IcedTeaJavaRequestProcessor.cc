@@ -751,36 +751,27 @@ JavaResultData*
 JavaRequestProcessor::getMethodID(std::string classID, NPIdentifier methodName,
                                   std::vector<std::string> args)
 {
-	JavaRequestProcessor* java_request;
-	std::string message = std::string();
-    std::string* signature;
-
-    signature = new std::string();
-    *signature += "(";
+	std::string message, signature = "(";
 
     // FIXME: Need to determine how to extract array types and complex java objects
     for (int i=0; i < args.size(); i++)
     {
-    	*signature += args[i];
+    	signature += args[i];
     }
 
-    *signature += ")";
+    signature += ")";
 
 	this->instance = 0; // context is always 0 (needed for java-side backwards compat.)
 	this->reference = IcedTeaPluginUtilities::getReference();
 
 	IcedTeaPluginUtilities::constructMessagePrefix(0, reference, &message);
-	message += " GetMethodID ";
-	message += classID;
-	message += " ";
-	message += browser_functions.utf8fromidentifier(methodName);
-	message += " ";
-	message += *signature;
+	message += " GetMethodID " + classID + " ";
+	message += IcedTeaPluginUtilities::NPIdentifierAsString(methodName) + " ";
+	message += signature;
 
 	postAndWaitForResponse(message);
 
 	IcedTeaPluginUtilities::releaseReference();
-	delete signature;
 
 	return result;
 }
@@ -789,36 +780,27 @@ JavaResultData*
 JavaRequestProcessor::getStaticMethodID(std::string classID, NPIdentifier methodName,
                                   std::vector<std::string> args)
 {
-    JavaRequestProcessor* java_request;
-    std::string message = std::string();
-    std::string* signature;
-
-    signature = new std::string();
-    *signature += "(";
+    std::string message, signature = "(";
 
     // FIXME: Need to determine how to extract array types and complex java objects
     for (int i=0; i < args.size(); i++)
     {
-        *signature += args[i];
+        signature += args[i];
     }
 
-    *signature += ")";
+    signature += ")";
 
     this->instance = 0; // context is always 0 (needed for java-side backwards compat.)
     this->reference = IcedTeaPluginUtilities::getReference();
 
     IcedTeaPluginUtilities::constructMessagePrefix(0, reference, &message);
-    message += " GetStaticMethodID ";
-    message += classID;
-    message += " ";
-    message += browser_functions.utf8fromidentifier(methodName);
-    message += " ";
-    message += *signature;
+    message += " GetStaticMethodID " + classID + " ";
+    message += IcedTeaPluginUtilities::NPIdentifierAsString(methodName) + " ";
+    message += signature;
 
     postAndWaitForResponse(message);
 
     IcedTeaPluginUtilities::releaseReference();
-    delete signature;
 
     return result;
 }
@@ -1297,7 +1279,6 @@ JavaRequestProcessor::hasPackage(int plugin_instance_id,
 {
 	JavaResultData* java_result;
 	JavaRequestProcessor* java_request = new JavaRequestProcessor();
-	std::string message = std::string();
 	std::string plugin_instance_id_str = std::string();
 	IcedTeaPluginUtilities::itoa(plugin_instance_id, &plugin_instance_id_str);
 
@@ -1306,11 +1287,9 @@ JavaRequestProcessor::hasPackage(int plugin_instance_id,
 	this->instance = 0; // context is always 0 (needed for java-side backwards compat.)
 	this->reference = IcedTeaPluginUtilities::getReference();
 
+	std::string message;
 	IcedTeaPluginUtilities::constructMessagePrefix(0, reference, &message);
-	message.append(" HasPackage ");
-    message.append(plugin_instance_id_str);
-    message.append(" ");
-	message.append(java_result->return_string->c_str());
+	message += " HasPackage " + plugin_instance_id_str + " " + *java_result->return_string;
 
 	postAndWaitForResponse(message);
 

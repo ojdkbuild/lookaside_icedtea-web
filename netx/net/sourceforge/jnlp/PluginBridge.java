@@ -26,18 +26,20 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URL;
 import java.net.MalformedURLException;
-import java.util.HashSet;
-import java.util.Locale;
-import java.util.List;
+import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
-import sun.misc.BASE64Decoder;
-
+import net.sourceforge.jnlp.SecurityDesc.RequestedPermissionLevel;
 import net.sourceforge.jnlp.runtime.JNLPRuntime;
+import net.sourceforge.jnlp.util.logging.OutputController;
+import net.sourceforge.jnlp.util.replacements.BASE64Decoder;
 
 /**
  * Allows reuse of code that expects a JNLPFile object,
@@ -47,6 +49,7 @@ public class PluginBridge extends JNLPFile {
 
     private PluginParameters params;
     private Set<String> jars = new HashSet<String>();
+    private List<ExtensionDesc> extensionJars = new ArrayList<ExtensionDesc>();
     //Folders can be added to the code-base through the archive tag
     private List<String> codeBaseFolders = new ArrayList<String>();
     private String[] cacheJars = new String[0];
@@ -90,20 +93,25 @@ public class PluginBridge extends JNLPFile {
         this.codeBase = codebase;
         this.sourceLocation = documentBase;
         this.params = params;
+        this.parserSettings = ParserSettings.getGlobalParserSettings();
 
         if (params.getJNLPHref() != null) {
             useJNLPHref = true;
             try {
                 // Use codeBase as the context for the URL. If jnlp_href's
                 // value is a complete URL, it will replace codeBase's context.
+                ParserSettings defaultSettings = new ParserSettings();
                 URL jnlp = new URL(codeBase, params.getJNLPHref());
+                if (fileLocation == null){
+                    fileLocation = jnlp;
+                }
                 JNLPFile jnlpFile = null;
 
                 if (params.getJNLPEmbedded() != null) {
                     InputStream jnlpInputStream = new ByteArrayInputStream(decodeBase64String(params.getJNLPEmbedded()));
-                    jnlpFile = new JNLPFile(jnlpInputStream, codeBase, false);
+                    jnlpFile = new JNLPFile(jnlpInputStream, codeBase, defaultSettings);
                 } else {
-                    jnlpFile = jnlpCreator.create(jnlp, null, false, JNLPRuntime.getDefaultUpdatePolicy(), codeBase);
+                    jnlpFile = jnlpCreator.create(jnlp, null, defaultSettings, JNLPRuntime.getDefaultUpdatePolicy(), codeBase);
                 }
 
                 if (jnlpFile.isApplet())
@@ -121,10 +129,13 @@ public class PluginBridge extends JNLPFile {
                      String fileName = jarDesc.getLocation().toExternalForm();
                      this.jars.add(fileName);
                  }
+
+                // Store any extensions listed in the JNLP file to be returned later on, namely in getResources()
+                extensionJars = Arrays.asList(jnlpFile.getResources().getExtensions());
             } catch (MalformedURLException e) {
                 // Don't fail because we cannot get the jnlp file. Parameters are optional not required.
                 // it is the site developer who should ensure that file exist.
-                System.err.println("Unable to get JNLP file at: " + params.getJNLPHref()
+                OutputController.getLogger().log(OutputController.Level.ERROR_ALL, "Unable to get JNLP file at: " + params.getJNLPHref()
                         + " with context of URL as: " + codeBase.toExternalForm());
             }
         } else {
@@ -168,10 +179,8 @@ public class PluginBridge extends JNLPFile {
 
             addArchiveEntries(archives);
 
-            if (JNLPRuntime.isDebug()) {
-                System.err.println("Jar string: " + archive);
-                System.err.println("jars length: " + archives.length);
-            }
+            OutputController.getLogger().log(OutputController.Level.ERROR_DEBUG, "Jar string: " + archive);
+            OutputController.getLogger().log(OutputController.Level.ERROR_DEBUG, "jars length: " + archives.length);
         }
 
         if (main.endsWith(".class"))
@@ -216,6 +225,22 @@ public class PluginBridge extends JNLPFile {
 
     public boolean useJNLPHref() {
         return useJNLPHref;
+    }
+
+    @Override
+    public RequestedPermissionLevel getRequestedPermissionLevel() {
+        final String level = params.getPermissions();
+        if (level == null) {
+            return RequestedPermissionLevel.NONE;
+        } else if (level.equals(SecurityDesc.RequestedPermissionLevel.DEFAULT.toHtmlString())) {
+            return RequestedPermissionLevel.NONE;
+        } else if (level.equals(SecurityDesc.RequestedPermissionLevel.SANDBOX.toHtmlString())) {
+            return RequestedPermissionLevel.SANDBOX;
+        } else if (level.equals(SecurityDesc.RequestedPermissionLevel.ALL.toHtmlString())) {
+            return RequestedPermissionLevel.ALL;
+        } else {
+            return RequestedPermissionLevel.NONE;
+        }
     }
 
     /**
@@ -318,6 +343,11 @@ public class PluginBridge extends JNLPFile {
                         return result;
                     } catch (MalformedURLException ex) { /* Ignored */
                     }
+                } else if (launchType.equals(ExtensionDesc.class)) {
+                    // We hope this is a safe list of JarDesc objects
+                    @SuppressWarnings("unchecked")
+                    List<T> castList = (List<T>) extensionJars; // this list is populated when the PluginBridge is first constructed
+                    return castList;
                 }
                 return sharedResources.getResources(launchType);
             }

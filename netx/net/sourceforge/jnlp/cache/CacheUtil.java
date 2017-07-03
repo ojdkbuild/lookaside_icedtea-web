@@ -48,12 +48,13 @@ import net.sourceforge.jnlp.config.DeploymentConfiguration;
 import net.sourceforge.jnlp.runtime.ApplicationInstance;
 import net.sourceforge.jnlp.runtime.JNLPRuntime;
 import net.sourceforge.jnlp.util.FileUtils;
+import net.sourceforge.jnlp.util.logging.OutputController;
 import net.sourceforge.jnlp.util.PropertiesFile;
 import net.sourceforge.jnlp.util.UrlUtils;
 
 /**
  * Provides static methods to interact with the cache, download
- * indicator, and other utility methods.<p>
+ * indicator, and other utility methods.
  *
  * @author <a href="mailto:jmaxwell@users.sourceforge.net">Jon A. Maxwell (JAM)</a> - initial author
  * @version $Revision: 1.17 $
@@ -67,7 +68,7 @@ public class CacheUtil {
 
     /**
      * Compares a URL using string compare of its protocol, host,
-     * port, path, query, and anchor.  This method avoids the host
+     * port, path, query, and anchor. This method avoids the host
      * name lookup that URL.equals does for http: protocol URLs.
      * It may not return the same value as the URL.equals method
      * (different hostnames that resolve to the same IP address,
@@ -110,12 +111,12 @@ public class CacheUtil {
     }
     /**
      * Caches a resource and returns a URL for it in the cache;
-     * blocks until resource is cached.  If the resource location is
+     * blocks until resource is cached. If the resource location is
      * not cacheable (points to a local file, etc) then the original
-     * URL is returned.<p>
+     * URL is returned.
      *
      * @param location location of the resource
-     * @param version the version, or null
+     * @param version the version, or {@code null}
      * @return either the location in the cache or the original location
      */
     public static URL getCachedResource(URL location, Version version, UpdatePolicy policy) {
@@ -131,7 +132,7 @@ public class CacheUtil {
     }
 
     /**
-     * Compare strings that can be null.
+     * Compare strings that can be {@code null}.
      */
     private static boolean compare(String s1, String s2, boolean ignore) {
         if (s1 == s2)
@@ -147,7 +148,7 @@ public class CacheUtil {
 
     /**
      * Returns the Permission object necessary to access the
-     * resource, or null if no permission is needed.
+     * resource, or {@code null} if no permission is needed.
      */
     public static Permission getReadPermission(URL location, Version version) {
         if (CacheUtil.isCacheable(location, version)) {
@@ -160,8 +161,7 @@ public class CacheUtil {
                 return location.openConnection().getPermission();
             } catch (java.io.IOException ioe) {
                 // should try to figure out the permission
-                if (JNLPRuntime.isDebug())
-                    ioe.printStackTrace();
+                OutputController.getLogger().log(ioe);
             }
         }
 
@@ -178,7 +178,7 @@ public class CacheUtil {
     public static boolean clearCache() {
 
         if (!okToClearCache()) {
-            System.err.println(R("CCannotClearCache"));
+            OutputController.getLogger().log(OutputController.Level.ERROR_ALL, R("CCannotClearCache"));
             return false;
         }
 
@@ -187,14 +187,18 @@ public class CacheUtil {
             return false;
         }
 
-        if (JNLPRuntime.isDebug()) {
-            System.err.println("Clearing cache directory: " + cacheDir);
-        }
+        OutputController.getLogger().log(OutputController.Level.ERROR_DEBUG, "Clearing cache directory: " + cacheDir);
+        lruHandler.lock();
         try {
             cacheDir = cacheDir.getCanonicalFile();
             FileUtils.recursiveDelete(cacheDir, cacheDir);
+            cacheDir.mkdir();
+            lruHandler.clearLRUSortedEntries();
+            lruHandler.store();
         } catch (IOException e) {
             throw new RuntimeException(e);
+        } finally {
+            lruHandler.unlock();
         }
         return true;
     }
@@ -204,33 +208,35 @@ public class CacheUtil {
      * @return true if the cache can be cleared at this time without problems
      */
     private static boolean okToClearCache() {
-        File otherJavawsRunning = new File(JNLPRuntime.getConfiguration()
-                .getProperty(DeploymentConfiguration.KEY_USER_NETX_RUNNING_FILE));
+        File otherJavawsRunning = new File(JNLPRuntime.getConfiguration().getProperty(DeploymentConfiguration.KEY_USER_NETX_RUNNING_FILE));
+        FileLock locking = null;
         try {
             if (otherJavawsRunning.isFile()) {
                 FileOutputStream fis = new FileOutputStream(otherJavawsRunning);
                 
                 FileChannel channel = fis.getChannel();
-                if (channel.tryLock() == null) {
-                    if (JNLPRuntime.isDebug()) {
-                        System.out.println("Other instances of netx are running");
-                    }
+                locking  = channel.tryLock();
+                if (locking == null) {
+                    OutputController.getLogger().log("Other instances of netx are running");
                     return false;
                 }
-
-                if (JNLPRuntime.isDebug()) {
-                    System.out.println("No other instances of netx are running");
-                }
+                OutputController.getLogger().log("No other instances of netx are running");
                 return true;
 
             } else {
-                if (JNLPRuntime.isDebug()) {
-                    System.out.println("No instance file found");
-                }
+                OutputController.getLogger().log("No instance file found");
                 return true;
             }
         } catch (IOException e) {
             return false;
+        } finally {
+            if (locking != null) {
+                try {
+                    locking.release();
+                } catch (IOException ex) {
+                    OutputController.getLogger().log(ex);
+                }
+            }
         }
     }
 
@@ -239,9 +245,9 @@ public class CacheUtil {
      * cache and it is up to date.  This method may not return
      * immediately.
      *
-     * @param source the source URL
+     * @param source the source {@link URL}
      * @param version the versions to check for
-     * @param connection a connection to the URL, or null
+     * @param connection a connection to the {@link URL}, or {@code null}
      * @return whether the cache contains the version
      * @throws IllegalArgumentException if the source is not cacheable
      */
@@ -259,14 +265,11 @@ public class CacheUtil {
             CacheEntry entry = new CacheEntry(source, version); // could pool this
             boolean result = entry.isCurrent(connection);
 
-            if (JNLPRuntime.isDebug())
-                System.out.println("isCurrent: " + source + " = " + result);
+            OutputController.getLogger().log("isCurrent: " + source + " = " + result);
 
             return result;
         } catch (Exception ex) {
-            if (JNLPRuntime.isDebug())
-                ex.printStackTrace();
-
+            OutputController.getLogger().log(ex);
             return isCached(source, version); // if can't connect return whether already in cache
         }
     }
@@ -287,8 +290,7 @@ public class CacheUtil {
         CacheEntry entry = new CacheEntry(source, version); // could pool this
         boolean result = entry.isCached();
 
-        if (JNLPRuntime.isDebug())
-            System.out.println("isCached: " + source + " = " + result);
+        OutputController.getLogger().log("isCached: " + source + " = " + result);
 
         return result;
     }
@@ -317,9 +319,9 @@ public class CacheUtil {
      * not download the resource.  The latest version of the
      * resource that matches the specified version will be returned.
      *
-     * @param source the source URL
+     * @param source the source {@link URL}
      * @param version the version id of the local file
-     * @return the file location in the cache, or null if no versions cached
+     * @return the file location in the cache, or {@code null} if no versions cached
      * @throws IllegalArgumentException if the source is not cacheable
      */
     public static File getCacheFile(URL source, Version version) {
@@ -349,7 +351,7 @@ public class CacheUtil {
      * This will return a File pointing to the location of cache item.
      * 
      * @param urlPath Path of cache item within cache directory.
-     * @return File if we have searched before, null otherwise.
+     * @return File if we have searched before, {@code null} otherwise.
      */
     private static File getCacheFileIfExist(File urlPath) {
         synchronized (lruHandler) {
@@ -381,7 +383,7 @@ public class CacheUtil {
 
     /**
      * Returns the parent directory of the cached resource.
-     * @param path The path of the cached resource directory.
+     * @param filePath The path of the cached resource directory.
      */
     public static String getCacheParentDirectory(String filePath) {
         String path = filePath;
@@ -425,7 +427,7 @@ public class CacheUtil {
                         FileUtils.createRestrictedFile(pf, true); // Create the info file for marking later.
                         lruHandler.addEntry(lruHandler.generateKey(cacheFile.getPath()), cacheFile.getPath());
                     } catch (IOException ioe) {
-                        ioe.printStackTrace();
+                       OutputController.getLogger().log(ioe);
                     }
 
                     break;
@@ -568,8 +570,7 @@ public class CacheUtil {
                                   100);
             }
         } catch (InterruptedException ex) {
-            if (JNLPRuntime.isDebug())
-                ex.printStackTrace();
+            OutputController.getLogger().log(ex);
         } finally {
             if (listener != null)
                 indicator.disposeListener(listener);
@@ -644,7 +645,7 @@ public class CacheUtil {
                         try {
                             FileUtils.recursiveDelete(f, f);
                         } catch (IOException e1) {
-                            e1.printStackTrace();
+                            OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e1);
                         }
                     }
 
@@ -685,7 +686,7 @@ public class CacheUtil {
             propertiesLockPool.put(storeFilePath, FileUtils.getFileLock(storeFilePath, false, true));
         } catch (OverlappingFileLockException e) {
         } catch (FileNotFoundException e) {
-            e.printStackTrace();
+           OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e);
         }
     }
 
@@ -704,7 +705,7 @@ public class CacheUtil {
             fl.channel().close();
             propertiesLockPool.remove(storeFile.getPath());
         } catch (IOException e) {
-            e.printStackTrace();
+            OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e);
         }
     }
 }

@@ -58,6 +58,8 @@ import javax.net.ssl.X509TrustManager;
 
 import net.sourceforge.jnlp.runtime.JNLPRuntime;
 import net.sourceforge.jnlp.security.SecurityDialogs.AccessType;
+import net.sourceforge.jnlp.security.SecurityDialogs.AppletAction;
+import net.sourceforge.jnlp.util.logging.OutputController;
 import sun.security.util.HostnameChecker;
 import sun.security.validator.ValidatorException;
 
@@ -110,7 +112,7 @@ final public class VariableX509TrustManager {
                 }
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e);
         }
 
         /*
@@ -135,7 +137,7 @@ final public class VariableX509TrustManager {
                 }
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e);
         }
 
         /*
@@ -159,7 +161,7 @@ final public class VariableX509TrustManager {
                 }
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e);
         }
     }
 
@@ -199,7 +201,7 @@ final public class VariableX509TrustManager {
      * @param authType The auth type algorithm
      * @param hostName The expected hostName that the server should have
      * @param socket The SSLSocket in use (may be null)
-     * @param ending The SSLEngine in use (may be null)
+     * @param engine The SSLEngine in use (may be null)
      */
     public synchronized void checkTrustServer(X509Certificate[] chain,
                              String authType, String hostName,
@@ -328,7 +330,7 @@ final public class VariableX509TrustManager {
         // finally check temp trusted certs
         if (!temporarilyTrusted.contains(chain[0])) {
             if (savedException == null) {
-                // System.out.println("IMPOSSIBLE!");
+                // OutputController.getLogger().log(OutputController.Level.MESSAGE_ALL, "IMPOSSIBLE!");
                 throw new ValidatorException(ValidatorException.T_SIGNATURE_ERROR, chain[0]);
             }
             throw savedException;
@@ -416,7 +418,6 @@ final public class VariableX509TrustManager {
         if (JNLPRuntime.isTrustAll()){
             return true;
         }
-        final VariableX509TrustManager trustManager = this;
         return AccessController.doPrivileged(new PrivilegedAction<Boolean>() {
             @Override
             public Boolean run() {
@@ -424,7 +425,7 @@ final public class VariableX509TrustManager {
                         AccessType.UNVERIFIED, null,
                         new HttpsCertVerifier(chain, authType,
                                               isTrusted, hostMatched,
-                                              hostName));
+                                hostName), null) == AppletAction.RUN;
             }
         });
     }

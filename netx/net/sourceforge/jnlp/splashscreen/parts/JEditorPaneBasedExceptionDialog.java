@@ -40,8 +40,6 @@ import java.awt.Toolkit;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.StringSelection;
 import java.awt.event.WindowEvent;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.text.DateFormat;
 import java.util.Date;
 import java.util.List;
@@ -63,7 +61,10 @@ import javax.swing.WindowConstants;
 import javax.swing.event.HyperlinkEvent;
 import javax.swing.event.HyperlinkListener;
 import net.sourceforge.jnlp.LaunchException;
+import net.sourceforge.jnlp.about.AboutDialog;
 import net.sourceforge.jnlp.runtime.Translator;
+import net.sourceforge.jnlp.util.BasicExceptionDialog;
+import net.sourceforge.jnlp.util.logging.OutputController;
 
 public class JEditorPaneBasedExceptionDialog extends JDialog implements HyperlinkListener {
 
@@ -71,6 +72,9 @@ public class JEditorPaneBasedExceptionDialog extends JDialog implements Hyperlin
     private JButton closeButton;
     private JButton closeAndCopyButton;
     private JButton homeButton;
+    private JButton aboutButton;
+    private JButton consoleButton;
+    private JButton cacheButton;
     private JEditorPane htmlErrorAndHelpPanel;
     private JLabel exceptionLabel;
     private JLabel iconLabel;
@@ -105,7 +109,7 @@ public class JEditorPaneBasedExceptionDialog extends JDialog implements Hyperlin
             Icon icon = new ImageIcon(this.getClass().getResource("/net/sourceforge/jnlp/resources/warning.png"));
             iconLabel.setIcon(icon);
         } catch (Exception lex) {
-            lex.printStackTrace();
+            OutputController.getLogger().log(OutputController.Level.ERROR_ALL, lex);
         }
         htmlErrorAndHelpPanel.addHyperlinkListener(this);
         homeButton.setVisible(false);
@@ -138,6 +142,9 @@ public class JEditorPaneBasedExceptionDialog extends JDialog implements Hyperlin
         htmlPaneScroller = new JScrollPane();
         htmlErrorAndHelpPanel = new JEditorPane();
         homeButton = new JButton();
+        aboutButton = new JButton();
+        consoleButton = BasicExceptionDialog.getShowButton(JEditorPaneBasedExceptionDialog.this);
+        cacheButton = BasicExceptionDialog.getClearCacheButton(JEditorPaneBasedExceptionDialog.this);
 
         setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
 
@@ -162,9 +169,30 @@ public class JEditorPaneBasedExceptionDialog extends JDialog implements Hyperlin
         GroupLayout jPanel2Layout = new GroupLayout(topPanel);
         topPanel.setLayout(jPanel2Layout);
         jPanel2Layout.setHorizontalGroup(
-                jPanel2Layout.createParallelGroup(GroupLayout.Alignment.LEADING).addGroup(jPanel2Layout.createSequentialGroup().addContainerGap().addComponent(closeButton).addPreferredGap(LayoutStyle.ComponentPlacement.RELATED, 314, Short.MAX_VALUE).addComponent(closeAndCopyButton).addContainerGap()));
+                jPanel2Layout.createParallelGroup(GroupLayout.Alignment.LEADING)
+                    .addGroup(jPanel2Layout.createSequentialGroup()
+                        .addContainerGap()
+                        .addComponent(closeButton)
+                        .addContainerGap()
+                        .addComponent(aboutButton)
+                        .addContainerGap()
+                        .addComponent(cacheButton)
+                        .addContainerGap()
+                        .addComponent(consoleButton)
+                        .addPreferredGap(LayoutStyle.ComponentPlacement.RELATED, 314, Short.MAX_VALUE)
+                        .addComponent(closeAndCopyButton)
+                        .addContainerGap()));
         jPanel2Layout.setVerticalGroup(
-                jPanel2Layout.createParallelGroup(GroupLayout.Alignment.LEADING).addGroup(GroupLayout.Alignment.TRAILING, jPanel2Layout.createSequentialGroup().addContainerGap(24, Short.MAX_VALUE).addGroup(jPanel2Layout.createParallelGroup(GroupLayout.Alignment.BASELINE).addComponent(closeButton).addComponent(closeAndCopyButton)).addContainerGap()));
+                jPanel2Layout.createParallelGroup(GroupLayout.Alignment.LEADING)
+                    .addGroup(GroupLayout.Alignment.TRAILING, jPanel2Layout.createSequentialGroup()
+                        .addContainerGap(24, Short.MAX_VALUE)
+                    .addGroup(jPanel2Layout.createParallelGroup(GroupLayout.Alignment.BASELINE)
+                        .addComponent(closeButton)
+                        .addComponent(aboutButton)
+                        .addComponent(cacheButton)
+                        .addComponent(consoleButton)
+                        .addComponent(closeAndCopyButton))
+                    .addContainerGap()));
 
         exceptionLabel.setFont(new java.awt.Font("Dialog", 1, 18)); // NOI18N
         exceptionLabel.setHorizontalAlignment(SwingConstants.CENTER);
@@ -186,13 +214,28 @@ public class JEditorPaneBasedExceptionDialog extends JDialog implements Hyperlin
             }
         });
 
+
+        aboutButton.setText(Translator.R("AboutDialogueTabAbout"));
+        aboutButton.addActionListener(new java.awt.event.ActionListener() {
+
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                try{
+               AboutDialog.display(true);
+            }catch(Exception ex){
+                OutputController.getLogger().log(OutputController.Level.ERROR_ALL, ex);
+                JOptionPane.showConfirmDialog(JEditorPaneBasedExceptionDialog.this, ex);
+            }
+            }
+        });
+        
         GroupLayout jPanel1Layout = new GroupLayout(mainPanel);
         mainPanel.setLayout(jPanel1Layout);
         jPanel1Layout.setHorizontalGroup(
                 jPanel1Layout.createParallelGroup(GroupLayout.Alignment.LEADING).addGroup(jPanel1Layout.createSequentialGroup().addContainerGap().addComponent(iconLabel, GroupLayout.PREFERRED_SIZE, 71, GroupLayout.PREFERRED_SIZE).addPreferredGap(LayoutStyle.ComponentPlacement.UNRELATED).addComponent(exceptionLabel, GroupLayout.DEFAULT_SIZE, 503, Short.MAX_VALUE).addPreferredGap(LayoutStyle.ComponentPlacement.RELATED).addComponent(homeButton, GroupLayout.PREFERRED_SIZE, 101, GroupLayout.PREFERRED_SIZE).addContainerGap()).addComponent(bottomPanel, GroupLayout.Alignment.TRAILING, GroupLayout.DEFAULT_SIZE, 723, Short.MAX_VALUE));
         jPanel1Layout.setVerticalGroup(
                 jPanel1Layout.createParallelGroup(GroupLayout.Alignment.LEADING).addGroup(jPanel1Layout.createSequentialGroup().addContainerGap().addGroup(jPanel1Layout.createParallelGroup(GroupLayout.Alignment.LEADING).addComponent(iconLabel, GroupLayout.PREFERRED_SIZE, 70, GroupLayout.PREFERRED_SIZE).addGroup(jPanel1Layout.createParallelGroup(GroupLayout.Alignment.BASELINE).addComponent(exceptionLabel, GroupLayout.PREFERRED_SIZE, 70, GroupLayout.PREFERRED_SIZE).addComponent(homeButton, GroupLayout.PREFERRED_SIZE, 64, GroupLayout.PREFERRED_SIZE))).addPreferredGap(LayoutStyle.ComponentPlacement.UNRELATED).addComponent(bottomPanel, GroupLayout.DEFAULT_SIZE, 158, Short.MAX_VALUE)));
-
+                
         GroupLayout layout = new GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
@@ -210,8 +253,8 @@ public class JEditorPaneBasedExceptionDialog extends JDialog implements Hyperlin
                 Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
                 clipboard.setContents(data, data);
             } catch (Exception ex) {
+                OutputController.getLogger().log(OutputController.Level.ERROR_ALL, ex);
                 JOptionPane.showMessageDialog(this, Translator.R(InfoItem.SPLASH + "cantCopyEx"));
-                ex.printStackTrace();
             }
         } else {
             JOptionPane.showMessageDialog(this, Translator.R(InfoItem.SPLASH + "noExRecorded"));
@@ -252,6 +295,9 @@ public class JEditorPaneBasedExceptionDialog extends JDialog implements Hyperlin
         StringBuilder s = new StringBuilder("<html><body>");
         String info = "<p>"
                 + Translator.R(InfoItem.SPLASH + "mainL1", createLink())
+                + " </p> \n" +
+                "<p>"
+                + Translator.R(InfoItem.SPLASH + "mainL2", createLink())
                 + " </p> \n";
         String t = "<p>"
                 + Translator.R(InfoItem.SPLASH + "mainL3")
@@ -265,7 +311,7 @@ public class JEditorPaneBasedExceptionDialog extends JDialog implements Hyperlin
                     + Translator.R(InfoItem.SPLASH + "mainL4")
                     + " </p>\n"
                     + info + formatListInfoList(l) + formatInfo(anotherInfo)
-                    +"<br>"+DateFormat.getInstance().format(shown)+"<br>"
+                    +"<br/>"+DateFormat.getInstance().format(shown)+"<br/>"
                     + "<p>"
                     + Translator.R(InfoItem.SPLASH + "exWas")
                     + " <br/>\n" + "<pre>" + getExceptionStackTraceAsString(ex) + "</pre>"
@@ -284,18 +330,14 @@ public class JEditorPaneBasedExceptionDialog extends JDialog implements Hyperlin
         if (exception == null) {
             return "";
         }
-        StringWriter sw = new StringWriter();
-        exception.printStackTrace(new PrintWriter(sw));
-        return sw.toString();
+        return OutputController.exceptionToString(exception);
     }
 
     public static String[] getExceptionStackTraceAsStrings(Throwable exception) {
         if (exception == null) {
             return new String[0];
         }
-        StringWriter sw = new StringWriter();
-        exception.printStackTrace(new PrintWriter(sw));
-        return sw.toString().split("\n");
+        return OutputController.exceptionToString(exception).split("\n");
     }
 
     @Override
@@ -355,9 +397,9 @@ public class JEditorPaneBasedExceptionDialog extends JDialog implements Hyperlin
 
     String getMessage() {
         return message;
-   }
+    }
 
-   private static String createLink() {
+    private static String createLink() {
         return "<a href=\"" + Translator.R(InfoItem.SPLASH + "url") + "\">" +
                 Translator.R(InfoItem.SPLASH + "urlLooks") + "</a>";
     }

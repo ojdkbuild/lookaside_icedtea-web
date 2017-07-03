@@ -19,12 +19,10 @@ package net.sourceforge.jnlp;
 import static net.sourceforge.jnlp.runtime.Translator.R;
 
 import java.applet.Applet;
+import java.applet.AppletStub;
 import java.awt.Container;
-import java.awt.EventQueue;
 import java.awt.SplashScreen;
-import java.awt.Toolkit;
 import java.io.File;
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.InetAddress;
 import java.net.URL;
@@ -47,18 +45,19 @@ import net.sourceforge.jnlp.services.ServiceUtil;
 import javax.swing.SwingUtilities;
 import javax.swing.text.html.parser.ParserDelegator;
 import net.sourceforge.jnlp.splashscreen.SplashUtils;
+import net.sourceforge.jnlp.util.logging.OutputController;
 
-import sun.awt.AppContext;
 import sun.awt.SunToolkit;
 
 /**
- * Launches JNLPFiles either in the foreground or background.<p>
- *
+ * Launches JNLPFiles either in the foreground or background.
+ * <p>
  * An optional LaunchHandler can be specified that is notified of
  * warning and error condition while launching and that indicates
  * whether a launch may proceed after a warning has occurred.  If
  * specified, the LaunchHandler is notified regardless of whether
- * the file is launched in the foreground or background.<p>
+ * the file is launched in the foreground or background.
+ * </p>
  *
  * @author <a href="mailto:jmaxwell@users.sourceforge.net">Jon A. Maxwell (JAM)</a> - initial author
  * @version $Revision: 1.22 $
@@ -79,7 +78,7 @@ public class Launcher {
     /** whether to create an AppContext (if possible) */
     private boolean context = true;
 
-    /** If the application should call System.exit on fatal errors */
+    /** If the application should call JNLPRuntime.exit on fatal errors */
     private boolean exitOnFailure = true;
 
     private ParserSettings parserSettings = new ParserSettings();
@@ -228,16 +227,10 @@ public class Launcher {
         //First checks whether offline-allowed tag is specified inside the jnlp
         //file.
         if (!file.getInformation().isOfflineAllowed()) {
-            try {
-                //Checks the offline/online status of the system.
-                //If system is offline do not launch.
-                InetAddress.getByName(file.getSourceLocation().getHost());
-
-            } catch (UnknownHostException ue) {
-                System.err.println("File cannot be launched because offline-allowed tag not specified and system currently offline.");
+            //offline status should be already known from jnlp downloading
+            if (!JNLPRuntime.isOnlineDetected()) {
+                OutputController.getLogger().log(OutputController.Level.ERROR_ALL, "File cannot be launched because offline-allowed tag not specified and system currently offline.");
                 return null;
-            } catch (Exception e) {
-                System.err.println(e);
             }
         }
 
@@ -282,6 +275,7 @@ public class Launcher {
      * @return the application instance
      */
     public ApplicationInstance launch(URL location) throws LaunchException {
+        JNLPRuntime.saveHistory(location.toExternalForm());
         return launch(fromUrl(location));
     }
 
@@ -321,18 +315,12 @@ public class Launcher {
      */
     private void addProperties(JNLPFile file, String[] props) throws LaunchException {
         ResourcesDesc resources = file.getResources();
-
-        for (int i = 0; i < props.length; i++) {
-            // allows empty property, not sure about validity of that.
-            int equals = props[i].indexOf("=");
-            if (equals == -1) {
-                throw launchError(new LaunchException(R("BBadProp", props[i])));
+        for (String prop : props) {
+            try{
+                resources.addResource(PropertyDesc.fromString(prop, R("BBadProp", prop)));
+            }catch (LaunchException ex){
+                throw launchError(ex);
             }
-
-            String key = props[i].substring(0, equals);
-            String value = props[i].substring(equals + 1, props[i].length());
-
-            resources.addResource(new PropertyDesc(key, value));
         }
     }
 
@@ -454,10 +442,9 @@ public class Launcher {
     /**
      * Returns the JNLPFile for the URL, with error handling.
      */
-
     private JNLPFile fromUrl(URL location) throws LaunchException {
         try {
-            JNLPFile file = new JNLPFile(location, parserSettings.isStrict());
+            JNLPFile file = new JNLPFile(location, parserSettings);
             
             boolean isLocal = false;
             boolean haveHref = false;
@@ -467,9 +454,25 @@ public class Launcher {
             if (file.getSourceLocation() != null) {
                 haveHref = true;
             }
+            if (!isLocal && haveHref){
+                //this is case when remote file have href to different file
+                if (!location.equals(file.getSourceLocation())){
+                    //mark local true, so the folowing condition will be true and 
+                    //new jnlp file will be downlaoded
+                    isLocal = true;
+                    //maybe this check is to strict, and will force redownlaod to often
+                    //another check can be just on jnlp name. But it will not work
+                    //if the href will be the file of same name, but on diferent path (or even domain)
+                }
+            }
 
             if (isLocal && haveHref) {
-                file = new JNLPFile(file.getSourceLocation(), parserSettings.isStrict());
+                JNLPFile fileFromHref = new JNLPFile(file.getSourceLocation(), parserSettings);
+                if (fileFromHref.getCodeBase() == null) {
+                    fileFromHref.codeBase = file.getCodeBase();
+                }
+                file = fileFromHref;
+
             }
             return file;
         } catch (Exception ex) {
@@ -481,7 +484,6 @@ public class Launcher {
             }
         }
     }
- 
 
    /**
      * Launches a JNLP application.  This method should be called
@@ -497,9 +499,7 @@ public class Launcher {
             try {
                 ServiceUtil.checkExistingSingleInstance(file);
             } catch (InstanceExistsException e) {
-                if (JNLPRuntime.isDebug()) {
-                    System.out.println("Single instance application is already running.");
-                }
+                OutputController.getLogger().log("Single instance application is already running.");
                 return null;
             }
 
@@ -560,9 +560,7 @@ public class Launcher {
 
             main.setAccessible(true);
 
-            if (JNLPRuntime.isDebug()) {
-                System.out.println("Invoking main() with args: " + Arrays.toString(args));
-            }
+            OutputController.getLogger().log("Invoking main() with args: " + Arrays.toString(args));
             main.invoke(null, new Object[] { args });
 
             return app;
@@ -596,9 +594,7 @@ public class Launcher {
 
         for (Thread thread : threads) {
             if (thread != null) {
-                if (JNLPRuntime.isDebug()) {
-                    System.err.println("Setting " + classLoader + " as the classloader for thread " + thread.getName());
-                }
+                OutputController.getLogger().log(OutputController.Level.ERROR_DEBUG, "Setting " + classLoader + " as the classloader for thread " + thread.getName());
                 thread.setContextClassLoader(classLoader);
             }
         }
@@ -607,15 +603,16 @@ public class Launcher {
 
     /**
      * Launches a JNLP applet. This method should be called from a
-     * thread in the application's thread group.<p>
-     *
+     * thread in the application's thread group.
+     * <p>
      * The enableCodeBase parameter adds the applet's codebase to
      * the locations searched for resources and classes.  This can
      * slow down the applet loading but allows browser-style applets
      * that don't use JAR files exclusively to be run from a applet
      * JNLP file.  If the applet JNLP file does not specify any
      * resources then the code base will be enabled regardless of
-     * the specified value.<p>
+     * the specified value.
+     * </p>
      *
      * @param file the JNLP file
      * @param enableCodeBase whether to add the codebase URL to the classloader
@@ -645,9 +642,7 @@ public class Launcher {
             applet.getAppletEnvironment().startApplet(); // this should be a direct call to applet instance
             return applet;
         } catch (InstanceExistsException ieex) {
-            if (JNLPRuntime.isDebug()) {
-                System.out.println("Single instance applet is already running.");
-            }
+            OutputController.getLogger().log("Single instance applet is already running.");
             throw launchError(new LaunchException(file, ieex, R("LSFatal"), R("LCLaunching"), R("LCouldNotLaunch"), R("LSingleInstanceExists")), applet);
         } catch (LaunchException lex) {
             throw launchError(lex, applet);
@@ -675,9 +670,7 @@ public class Launcher {
             return applet;
 
         } catch (InstanceExistsException ieex) {
-            if (JNLPRuntime.isDebug()) {
-                System.out.println("Single instance applet is already running.");
-            }
+            OutputController.getLogger().log("Single instance applet is already running.");
             throw launchError(new LaunchException(file, ieex, R("LSFatal"), R("LCLaunching"), R("LCouldNotLaunch"), R("LSingleInstanceExists")), applet);
         } catch (LaunchException lex) {
             throw launchError(lex, applet);
@@ -708,8 +701,7 @@ public class Launcher {
     protected  AppletInstance createApplet(JNLPFile file, boolean enableCodeBase, Container cont) throws LaunchException {
          AppletInstance appletInstance = null;
          try {
-            JNLPClassLoader loader = JNLPClassLoader.getInstance(file, updatePolicy);
-            forceContextClassLoaderHack(loader);
+            JNLPClassLoader loader = JNLPClassLoader.getInstance(file, updatePolicy, enableCodeBase);
 
             if (enableCodeBase) {
                 loader.enableCodeBase();
@@ -735,6 +727,7 @@ public class Launcher {
             String appletName = file.getApplet().getMainClass();
             Class<?> appletClass = loader.loadClass(appletName);
             Applet applet = (Applet) appletClass.newInstance();
+            applet.setStub((AppletStub)cont);
             // Finish setting up appletInstance.
             appletInstance.setApplet(applet);
             appletInstance.getAppletEnvironment().setApplet(applet);
@@ -755,8 +748,7 @@ public class Launcher {
      */
     protected Applet createAppletObject(JNLPFile file, boolean enableCodeBase, Container cont) throws LaunchException {
         try {
-            JNLPClassLoader loader = JNLPClassLoader.getInstance(file, updatePolicy);
-            forceContextClassLoaderHack(loader);
+            JNLPClassLoader loader = JNLPClassLoader.getInstance(file, updatePolicy, enableCodeBase);
 
             if (enableCodeBase) {
                 loader.enableCodeBase();
@@ -779,8 +771,7 @@ public class Launcher {
      */
     protected ApplicationInstance createApplication(JNLPFile file) throws LaunchException {
         try {
-            JNLPClassLoader loader = JNLPClassLoader.getInstance(file, updatePolicy);
-            forceContextClassLoaderHack(loader);
+            JNLPClassLoader loader = JNLPClassLoader.getInstance(file, updatePolicy, false);
             ThreadGroup group = Thread.currentThread().getThreadGroup();
 
             ApplicationInstance app = new ApplicationInstance(file, group, loader);
@@ -864,26 +855,6 @@ public class Launcher {
         new ParserDelegator();
     }
 
-    /*
-     * This is necessary to ensure the AppContext context-classloader is correctly set to our JNLPClassLoader.
-     * This is unfortunately necessary until it is possible to create a JNLPClassLoader -before- we create our AppContext.
-     */
-    private void forceContextClassLoaderHack(ClassLoader classLoader) {
-        try {
-            Field appContextClassLoaderField = AppContext.class.getDeclaredField("contextClassLoader");
-            appContextClassLoaderField.setAccessible(true);
-            appContextClassLoaderField.set(AppContext.getAppContext(), classLoader);
-
-            Field eventQueueClassLoaderField = EventQueue.class.getDeclaredField("classLoader");
-            eventQueueClassLoaderField.setAccessible(true);
-            eventQueueClassLoaderField.set(Toolkit.getDefaultToolkit().getSystemEventQueue(), classLoader);
-
-        } catch (Exception e) {
-            System.err.println("Problem occurred while setting the AppContext context-classloader using reflection:");
-            e.printStackTrace();
-        }
-    }
-
        /**
      * This runnable is used to call the appropriate launch method
      * for the application, applet, or installer in its thread group.
@@ -945,12 +916,15 @@ public class Launcher {
                     }
                 }
             } catch (LaunchException ex) {
-                ex.printStackTrace();
+                OutputController.getLogger().log(OutputController.Level.ERROR_ALL, ex);
                 exception = ex;
                 // Exit if we can't launch the application.
                 if (exitOnFailure) {
-                    System.exit(1);
+                    JNLPRuntime.exit(1);
                 }
+            }  catch (Throwable ex) {
+                OutputController.getLogger().log(OutputController.Level.ERROR_ALL, ex);
+                throw new RuntimeException(ex);
             }
         }
 
@@ -963,7 +937,5 @@ public class Launcher {
         }
 
     };
-
- 
 
 }

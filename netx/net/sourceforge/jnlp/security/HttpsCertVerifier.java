@@ -52,6 +52,7 @@ import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import net.sourceforge.jnlp.util.logging.OutputController;
 
 import sun.security.util.DerValue;
 import sun.security.util.HostnameChecker;
@@ -76,6 +77,7 @@ public class HttpsCertVerifier implements CertVerifier {
         this.hostMatched = hostMatched;
     }
 
+    @Override
     public boolean getAlreadyTrustPublisher() {
         return isTrusted;
     }
@@ -98,7 +100,7 @@ public class HttpsCertVerifier implements CertVerifier {
         try {
             certPaths.add(CertificateFactory.getInstance("X.509").generateCertPath(list));
         } catch (CertificateException ce) {
-            ce.printStackTrace();
+            OutputController.getLogger().log(OutputController.Level.ERROR_ALL, ce);
 
             // carry on
         }
@@ -187,9 +189,9 @@ public class HttpsCertVerifier implements CertVerifier {
                 names = names.substring(2); // remove proceeding ", "
 
         } catch (CertificateParsingException cpe) {
-            cpe.printStackTrace();
+            OutputController.getLogger().log(OutputController.Level.ERROR_ALL, cpe);
         } catch (IOException ioe) {
-            ioe.printStackTrace();
+            OutputController.getLogger().log(OutputController.Level.ERROR_ALL, ioe);
         }
 
         return names;

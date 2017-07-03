@@ -403,6 +403,31 @@ then
 fi
 ])
 
+AC_DEFUN_ONCE([IT_CHECK_FOR_TAGSOUP],
+[
+  AC_MSG_CHECKING([for tagsoup])
+  AC_ARG_WITH([tagsoup],
+             [AS_HELP_STRING([--with-tagsoup],
+                             [tagsoup.jar])],
+             [
+                TAGSOUP_JAR=${withval}
+             ],
+             [
+                TAGSOUP_JAR=
+             ])
+  if test -z "${TAGSOUP_JAR}"; then
+    for dir in /usr/share/java /usr/local/share/java ; do
+      if test -f $dir/tagsoup.jar; then
+        TAGSOUP_JAR=$dir/tagsoup.jar
+	    break
+      fi
+    done
+  fi
+  AC_MSG_RESULT(${TAGSOUP_JAR})
+  AC_SUBST(TAGSOUP_JAR)
+  AM_CONDITIONAL([HAVE_TAGSOUP], [test x$TAGSOUP_JAR != xno -a x$TAGSOUP_JAR != x ])
+])
+
 dnl Generic macro to check for a Java class
 dnl Takes the name of the class as an argument.  The macro name
 dnl is usually the name of the class with '.'
@@ -495,23 +520,44 @@ AC_DEFUN_ONCE([IT_CHECK_GLIB_VERSION],[
    PKG_CHECK_MODULES([GLIB2_V_216],[glib-2.0 >= 2.16],[],[AC_DEFINE([LEGACY_GLIB])])
  ])
 
-AC_DEFUN_ONCE([IT_CHECK_XULRUNNER_API_VERSION],
+AC_DEFUN_ONCE([IT_CHECK_XULRUNNER_MIMEDESCRIPTION_CONSTCHAR],
 [
   AC_MSG_CHECKING([for legacy xulrunner api])
   AC_LANG_PUSH(C++)
-  CXXFLAGS_BACKUP=$CXXFLAGS
-  CXXFLAGS=$CXXFLAGS" "$MOZILLA_CFLAGS
-  AC_TRY_COMPILE([
-    #include <npfunctions.h>
-    const  char* NP_GetMIMEDescription ()
-    {return (char*) "yap!";}
-  ],[],[
+  CXXFLAGS_BACKUP="$CXXFLAGS"
+  CXXFLAGS="$CXXFLAGS"" ""$MOZILLA_CFLAGS"
+  AC_COMPILE_IFELSE([
+    AC_LANG_SOURCE([[#include <npfunctions.h>
+                     const  char* NP_GetMIMEDescription ()
+                       {return (char*) "yap!";}]])
+    ],[
     AC_MSG_RESULT(no)
-  ],[
+    ],[
     AC_MSG_RESULT(yes)
     AC_DEFINE([LEGACY_XULRUNNERAPI])
   ])
-  CXXFLAGS=$CXXFLAGS_BACKUP
+  CXXFLAGS="$CXXFLAGS_BACKUP"
+  AC_LANG_POP(C++)
+])
+
+AC_DEFUN_ONCE([IT_CHECK_XULRUNNER_REQUIRES_C11],
+[
+  AC_MSG_CHECKING([for xulrunner enforcing C++11 standard])
+  AC_LANG_PUSH(C++)
+  CXXFLAGS_BACKUP="$CXXFLAGS"
+  CXXFLAGS="$CXXFLAGS"" ""$MOZILLA_CFLAGS"
+  AC_COMPILE_IFELSE([
+    AC_LANG_SOURCE([[#include <npapi.h>
+                     #include <npruntime.h>
+                     void setnpptr (NPVariant *result)
+                       { VOID_TO_NPVARIANT(*result);}]])
+    ],[
+    AC_MSG_RESULT(no)
+    CXXFLAGS="$CXXFLAGS_BACKUP"
+    ],[
+    AC_MSG_RESULT(yes)
+    CXXFLAGS="$CXXFLAGS_BACKUP -std=c++11"
+  ])
   AC_LANG_POP(C++)
 ])
 
@@ -806,38 +852,29 @@ EOF
 dnl Checks that sun.applet.AppletViewerPanel is available
 dnl and public (via the patch in IcedTea6, applet_hole.patch)
 dnl Can be removed when that is upstream or unneeded
-AC_DEFUN([IT_CHECK_FOR_APPLETVIEWERPANEL_HOLE],[
+AC_DEFUN([IT_CHECK_FOR_SUN_APPLET_ACCESSIBILITY],[
 AC_REQUIRE([IT_FIND_JAVAC])
 AC_REQUIRE([IT_FIND_JAVA])
-AC_CACHE_CHECK([if sun.applet.AppletViewerPanel is available and public], it_cv_applet_hole, [
+AC_CACHE_CHECK([if selected classes, fields and methods from sun.applet are accessible via reflection], it_cv_applet_hole, [
 CLASS=TestAppletViewer.java
 BYTECODE=$(echo $CLASS|sed 's#\.java##')
 mkdir -p tmp.$$
 cd tmp.$$
 cat << \EOF > $CLASS
 [/* [#]line __oline__ "configure" */
-import java.lang.reflect.Modifier;
+import java.lang.reflect.*;
 
 public class TestAppletViewer
 {
-  public static void main(String[] args)
+  public static void main(String[] args) throws Exception
   {
-    try
-      {
-        Class<?> clazz = Class.forName("sun.applet.AppletViewerPanel");
-        if (Modifier.isPublic(clazz.getModifiers()))
-          {
-            System.err.println("Found public sun.applet.AppletViewerPanel");
-            System.exit(0);
-          }
-        System.err.println("Found non-public sun.applet.AppletViewerPanel");
-        System.exit(2);
-      }
-    catch (ClassNotFoundException e)
-      {
-        System.err.println("Could not find sun.applet.AppletViewerPanel");
-        System.exit(1);
-      }
+   Class<?> ap = Class.forName("sun.applet.AppletPanel");
+   Class<?> avp = Class.forName("sun.applet.AppletViewerPanel");
+   Field f1 = ap.getDeclaredField("applet");
+   Field f2 = avp.getDeclaredField("documentURL");
+   Method m1 = ap.getDeclaredMethod("run");
+   Method m2 = ap.getDeclaredMethod("runLoader");
+   Field f3 = avp.getDeclaredField("baseURL");
   }
 }
 ]
@@ -846,21 +883,17 @@ if $JAVAC -cp . $JAVACFLAGS -nowarn $CLASS >&AS_MESSAGE_LOG_FD 2>&1; then
   if $JAVA -classpath . $BYTECODE >&AS_MESSAGE_LOG_FD 2>&1; then
       it_cv_applet_hole=yes;
   else
-      it_cv_applet_hole=$?;
+      it_cv_applet_hole=no;
   fi
 else
-  it_cv_applet_hole=3;
+  it_cv_applet_hole=no;
 fi
 ])
 rm -f $CLASS *.class
 cd ..
 rmdir tmp.$$
-if test x"${it_cv_applet_hole}" = "x1"; then
-   AC_MSG_ERROR([sun.applet.AppletViewerPanel is not available.])
-elif test x"${it_cv_applet_hole}" = "x2"; then
-   AC_MSG_ERROR([sun.applet.AppletViewerPanel is not public.])
-elif test x"${it_cv_applet_hole}" = "x3"; then
-   AC_MSG_ERROR([Compilation failed.  See config.log.])
+if test x"${it_cv_applet_hole}" = "xno"; then
+   AC_MSG_ERROR([Some of the checked items is not avaiable. Check logs.])
 fi
 AC_PROVIDE([$0])dnl
 ])

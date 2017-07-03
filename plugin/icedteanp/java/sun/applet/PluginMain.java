@@ -75,6 +75,7 @@ import java.net.URL;
 import java.net.URLStreamHandler;
 import java.util.Enumeration;
 import java.util.Hashtable;
+import java.util.Map;
 import java.util.Properties;
 import sun.awt.AppContext;
 import sun.awt.SunToolkit;
@@ -82,14 +83,14 @@ import sun.awt.SunToolkit;
 import net.sourceforge.jnlp.config.DeploymentConfiguration;
 import net.sourceforge.jnlp.runtime.JNLPRuntime;
 import net.sourceforge.jnlp.security.JNLPAuthenticator;
+import net.sourceforge.jnlp.util.logging.JavaConsole;
+import net.sourceforge.jnlp.util.logging.LogConfig;
+import net.sourceforge.jnlp.util.logging.OutputController;
 
 /**
  * The main entry point into PluginAppletViewer.
  */
 public class PluginMain {
-    // the files where stdout/stderr are sent to
-    public static final String PLUGIN_STDERR_FILE = "java.stderr";
-    public static final String PLUGIN_STDOUT_FILE = "java.stdout";
 
     // This is used in init().  Getting rid of this is desirable but depends
     // on whether the property that uses it is necessary/standard.
@@ -109,8 +110,8 @@ public class PluginMain {
             // Place an arbitrary handler, we only need the URL construction to not error-out
             handlers.put("javascript", new sun.net.www.protocol.http.Handler());
         } catch (Exception e) {
-            System.err.println("Unable to install 'javascript:' URL protocol handler!");
-            e.printStackTrace();
+            OutputController.getLogger().log(OutputController.Level.ERROR_ALL, "Unable to install 'javascript:' URL protocol handler!");
+            OutputController.getLogger().log(e);
         }
     }
 
@@ -119,31 +120,36 @@ public class PluginMain {
      */
     public static void main(String args[])
             throws IOException {
+        //we are polite, we reprint start arguments
+        OutputController.getLogger().log("startup arguments: ");
+        for (int i = 0; i < args.length; i++) {
+            String string = args[i];
+            OutputController.getLogger().log(i + ": "+string);
+            
+        }
         if (AppContext.getAppContext() == null) {
             SunToolkit.createNewAppContext();
         }
         installDummyJavascriptProtocolHandler();
 
-        if (args.length != 2 || !(new File(args[0]).exists()) || !(new File(args[1]).exists())) {
-            System.err.println("Invalid pipe names provided. Refusing to proceed.");
-            System.exit(1);
+        if (args.length < 2 || !(new File(args[0]).exists()) || !(new File(args[1]).exists())) {
+            OutputController.getLogger().log(OutputController.Level.ERROR_ALL, "Invalid pipe names provided. Refusing to proceed.");
+            JNLPRuntime.exit(1);
         }
-
+        DeploymentConfiguration.move14AndOlderFilesTo15StructureCatched();
+        if (JavaConsole.isEnabled()) {
+            if ((args.length < 3) || !new File(args[2]).exists()) {
+                OutputController.getLogger().log(OutputController.Level.ERROR_ALL, "Warning, although console is on, plugin debug connection do not exists. No plugin information will be displayed in console (only java ones).");
+            } else {
+                JavaConsole.getConsole().createPluginReader(new File(args[2]));
+            }
+        }
         try {
             PluginStreamHandler streamHandler = connect(args[0], args[1]);
-            boolean redirectStreams = System.getenv().containsKey("ICEDTEAPLUGIN_DEBUG");
-
-            // must be called before JNLPRuntime.initialize()
-            JNLPRuntime.setRedirectStreams(redirectStreams);
 
             PluginAppletSecurityContext sc = new PluginAppletSecurityContext(0);
             sc.prePopulateLCClasses();
             PluginAppletSecurityContext.setStreamhandler(streamHandler);
-            //the properties are initialised during classlaoder creation
-            if (DeploymentConfiguration.CONSOLE_SHOW.equals(
-                JNLPRuntime.getConfiguration().getProperty(DeploymentConfiguration.KEY_CONSOLE_STARTUP_MODE))) {
-            PluginAppletSecurityContext.getStreamhandler().showConsole();
-        }
             AppletSecurityContextManager.addContext(0, sc);
 
             PluginAppletViewer.setStreamhandler(streamHandler);
@@ -155,11 +161,18 @@ public class PluginMain {
             streamHandler.startProcessing();
 
             setCookieHandler(streamHandler);
+            JavaConsole.getConsole().setClassLoaderInfoProvider(new JavaConsole.ClassLoaderInfoProvider() {
+
+                @Override
+                public Map<String, String> getLoaderInfo() {
+                    return PluginAppletSecurityContext.getLoaderInfo();
+                }
+            });
 
         } catch (Exception e) {
-            e.printStackTrace();
-            System.err.println("Something very bad happened. I don't know what to do, so I am going to exit :(");
-            System.exit(1);
+            OutputController.getLogger().log(e);
+            OutputController.getLogger().log(OutputController.Level.ERROR_ALL, "Something very bad happened. I don't know what to do, so I am going to exit :(");
+            JNLPRuntime.exit(1);
         }
     }
 
@@ -173,7 +186,7 @@ public class PluginMain {
             streamHandler = new PluginStreamHandler(new FileInputStream(inPipe), new FileOutputStream(outPipe));
             PluginDebug.debug("Streams initialized");
         } catch (IOException ioe) {
-            ioe.printStackTrace();
+            OutputController.getLogger().log(OutputController.Level.ERROR_ALL,ioe);
         }
         return streamHandler;
     }
@@ -236,7 +249,7 @@ public class PluginMain {
             Authenticator.setDefault(new JNLPAuthenticator());
         }
         // override the proxy selector set by JNLPRuntime
-        ProxySelector.setDefault(new PluginProxySelector());
+        ProxySelector.setDefault(new PluginProxySelector(JNLPRuntime.getConfiguration()));
     }
 
     private static void setCookieHandler(PluginStreamHandler streamHandler) {

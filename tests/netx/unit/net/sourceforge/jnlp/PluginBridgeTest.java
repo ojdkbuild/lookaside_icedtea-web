@@ -48,7 +48,8 @@ public class PluginBridgeTest {
             return JNLPHref;
         }
 
-        public JNLPFile create(URL location, Version version, boolean strict,
+        @Override
+        public JNLPFile create(URL location, Version version, ParserSettings settings,
                 UpdatePolicy policy, URL forceCodebase) throws IOException, ParseException {
             JNLPHref = location;
             return new MockJNLPFile();
@@ -105,6 +106,35 @@ public class PluginBridgeTest {
         PluginBridge pb = new PluginBridge(codeBase, null, "", "", 0, 0, params, mockCreator);
         assertEquals(desiredDomain + relativeLocation,
                 mockCreator.getJNLPHref().toExternalForm());
+    }
+    
+    @Test
+    public void testGetRequestedPermissionLevel() throws MalformedURLException, Exception {
+        String desiredDomain = "http://desired.absolute.codebase.com";
+        URL codeBase = new URL(desiredDomain + "/undesired/sub/dir");
+        String relativeLocation = "/app/test/test.jnlp";
+        PluginParameters params = createValidParamObject();
+        params.put("jnlp_href", relativeLocation);
+        MockJNLPCreator mockCreator = new MockJNLPCreator();
+        PluginBridge pb = new PluginBridge(codeBase, null, "", "", 0, 0, params, mockCreator);
+        assertEquals(pb.getRequestedPermissionLevel(), SecurityDesc.RequestedPermissionLevel.NONE);
+        
+        params.put(SecurityDesc.RequestedPermissionLevel.PERMISSIONS_NAME,SecurityDesc.RequestedPermissionLevel.ALL.toHtmlString());
+        pb = new PluginBridge(codeBase, null, "", "", 0, 0, params, mockCreator);
+        assertEquals(pb.getRequestedPermissionLevel(), SecurityDesc.RequestedPermissionLevel.ALL);
+        
+        //unknown for applets!
+        params.put(SecurityDesc.RequestedPermissionLevel.PERMISSIONS_NAME, SecurityDesc.RequestedPermissionLevel.J2EE.toJnlpString());
+        pb = new PluginBridge(codeBase, null, "", "", 0, 0, params, mockCreator);
+        assertEquals(pb.getRequestedPermissionLevel(), SecurityDesc.RequestedPermissionLevel.NONE);
+        
+        params.put(SecurityDesc.RequestedPermissionLevel.PERMISSIONS_NAME, SecurityDesc.RequestedPermissionLevel.SANDBOX.toHtmlString());
+        pb = new PluginBridge(codeBase, null, "", "", 0, 0, params, mockCreator);
+        assertEquals(pb.getRequestedPermissionLevel(), SecurityDesc.RequestedPermissionLevel.SANDBOX);
+        
+        params.put(SecurityDesc.RequestedPermissionLevel.PERMISSIONS_NAME, SecurityDesc.RequestedPermissionLevel.DEFAULT.toHtmlString());
+        pb = new PluginBridge(codeBase, null, "", "", 0, 0, params, mockCreator);
+        assertEquals(pb.getRequestedPermissionLevel(), SecurityDesc.RequestedPermissionLevel.NONE);
     }
 
     @Test
@@ -195,6 +225,8 @@ public class PluginBridgeTest {
     }
 
     @Test
+    //http://docs.oracle.com/javase/6/docs/technotes/guides/jweb/applet/codebase_determination.html
+    //example 3
     public void testEmbeddedJnlpWithInvalidCodebase() throws Exception {
         URL overwrittenCodebase = new URL("http://icedtea.classpath.org");
         String relativeLocation = "/EmbeddedJnlpFile.jnlp";

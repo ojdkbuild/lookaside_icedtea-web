@@ -42,6 +42,7 @@ import java.util.Map;
 
 import net.sourceforge.jnlp.JNLPFile;
 import net.sourceforge.jnlp.LaunchException;
+import net.sourceforge.jnlp.runtime.JNLPClassLoader.SecurityDelegate;
 import net.sourceforge.jnlp.tools.CertInformation;
 import net.sourceforge.jnlp.tools.JarCertVerifier;
 
@@ -77,7 +78,6 @@ public interface AppVerifier {
      * @param certs Any possible signer and their respective information regarding this app.
      * @param signedJars A map of all the jars of this app and the number of
      * signed entries each one has.
-     * @return
      */
     public boolean isFullySigned(Map<CertPath, CertInformation> certs,
             Map<String, Integer> signedJars);
@@ -86,6 +86,6 @@ public interface AppVerifier {
      * Prompt the user with requests for trusting the certificates used by this app
      * @throws LaunchException
      */
-    public void checkTrustWithUser(JarCertVerifier jcv, JNLPFile file)
+    public void checkTrustWithUser(SecurityDelegate securityDelegate, JarCertVerifier jcv, JNLPFile file)
             throws LaunchException;
 }
