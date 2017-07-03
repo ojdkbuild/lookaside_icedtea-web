@@ -399,7 +399,7 @@ IcedTeaPluginUtilities::getUTF16LEString(int length, int begin, std::vector<std:
 
 	wchar_t c;
 
-	if (plugin_debug) printf("Converted UTF-16LE string: ");
+	PLUGIN_DEBUG("Converted UTF-16LE string: ");
 
 	result_unicode_str->clear();
 	for (int i = begin; i < begin+length; i+=2)
@@ -413,14 +413,14 @@ IcedTeaPluginUtilities::getUTF16LEString(int length, int begin, std::vector<std:
         	(c >= 'A' && c <= 'Z') ||
         	(c >= '0' && c <= '9'))
         {
-        	if (plugin_debug) printf("%c", c);
+        	PLUGIN_DEBUG("%c", c);
         }
 
         result_unicode_str->push_back(c);
 	}
 
 	// not routing via debug print macros due to wide-string issues
-	if (plugin_debug) printf(". Length=%d\n", result_unicode_str->length());
+	PLUGIN_DEBUG(". Length=%d\n", result_unicode_str->length());
 }
 
 /*
@@ -1071,6 +1071,36 @@ bool IcedTeaPluginUtilities::file_exists(std::string filename)
 {
     std::ifstream infile(filename.c_str());
     return infile.good();
+}
+
+
+std::string IcedTeaPluginUtilities::getTmpPath(){
+  const char* tmpdir_env = getenv("TMPDIR");
+  if (tmpdir_env != NULL && g_file_test (tmpdir_env,
+                    (GFileTest) (G_FILE_TEST_EXISTS | G_FILE_TEST_IS_DIR)))
+  {
+    return std::string(tmpdir_env);
+  }
+  else if (g_file_test (P_tmpdir,
+                    (GFileTest) (G_FILE_TEST_EXISTS | G_FILE_TEST_IS_DIR)))
+  {
+    return std::string(P_tmpdir);
+  }
+  else
+  {
+    // If TMPDIR and P_tmpdir do not exist, try /tmp directly
+    return "/tmp";
+  }
+}
+
+std::string IcedTeaPluginUtilities::getRuntimePath(){
+ const char* rntdir_env = getenv("XDG_RUNTIME_DIR");
+  if (rntdir_env != NULL && g_file_test (rntdir_env,
+                    (GFileTest) (G_FILE_TEST_EXISTS | G_FILE_TEST_IS_DIR)))
+  {
+    return std::string(rntdir_env);
+  }
+  return IcedTeaPluginUtilities::getTmpPath();
 }
 
 

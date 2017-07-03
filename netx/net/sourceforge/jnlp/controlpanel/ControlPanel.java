@@ -123,7 +123,7 @@ public class ControlPanel extends JFrame {
     }
 
     private JPanel createTopPanel() {
-        Font currentFont = null;
+        Font currentFont;
         JLabel about = new JLabel(R("CPMainDescriptionShort"));
         currentFont = about.getFont();
         about.setFont(currentFont.deriveFont(currentFont.getSize2D() + 2));
@@ -263,7 +263,8 @@ public class ControlPanel extends JFrame {
                 // new SettingsPanel(Translator.R("CPTabRuntimes"), createRuntimesSettingsPanel()),
                 new SettingsPanel(Translator.R("CPTabSecurity"), createSecuritySettingsPanel()),
                 //todo refactor to work with tmp file and apply as asu designed it
-                new SettingsPanel(Translator.R("APPEXTSECControlPanelExtendedAppletSecurityTitle"), new UnsignedAppletsTrustingListPanel(DeploymentConfiguration.getAppletTrustGlobalSettingsPath(),DeploymentConfiguration.getAppletTrustUserSettingsPath(), this.config) )
+                new SettingsPanel(Translator.R("CPTabPolicy"), createPolicySettingsPanel()),
+                new SettingsPanel(Translator.R("APPEXTSECControlPanelExtendedAppletSecurityTitle"), new UnsignedAppletsTrustingListPanel(DeploymentConfiguration.getAppletTrustGlobalSettingsPath(), DeploymentConfiguration.getAppletTrustUserSettingsPath(), this.config))
         };
 
         // Add panels.
@@ -275,10 +276,12 @@ public class ControlPanel extends JFrame {
         for (SettingsPanel panel : panels) {
             JPanel p = panel.getPanel();
             Dimension d = p.getMinimumSize();
-            if (d.height > height)
+            if (d.height > height) {
                 height = d.height;
-            if (d.width > width)
+            }
+            if (d.width > width) {
                 width = d.width;
+            }
         }
         Dimension dim = new Dimension(width, height);
 
@@ -352,6 +355,10 @@ public class ControlPanel extends JFrame {
 
     private JPanel createSecuritySettingsPanel() {
         return new SecuritySettingsPanel(this.config);
+    }
+
+    private JPanel createPolicySettingsPanel() {
+        return new PolicyPanel(this, this.config);
     }
 
     private JPanel createJVMSettingsPanel() {

@@ -106,13 +106,14 @@ public class CertWarningPane extends SecurityDialogPanel {
         //these strings -- we just want to fill in as many as possible.
         try {
             if ((certVerifier instanceof HttpsCertVerifier) &&
-                             (c instanceof X509Certificate))
+                             (c instanceof X509Certificate)) {
                 name = SecurityUtil.getCN(((X509Certificate) c)
                                         .getSubjectX500Principal().getName());
-            else if (file instanceof PluginBridge)
+            } else if (file instanceof PluginBridge) {
                 name = file.getTitle();
-            else
+            } else {
                 name = file.getInformation().getTitle();
+            }
         } catch (Exception e) {
         }
 
@@ -125,10 +126,11 @@ public class CertWarningPane extends SecurityDialogPanel {
         }
 
         try {
-            if (file instanceof PluginBridge)
+            if (file instanceof PluginBridge) {
                 from = file.getCodeBase().getHost();
-            else
+            } else {
                 from = file.getInformation().getHomepage().toString();
+            }
         } catch (Exception e) {
         }
 
@@ -145,7 +147,7 @@ public class CertWarningPane extends SecurityDialogPanel {
             topLabelText = R("SHttpsUnverified") + " " + R("Continue");
             propertyName = "OptionPane.warningIcon";
             iconLocation += "warning.png";
-        } else
+        } else {
             switch (type) {
                 case VERIFIED:
                     topLabelText = R("SSigVerified");
@@ -166,7 +168,7 @@ public class CertWarningPane extends SecurityDialogPanel {
                     bottomLabelText += " " + R("SWarnFullPermissionsIgnorePolicy");
                     break;
             }
-
+        }
         ImageIcon icon = new ImageIcon((new sun.misc.Launcher())
                                 .getClassLoader().getResource(iconLocation));
         JLabel topLabel = new JLabel(htmlWrap(topLabelText), icon, SwingConstants.LEFT);
@@ -194,8 +196,9 @@ public class CertWarningPane extends SecurityDialogPanel {
         infoPanel.add(nameLabel);
         infoPanel.add(publisherLabel);
 
-        if (!(certVerifier instanceof HttpsCertVerifier))
+        if (!(certVerifier instanceof HttpsCertVerifier)) {
             infoPanel.add(fromLabel);
+        }
 
         infoPanel.add(alwaysTrust);
         infoPanel.setBorder(BorderFactory.createEmptyBorder(25, 25, 25, 25));
@@ -224,7 +227,7 @@ public class CertWarningPane extends SecurityDialogPanel {
         add(infoPanel);
         add(buttonPanel);
 
-        JLabel bottomLabel = new JLabel(htmlWrap(bottomLabelText));;
+        JLabel bottomLabel = new JLabel(htmlWrap(bottomLabelText));
         JButton moreInfo = new JButton(R("ButMoreInformation"));
         moreInfo.addActionListener(new MoreInfoButtonListener());
 

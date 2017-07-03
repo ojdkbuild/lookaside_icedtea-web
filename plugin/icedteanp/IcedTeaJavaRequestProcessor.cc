@@ -78,7 +78,7 @@ JavaRequestProcessor::newMessageOnBus(const char* message)
 					result->error_msg->append(" ");
 				}
 
-				printf("Error on Java side: %s\n", result->error_msg->c_str());
+				PLUGIN_ERROR("Error on Java side: %s\n", result->error_msg->c_str());
 
 				result->error_occurred = true;
 				result_ready = true;
@@ -965,7 +965,7 @@ createJavaObjectFromVariant(NPP instance, NPVariant variant, std::string* id)
                 java_result = java_request.newArray(java_array_type, length_str);
 
                 if (java_result->error_occurred) {
-                    printf("Unable to create array\n");
+                    PLUGIN_ERROR("Unable to create array\n");
                     id->append("-1");
                     return;
                 }
@@ -984,7 +984,7 @@ createJavaObjectFromVariant(NPP instance, NPVariant variant, std::string* id)
                     createJavaObjectFromVariant(instance, value, &value_id);
 
                     if (value_id == "-1") {
-                        printf("Unable to populate array\n");
+                        PLUGIN_ERROR("Unable to populate array\n");
                         id->clear();
                         id->append("-1");
                         return;
@@ -1020,7 +1020,7 @@ createJavaObjectFromVariant(NPP instance, NPVariant variant, std::string* id)
                 // the result we want is in result_string (assuming there was no error)
                 if (java_result->error_occurred)
                 {
-                    printf("Unable to get JSObject class id\n");
+                    PLUGIN_ERROR("Unable to get JSObject class id\n");
                     id->clear();
                     id->append("-1");
                     return;
@@ -1036,7 +1036,7 @@ createJavaObjectFromVariant(NPP instance, NPVariant variant, std::string* id)
                 // the result we want is in result_string (assuming there was no error)
                 if (java_result->error_occurred)
                 {
-                    printf("Unable to get JSObject constructor id\n");
+                    PLUGIN_ERROR("Unable to get JSObject constructor id\n");
                     id->clear();
                     id->append("-1");
                     return;
@@ -1060,7 +1060,7 @@ createJavaObjectFromVariant(NPP instance, NPVariant variant, std::string* id)
                 // the result we want is in result_string (assuming there was no error)
                 if (java_result->error_occurred)
                 {
-                    printf("Unable to create JSObject\n");
+                    PLUGIN_ERROR("Unable to create JSObject\n");
                     id->clear();
                     id->append("-1");
                     return;
@@ -1077,7 +1077,7 @@ createJavaObjectFromVariant(NPP instance, NPVariant variant, std::string* id)
 
 		// the result we want is in result_string (assuming there was no error)
 		if (java_result->error_occurred) {
-			printf("Unable to find classid for %s\n", className.c_str());
+			PLUGIN_ERROR("Unable to find classid for %s\n", className.c_str());
 			id->append("-1");
 			return;
 		}
@@ -1092,7 +1092,7 @@ createJavaObjectFromVariant(NPP instance, NPVariant variant, std::string* id)
 
 		// the result we want is in result_string (assuming there was no error)
 		if (java_result->error_occurred) {
-			printf("Unable to find string constructor for %s\n", className.c_str());
+			PLUGIN_ERROR("Unable to find string constructor for %s\n", className.c_str());
 			id->append("-1");
             return;
 		}
@@ -1104,7 +1104,7 @@ createJavaObjectFromVariant(NPP instance, NPVariant variant, std::string* id)
 		java_result = java_request.newString(stringArg);
 
 		if (java_result->error_occurred) {
-			printf("Unable to create requested object\n");
+			PLUGIN_ERROR("Unable to create requested object\n");
 			id->append("-1");
             return;
 		}
@@ -1117,7 +1117,7 @@ createJavaObjectFromVariant(NPP instance, NPVariant variant, std::string* id)
 		java_result = java_request.newObjectWithConstructor("[System]", jsObjectClassID, jsObjectConstructorID, args);
 
         if (java_result->error_occurred) {
-            printf("Unable to create requested object\n");
+            PLUGIN_ERROR("Unable to create requested object\n");
             id->append("-1");
             return;
         }

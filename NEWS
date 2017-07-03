@@ -8,13 +8,24 @@ GX  - http://bugs.gentoo.org/show_bug.cgi?id=X
 
 CVE-XXXX-YYYY: http://www.cve.mitre.org/cgi-bin/cvename.cgi?name=XXXX-YYYY
 
-New in release 1.4.1 (2013-XX-YY):
+New in release 1.4.2 (2014-02-05):
+* Dialogs center on screen before becoming visible
+* Support for u45 new manifest attributes (Application-Name)
+* Custom applet permission policies panel in itweb-settings control panel
+* Plugin
+  - PR1271: icedtea-web does not handle 'javascript:'-protocol URLs
+  - RH976833: Multiple applets on one page cause deadlock
+  - Enabled javaconsole
+  - RH1010958: insecure temporary file use flaw in LiveConnect implementation
+
+New in release 1.4.1 (2013-09-19):
 * Improved and cleaned Temporary internet files panel
 * NetX
   - PR1465 - java.io.FileNotFoundException while trying to download a JAR file
   - PR1473 - javaws should not depend on name of local file
 * Plugin
   - PR854: Resizing an applet several times causes 100% CPU load
+  - Pipes moved into XDG_RUNTIME_DIR
 * Security Updates
   - CVE-2012-4540, RH869040: Heap-based buffer overflow after triggering event attached to applet
 

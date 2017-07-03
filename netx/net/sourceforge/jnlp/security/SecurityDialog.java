@@ -244,6 +244,7 @@ public class SecurityDialog extends JDialog {
         installPanel();
 
         pack();
+        centerDialog(this);
 
         WindowAdapter adapter = new WindowAdapter() {
             private boolean gotFocus = false;
@@ -262,14 +263,12 @@ public class SecurityDialog extends JDialog {
                 if (e.getSource() instanceof SecurityDialog) {
                     SecurityDialog dialog = (SecurityDialog) e.getSource();
                     dialog.setResizable(true);
-                    centerDialog(dialog);
                     dialog.setValue(null);
                 }
             }
         };
         addWindowListener(adapter);
         addWindowFocusListener(adapter);
-
     }
 
     public AccessType getAccessType() {

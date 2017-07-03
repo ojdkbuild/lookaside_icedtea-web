@@ -42,6 +42,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 
 public class StreamUtils {
 
@@ -51,7 +52,7 @@ public class StreamUtils {
      * 
      * @param stream the stream that will be closed
      */
-    public static void closeSilently (Closeable stream) {
+    public static void closeSilently(Closeable stream) {
         if (stream != null) {
             try {
                 stream.close();
@@ -61,8 +62,27 @@ public class StreamUtils {
         }
     }
 
+    /**
+     * Copy an input stream's contents into an output stream.
+     */
+    public static void copyStream(InputStream input, OutputStream output)
+            throws IOException {
+        byte[] buffer = new byte[1024];
+        while (true) {
+            int bytesRead = input.read(buffer);
+            if (bytesRead == -1) {
+                break;
+            }
+            output.write(buffer, 0, bytesRead);
+        }
+    }
 
-    public static String readStreamAsString(InputStream stream) throws IOException {
+    public static String readStreamAsString(InputStream stream)  throws IOException {
+        return readStreamAsString(stream, false);
+    }
+    
+    public static String readStreamAsString(InputStream stream, boolean includeEndOfLines)
+            throws IOException {
         InputStreamReader is = new InputStreamReader(stream);
         StringBuilder sb = new StringBuilder();
         BufferedReader br = new BufferedReader(is);
@@ -72,6 +92,9 @@ public class StreamUtils {
                 break;
             }
             sb.append(read);
+            if (includeEndOfLines){
+                sb.append('\n');
+            }
 
         }
 

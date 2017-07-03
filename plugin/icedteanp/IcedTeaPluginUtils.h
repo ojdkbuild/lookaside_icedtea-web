@@ -59,21 +59,30 @@ exception statement from your version. */
 #include <glib.h>
 #include <npruntime.h>
 
-#define PLUGIN_DEBUG(...) \
-  do                                                          \
-  {                                                           \
-    if (plugin_debug)                                         \
-    {                                                         \
+#define PLUGIN_DEBUG(...)                                      \
+  do                                                           \
+  {                                                            \
+    if (plugin_debug)                                          \
+    {                                                          \
       fprintf (stderr, "ITNPP Thread# %ld: ", pthread_self()); \
-      fprintf (stderr, __VA_ARGS__);                          \
-    }                                                         \
+      fprintf (stderr, __VA_ARGS__);                           \
+    }                                                          \
   } while (0)
+  
+  // Error reporting macros.
+#define PLUGIN_ERROR(...)                                   \
+  do                                                          \
+  {                                                         \
+        fprintf  (stderr, "%s:%d: thread %p: Error: %s\n",  \
+               __FILE__, __LINE__,                          \
+              g_thread_self (), __VA_ARGS__);               \
+   } while (0)
 
 #define CHECK_JAVA_RESULT(result_data)                               \
 {                                                                    \
     if (((JavaResultData*) result_data)->error_occurred)             \
     {                                                                \
-        printf("Error: Error occurred on Java side: %s.\n",          \
+        PLUGIN_ERROR("Error: Error occurred on Java side: %s.\n",    \
                ((JavaResultData*) result_data)->error_msg->c_str()); \
         return;                                                      \
     }                                                                \
@@ -277,7 +286,8 @@ class IcedTeaPluginUtilities
         /*cutting whitespaces from end and start of string*/
         static void trim(std::string& str);
         static bool file_exists(std::string filename);
-
+        static std::string getTmpPath();
+        static std::string getRuntimePath();
 };
 
 /*

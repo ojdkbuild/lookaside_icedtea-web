@@ -38,6 +38,9 @@ exception statement from your version. */
 
 // System includes.
 #include <dlfcn.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <dirent.h>
 #include <errno.h>
 #include <libgen.h>
 #include <stdio.h>
@@ -55,19 +58,6 @@ exception statement from your version. */
 #include "IcedTeaScriptablePluginObject.h"
 #include "IcedTeaNPPlugin.h"
 
-
-// Error reporting macros.
-#define PLUGIN_ERROR(message)                                       \
-  g_printerr ("%s:%d: thread %p: Error: %s\n", __FILE__, __LINE__,  \
-              g_thread_self (), message)
-
-#define PLUGIN_ERROR_TWO(first, second)                                 \
-  g_printerr ("%s:%d: thread %p: Error: %s: %s\n", __FILE__, __LINE__,  \
-              g_thread_self (), first, second)
-
-#define PLUGIN_ERROR_THREE(first, second, third)                        \
-  g_printerr ("%s:%d: thread %p: Error: %s: %s: %s\n", __FILE__,        \
-              __LINE__, g_thread_self (), first, second, third)
 
 // Plugin information passed to about:plugins.
 #define PLUGIN_FULL_NAME PLUGIN_NAME " (using " PLUGIN_VERSION ")"
@@ -133,6 +123,7 @@ exception statement from your version. */
 
 // Data directory for plugin.
 static std::string data_directory;
+static DIR *data_directory_descriptor;
 
 // Fully-qualified appletviewer default  executable and rt.jar
 static const char* appletviewer_default_executable = ICEDTEA_WEB_JRE "/bin/java";
@@ -206,7 +197,7 @@ static void plugin_data_destroy (NPP instance);
 NPError get_cookie_info(const char* siteAddr, char** cookieString, uint32_t* len);
 NPError get_proxy_info(const char* siteAddr, char** proxy, uint32_t* len);
 void consume_message(gchar* message);
-void start_jvm_if_needed();
+NPError start_jvm_if_needed();
 static void appletviewer_monitor(GPid pid, gint status, gpointer data);
 void plugin_send_initialization_message(char* instance, gulong handle,
                                                int width, int height,
@@ -262,7 +253,7 @@ static std::string get_plugin_executable(){
             if (IcedTeaPluginUtilities::file_exists(custom_jre+"/bin/java")){
                   return custom_jre+"/bin/java";
             } else {
-                 fprintf(stderr, "Your custom jre (/bin/java check) %s is not valid. Please fix %s in your %s. In attempt to run using default one. \n", custom_jre.c_str(), custom_jre_key.c_str(), default_file_ITW_deploy_props_name.c_str());
+                 PLUGIN_ERROR("Your custom jre (/bin/java check) %s is not valid. Please fix %s in your %s. In attempt to run using default one. \n", custom_jre.c_str(), custom_jre_key.c_str(), default_file_ITW_deploy_props_name.c_str());
             }
       }
       return appletviewer_default_executable;      
@@ -275,13 +266,27 @@ static std::string get_plugin_rt_jar(){
             if (IcedTeaPluginUtilities::file_exists(custom_jre+"/lib/rt.jar")){
                   return custom_jre+"/lib/rt.jar";
             } else {
-                  fprintf(stderr, "Your custom jre (/lib/rt.jar check) %s is not valid. Please fix %s in your %s. In attempt to run using default one. \n", custom_jre.c_str(), custom_jre_key.c_str(), default_file_ITW_deploy_props_name.c_str());
+                  PLUGIN_ERROR("Your custom jre (/lib/rt.jar check) %s is not valid. Please fix %s in your %s. In attempt to run using default one. \n", custom_jre.c_str(), custom_jre_key.c_str(), default_file_ITW_deploy_props_name.c_str());
             }
       }
       return appletviewer_default_rtjar;      
 }
 
-
+static void cleanUpDir(){
+  //free data_directory descriptor 
+  if (data_directory_descriptor != NULL) {
+    closedir(data_directory_descriptor);
+  }
+  //clean up pipes directory
+  PLUGIN_DEBUG ("Removing runtime directory %s \n", data_directory.c_str());
+  int removed = rmdir(data_directory.c_str());
+  if (removed != 0) {
+    PLUGIN_ERROR ("Failed to remove runtime directory %s, because of  %s \n", data_directory.c_str(), strerror(errno));
+  } else {
+    PLUGIN_DEBUG ("Removed runtime directory %s \n", data_directory.c_str());
+  }
+  data_directory_descriptor = NULL;
+}
 /* 
  * Find first member in GHashTable* depending on version of glib
  */
@@ -331,7 +336,7 @@ ITNP_New (NPMIMEType pluginType, NPP instance, uint16_t mode,
   identifier = browser_functions.getstringidentifier("document");
   if (!browser_functions.hasproperty(instance, window_ptr, identifier))
   {
-	printf("%s not found!\n", "document");
+	PLUGIN_ERROR("%s not found!\n", "document");
   }
   browser_functions.getproperty(instance, window_ptr, identifier, &member_ptr);
 
@@ -346,6 +351,7 @@ ITNP_New (NPMIMEType pluginType, NPP instance, uint16_t mode,
   gchar* cookie_info = NULL;
 
   NPObject* npPluginObj = NULL;
+  NPError startup_error = NPERR_NO_ERROR; 
 
   if (!instance)
     {
@@ -364,7 +370,7 @@ ITNP_New (NPMIMEType pluginType, NPP instance, uint16_t mode,
     }
 
   // start the jvm if needed
-  start_jvm_if_needed();
+  startup_error = start_jvm_if_needed();
 
   // Initialize data->instance_id.
   //
@@ -436,7 +442,7 @@ ITNP_New (NPMIMEType pluginType, NPP instance, uint16_t mode,
 }
 
 // Starts the JVM if it is not already running
-void start_jvm_if_needed()
+NPError start_jvm_if_needed()
 {
 
   // This is asynchronized function. It must
@@ -451,7 +457,7 @@ void start_jvm_if_needed()
   if (jvm_up)
   {
       PLUGIN_DEBUG("JVM is up. Returning.\n");
-      return;
+      return  NPERR_NO_ERROR;
   }
 
   PLUGIN_DEBUG("No JVM is running. Attempting to start one...\n");
@@ -480,7 +486,7 @@ void start_jvm_if_needed()
   PLUGIN_DEBUG ("ITNP_New: creating input fifo: %s\n", in_pipe_name);
   if (mkfifo (in_pipe_name, 0600) == -1 && errno != EEXIST)
     {
-      PLUGIN_ERROR_TWO ("Failed to create input pipe", strerror (errno));
+      PLUGIN_ERROR ("Failed to create input pipe", strerror (errno));
       np_error = NPERR_GENERIC_ERROR;
       goto cleanup_in_pipe_name;
     }
@@ -506,7 +512,7 @@ void start_jvm_if_needed()
   PLUGIN_DEBUG ("ITNP_New: creating output fifo: %s\n", out_pipe_name);
   if (mkfifo (out_pipe_name, 0600) == -1 && errno != EEXIST)
     {
-      PLUGIN_ERROR_TWO ("Failed to create output pipe", strerror (errno));
+      PLUGIN_ERROR ("Failed to create output pipe", strerror (errno));
       np_error = NPERR_GENERIC_ERROR;
       goto cleanup_out_pipe_name;
     }
@@ -528,7 +534,7 @@ void start_jvm_if_needed()
     {
       if (channel_error)
         {
-          PLUGIN_ERROR_TWO ("Failed to create output channel",
+          PLUGIN_ERROR ("Failed to create output channel",
                             channel_error->message);
           g_error_free (channel_error);
           channel_error = NULL;
@@ -555,7 +561,7 @@ void start_jvm_if_needed()
     {
       if (channel_error)
         {
-          PLUGIN_ERROR_TWO ("Failed to create input channel",
+          PLUGIN_ERROR ("Failed to create input channel",
                             channel_error->message);
           g_error_free (channel_error);
           channel_error = NULL;
@@ -619,10 +625,12 @@ void start_jvm_if_needed()
   g_free (in_pipe_name);
   in_pipe_name = NULL;
 
+  cleanUpDir();
  done:
 
   // Now other threads may re-enter.. unlock the mutex
   g_mutex_unlock(vm_start_mutex);
+  return np_error;
 
 }
 
@@ -1020,7 +1028,7 @@ plugin_in_pipe_callback (GIOChannel* source,
         {
           if (channel_error)
             {
-              PLUGIN_ERROR_TWO ("Failed to read line from input channel",
+              PLUGIN_ERROR ("Failed to read line from input channel",
                                 channel_error->message);
               g_error_free (channel_error);
               channel_error = NULL;
@@ -1359,7 +1367,7 @@ plugin_test_appletviewer ()
     {
       if (channel_error)
         {
-          PLUGIN_ERROR_TWO ("Failed to spawn applet viewer",
+          PLUGIN_ERROR ("Failed to spawn applet viewer",
                             channel_error->message);
           g_error_free (channel_error);
           channel_error = NULL;
@@ -1439,7 +1447,7 @@ plugin_start_appletviewer (ITNPPluginData* data)
     {
       if (channel_error)
         {
-          PLUGIN_ERROR_TWO ("Failed to spawn applet viewer",
+          PLUGIN_ERROR ("Failed to spawn applet viewer",
                             channel_error->message);
           g_error_free (channel_error);
           channel_error = NULL;
@@ -1570,7 +1578,7 @@ plugin_send_message_to_appletviewer (gchar const* message)
         {
           if (channel_error)
             {
-              PLUGIN_ERROR_TWO ("Failed to write bytes to output channel",
+              PLUGIN_ERROR ("Failed to write bytes to output channel",
                                 channel_error->message);
               g_error_free (channel_error);
               channel_error = NULL;
@@ -1584,7 +1592,7 @@ plugin_send_message_to_appletviewer (gchar const* message)
         {
           if (channel_error)
             {
-              PLUGIN_ERROR_TWO ("Failed to flush bytes to output channel",
+              PLUGIN_ERROR ("Failed to flush bytes to output channel",
                                 channel_error->message);
               g_error_free (channel_error);
               channel_error = NULL;
@@ -1651,7 +1659,7 @@ plugin_stop_appletviewer ()
             {
               if (channel_error)
                 {
-                  PLUGIN_ERROR_TWO ("Failed to write shutdown message to"
+                  PLUGIN_ERROR ("Failed to write shutdown message to"
                                     " appletviewer", channel_error->message);
                   g_error_free (channel_error);
                   channel_error = NULL;
@@ -1665,7 +1673,7 @@ plugin_stop_appletviewer ()
             {
               if (channel_error)
                 {
-                  PLUGIN_ERROR_TWO ("Failed to write shutdown message to"
+                  PLUGIN_ERROR ("Failed to write shutdown message to"
                                     " appletviewer", channel_error->message);
                   g_error_free (channel_error);
                   channel_error = NULL;
@@ -1680,7 +1688,7 @@ plugin_stop_appletviewer ()
             {
               if (channel_error)
                 {
-                  PLUGIN_ERROR_TWO ("Failed to shut down appletviewer"
+                  PLUGIN_ERROR ("Failed to shut down appletviewer"
                                     " output channel", channel_error->message);
                   g_error_free (channel_error);
                   channel_error = NULL;
@@ -1698,7 +1706,7 @@ plugin_stop_appletviewer ()
             {
               if (channel_error)
                 {
-                  PLUGIN_ERROR_TWO ("Failed to shut down appletviewer"
+                  PLUGIN_ERROR ("Failed to shut down appletviewer"
                                     " input channel", channel_error->message);
                   g_error_free (channel_error);
                   channel_error = NULL;
@@ -1899,60 +1907,37 @@ NP_Initialize (NPNetscapeFuncs* browserTable, NPPluginFuncs* pluginTable)
   // Make sure the plugin data directory exists, creating it if
   // necessary.
 
-  const char* tmpdir_env = getenv("TMPDIR");
-  if (tmpdir_env != NULL && g_file_test (tmpdir_env,
-                    (GFileTest) (G_FILE_TEST_EXISTS | G_FILE_TEST_IS_DIR)))
-    {
-      data_directory = tmpdir_env;
-    }
-  else if (g_file_test (P_tmpdir,
-                    (GFileTest) (G_FILE_TEST_EXISTS | G_FILE_TEST_IS_DIR)))
-    {
-      data_directory = P_tmpdir;
-    }
-  else
-    {
-      // If TMPDIR and P_tmpdir do not exist, try /tmp directly
-      data_directory = "/tmp";
-    }
-
-  data_directory += "/icedteaplugin-";
-  if (getenv("USER") != NULL)
-      data_directory += getenv("USER");
-
+  data_directory = IcedTeaPluginUtilities::getRuntimePath() + "/icedteaplugin-";
+  if (getenv("USER") != NULL) {
+    data_directory = data_directory + getenv("USER") + "-";
+  }
+  data_directory += "XXXXXX";
   // Now create a icedteaplugin subdir
-  if (!g_file_test (data_directory.c_str(),
-                    (GFileTest) (G_FILE_TEST_EXISTS | G_FILE_TEST_IS_DIR)))
-    {
-      int file_error = 0;
+  char fileNameX[data_directory.length()+1];
+  std::strcpy (fileNameX, data_directory.c_str());
+  char * fileName = mkdtemp(fileNameX);
+  if (fileName == NULL) {
+    PLUGIN_ERROR ("Failed to create data directory %s, %s\n",
+                        data_directory.c_str(),
+                        strerror (errno));
+    return NPERR_GENERIC_ERROR;
+  }
+  data_directory = std::string(fileName);
 
-      file_error = g_mkdir (data_directory.c_str(), 0700);
-      if (file_error != 0)
-        {
-          PLUGIN_ERROR_THREE ("Failed to create data directory",
-                          data_directory.c_str(),
-                          strerror (errno));
-          return NPERR_GENERIC_ERROR;
-        }
-    }
-
-
-  // If data directory doesn't exist by this point, bail
-  if (!g_file_test (data_directory.c_str(),
-                    (GFileTest) (G_FILE_TEST_EXISTS | G_FILE_TEST_IS_DIR)))
-    {
-      PLUGIN_ERROR_THREE ("Temp directory does not exist: ",
-                          data_directory.c_str(),
-                          strerror (errno));
+  //open uniques icedteaplugin subdir for one single run  
+  data_directory_descriptor = opendir(data_directory.c_str());
+  if (data_directory_descriptor == NULL) {
+      PLUGIN_ERROR ("Failed to open data directory %s %s\n",
+                      data_directory.c_str(), strerror (errno));
       return NPERR_GENERIC_ERROR;
-    }
+  }
 
   // Set appletviewer_executable.
   PLUGIN_DEBUG("Executing java at %s\n", get_plugin_executable().c_str());
   np_error = plugin_test_appletviewer ();
   if (np_error != NPERR_NO_ERROR)
     {
-      fprintf(stderr, "Unable to find java executable %s\n", get_plugin_executable().c_str());
+      PLUGIN_ERROR("Unable to find java executable %s\n", get_plugin_executable().c_str());
       return np_error;
     }
 
@@ -2128,6 +2113,8 @@ NP_Shutdown (void)
   delete plugin_to_java_bus;
   //delete internal_bus;
 
+  cleanUpDir();
+  
   PLUGIN_DEBUG ("NP_Shutdown return\n");
 
   return NPERR_NO_ERROR;
@@ -2163,7 +2150,7 @@ get_scriptable_object(NPP instance)
 
         if (java_result->error_occurred)
         {
-            printf("Error: Unable to fetch applet instance id from Java side.\n");
+            PLUGIN_ERROR("Error: Unable to fetch applet instance id from Java side.\n");
             return NULL;
         }
 
@@ -2173,7 +2160,7 @@ get_scriptable_object(NPP instance)
 
         if (java_result->error_occurred)
         {
-            printf("Error: Unable to fetch applet instance id from Java side.\n");
+            PLUGIN_ERROR("Error: Unable to fetch applet instance id from Java side.\n");
             return NULL;
         }
 

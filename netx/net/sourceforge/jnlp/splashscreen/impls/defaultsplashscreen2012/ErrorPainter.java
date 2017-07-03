@@ -48,6 +48,7 @@ import java.util.Observable;
 import net.sourceforge.jnlp.runtime.Translator;
 import net.sourceforge.jnlp.splashscreen.parts.BasicComponentSplashScreen;
 import net.sourceforge.jnlp.splashscreen.parts.InformationElement;
+import net.sourceforge.jnlp.splashscreen.parts.extensions.ExtensionManager;
 
 public final class ErrorPainter extends BasePainter {
 
@@ -129,6 +130,7 @@ public final class ErrorPainter extends BasePainter {
         }
 
         if (super.showNiceTexts) {
+            ExtensionManager.getExtension().paint(g, this);
             paintNiceTexts(g2d);
         } else {
             paintPlainTexts(g2d);

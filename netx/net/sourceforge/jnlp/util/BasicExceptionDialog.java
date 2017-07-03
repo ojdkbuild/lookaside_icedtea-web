@@ -124,6 +124,7 @@ public class BasicExceptionDialog {
 
         errorDialog.pack();
         errorDialog.setResizable(true);
+        ScreenFinder.centerWindowsToCurrentScreen(errorDialog);
         errorDialog.setVisible(true);
         errorDialog.dispose();
     }

@@ -167,6 +167,16 @@ public final class DeploymentConfiguration {
      */
     public static final String KEY_PLUGIN_JVM_ARGUMENTS= "deployment.plugin.jvm.arguments";
     public static final String KEY_JRE_DIR= "deployment.jre.dir";
+    private ConfigurationException loadingException = null;
+
+    public void setLoadingException(ConfigurationException ex) {
+        loadingException = ex;
+    }
+
+    public ConfigurationException getLoadingException() {
+        return loadingException;
+    }
+    
 
     public enum ConfigType {
         System, User
@@ -488,7 +498,7 @@ public final class DeploymentConfiguration {
                             + systemPropertiesFile);
                 }
                 Setting<String> mandatory = systemConfiguration.get("deployment.system.config.mandatory");
-                systemPropertiesMandatory = Boolean.valueOf(mandatory == null ? null : (String) mandatory.getValue());
+                systemPropertiesMandatory = Boolean.valueOf(mandatory == null ? null : mandatory.getValue());
                 return true;
             } else {
                 if (JNLPRuntime.isDebug()) {
@@ -562,8 +572,8 @@ public final class DeploymentConfiguration {
 
         for (String key : currentConfiguration.keySet()) {
             String oldValue = unchangeableConfiguration.get(key) == null ? null
-                    : (String) unchangeableConfiguration.get(key).getValue();
-            String newValue = currentConfiguration.get(key) == null ? null : (String) currentConfiguration
+                    : unchangeableConfiguration.get(key).getValue();
+            String newValue = currentConfiguration.get(key) == null ? null : currentConfiguration
                     .get(key).getValue();
             if (oldValue == null && newValue == null) {
                 continue;

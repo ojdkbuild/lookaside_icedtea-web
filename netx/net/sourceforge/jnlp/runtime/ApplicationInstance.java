@@ -301,7 +301,7 @@ public class ApplicationInstance {
             }
 
             // then stop
-            Thread.currentThread().yield();
+            Thread.yield();
             nthreads = group.enumerate(threads);
             for (int i = 0; i < nthreads; i++) {
                 if (JNLPRuntime.isDebug())

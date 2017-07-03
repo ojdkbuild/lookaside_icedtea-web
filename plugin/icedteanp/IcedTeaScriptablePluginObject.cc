@@ -49,19 +49,19 @@ IcedTeaScriptablePluginObject::IcedTeaScriptablePluginObject(NPP instance)
 void
 IcedTeaScriptablePluginObject::deAllocate(NPObject *npobj)
 {
-	printf ("** Unimplemented: IcedTeaScriptablePluginObject::deAllocate %p\n", npobj);
+	PLUGIN_ERROR ("** Unimplemented: IcedTeaScriptablePluginObject::deAllocate %p\n", npobj);
 }
 
 void
 IcedTeaScriptablePluginObject::invalidate(NPObject *npobj)
 {
-	printf ("** Unimplemented: IcedTeaScriptablePluginObject::invalidate %p\n", npobj);
+	PLUGIN_ERROR ("** Unimplemented: IcedTeaScriptablePluginObject::invalidate %p\n", npobj);
 }
 
 bool
 IcedTeaScriptablePluginObject::hasMethod(NPObject *npobj, NPIdentifier name)
 {
-	printf ("** Unimplemented: IcedTeaScriptablePluginObject::hasMethod %p\n", npobj);
+	PLUGIN_ERROR ("** Unimplemented: IcedTeaScriptablePluginObject::hasMethod %p\n", npobj);
 	return false;
 }
 
@@ -69,7 +69,7 @@ bool
 IcedTeaScriptablePluginObject::invoke(NPObject *npobj, NPIdentifier name, const NPVariant *args,
 			uint32_t argCount,NPVariant *result)
 {
-	printf ("** Unimplemented: IcedTeaScriptablePluginObject::invoke %p\n", npobj);
+	PLUGIN_ERROR ("** Unimplemented: IcedTeaScriptablePluginObject::invoke %p\n", npobj);
 	return false;
 }
 
@@ -77,14 +77,14 @@ bool
 IcedTeaScriptablePluginObject::invokeDefault(NPObject *npobj, const NPVariant *args,
 			       uint32_t argCount, NPVariant *result)
 {
-	printf ("** Unimplemented: IcedTeaScriptablePluginObject::invokeDefault %p\n", npobj);
+	PLUGIN_ERROR ("** Unimplemented: IcedTeaScriptablePluginObject::invokeDefault %p\n", npobj);
 	return false;
 }
 
 bool
 IcedTeaScriptablePluginObject::hasProperty(NPObject *npobj, NPIdentifier name)
 {
-	printf ("** Unimplemented: IcedTeaScriptablePluginObject::hasProperty %p\n", npobj);
+	PLUGIN_ERROR ("** Unimplemented: IcedTeaScriptablePluginObject::hasProperty %p\n", npobj);
 	return false;
 }
 
@@ -97,7 +97,7 @@ IcedTeaScriptablePluginObject::getProperty(NPObject *npobj, NPIdentifier name, N
 		//NPObject* obj = IcedTeaScriptablePluginObject::get_scriptable_java_package_object(getInstanceFromMemberPtr(npobj), name);
 		//OBJECT_TO_NPVARIANT(obj, *result);
 
-		//printf ("Filling variant %p with object %p\n", result);
+		//PLUGIN_ERROR ("Filling variant %p with object %p\n", result);
 	}
 
 	return false;
@@ -106,21 +106,21 @@ IcedTeaScriptablePluginObject::getProperty(NPObject *npobj, NPIdentifier name, N
 bool
 IcedTeaScriptablePluginObject::setProperty(NPObject *npobj, NPIdentifier name, const NPVariant *value)
 {
-	printf ("** Unimplemented: IcedTeaScriptablePluginObject::setProperty %p\n", npobj);
+	PLUGIN_ERROR ("** Unimplemented: IcedTeaScriptablePluginObject::setProperty %p\n", npobj);
 	return false;
 }
 
 bool
 IcedTeaScriptablePluginObject::removeProperty(NPObject *npobj, NPIdentifier name)
 {
-	printf ("** Unimplemented: IcedTeaScriptablePluginObject::removeProperty %p\n", npobj);
+	PLUGIN_ERROR ("** Unimplemented: IcedTeaScriptablePluginObject::removeProperty %p\n", npobj);
 	return false;
 }
 
 bool
 IcedTeaScriptablePluginObject::enumerate(NPObject *npobj, NPIdentifier **value, uint32_t *count)
 {
-	printf ("** Unimplemented: IcedTeaScriptablePluginObject::enumerate %p\n", npobj);
+	PLUGIN_ERROR ("** Unimplemented: IcedTeaScriptablePluginObject::enumerate %p\n", npobj);
 	return false;
 }
 
@@ -128,7 +128,7 @@ bool
 IcedTeaScriptablePluginObject::construct(NPObject *npobj, const NPVariant *args, uint32_t argCount,
 	           NPVariant *result)
 {
-	printf ("** Unimplemented: IcedTeaScriptablePluginObject::construct %p\n", npobj);
+	PLUGIN_ERROR ("** Unimplemented: IcedTeaScriptablePluginObject::construct %p\n", npobj);
 	return false;
 }
 
@@ -217,7 +217,7 @@ bool
 IcedTeaScriptableJavaPackageObject::invoke(NPObject *npobj, NPIdentifier name, const NPVariant *args,
 			uint32_t argCount,NPVariant *result)
 {
-	printf ("** Unimplemented: IcedTeaScriptableJavaPackageObject::invoke %p\n", npobj);
+	PLUGIN_ERROR ("** Unimplemented: IcedTeaScriptableJavaPackageObject::invoke %p\n", npobj);
 	return false;
 }
 
@@ -225,7 +225,7 @@ bool
 IcedTeaScriptableJavaPackageObject::invokeDefault(NPObject *npobj, const NPVariant *args,
 			       uint32_t argCount, NPVariant *result)
 {
-	printf ("** Unimplemented: IcedTeaScriptableJavaPackageObject::invokeDefault %p\n", npobj);
+	PLUGIN_ERROR ("** Unimplemented: IcedTeaScriptableJavaPackageObject::invokeDefault %p\n", npobj);
 	return false;
 }
 
@@ -331,14 +331,14 @@ IcedTeaScriptableJavaPackageObject::setProperty(NPObject *npobj, NPIdentifier na
 bool
 IcedTeaScriptableJavaPackageObject::removeProperty(NPObject *npobj, NPIdentifier name)
 {
-	printf ("** Unimplemented: IcedTeaScriptableJavaPackageObject::removeProperty %p\n", npobj);
+	PLUGIN_ERROR ("** Unimplemented: IcedTeaScriptableJavaPackageObject::removeProperty %p\n", npobj);
 	return false;
 }
 
 bool
 IcedTeaScriptableJavaPackageObject::enumerate(NPObject *npobj, NPIdentifier **value, uint32_t *count)
 {
-	printf ("** Unimplemented: IcedTeaScriptableJavaPackageObject::enumerate %p\n", npobj);
+	PLUGIN_ERROR ("** Unimplemented: IcedTeaScriptableJavaPackageObject::enumerate %p\n", npobj);
 	return false;
 }
 
@@ -346,7 +346,7 @@ bool
 IcedTeaScriptableJavaPackageObject::construct(NPObject *npobj, const NPVariant *args, uint32_t argCount,
 	           NPVariant *result)
 {
-	printf ("** Unimplemented: IcedTeaScriptableJavaPackageObject::construct %p\n", npobj);
+	PLUGIN_ERROR ("** Unimplemented: IcedTeaScriptableJavaPackageObject::construct %p\n", npobj);
 	return false;
 }
 
@@ -566,7 +566,7 @@ IcedTeaScriptableJavaObject::invoke(NPObject *npobj, NPIdentifier name, const NP
 
         if (id == "-1")
         {
-            printf("Unable to create arguments on Java side\n");
+            PLUGIN_ERROR("Unable to create arguments on Java side\n");
             return false;
         }
 
@@ -603,7 +603,7 @@ bool
 IcedTeaScriptableJavaObject::invokeDefault(NPObject *npobj, const NPVariant *args,
 			       uint32_t argCount, NPVariant *result)
 {
-	printf ("** Unimplemented: IcedTeaScriptableJavaObject::invokeDefault %p\n", npobj);
+	PLUGIN_ERROR ("** Unimplemented: IcedTeaScriptableJavaObject::invokeDefault %p\n", npobj);
 	return false;
 }
 
@@ -676,7 +676,7 @@ IcedTeaScriptableJavaObject::getProperty(NPObject *npobj, NPIdentifier name, NPV
             java_result = java_request.getArrayLength(instance_id);
             if (java_result->error_occurred)
             {
-                printf("ERROR: Couldn't fetch array length\n");
+                PLUGIN_ERROR("ERROR: Couldn't fetch array length\n");
                 return false;
             }
 
@@ -752,7 +752,7 @@ IcedTeaScriptableJavaObject::setProperty(NPObject *npobj, NPIdentifier name, con
              browser_functions.utf8fromidentifier(name) &&
              !strcmp(browser_functions.utf8fromidentifier(name), "length"))
         {
-            printf("ERROR: Array length is not a modifiable property\n");
+            PLUGIN_ERROR("ERROR: Array length is not a modifiable property\n");
             return false;
         } else if ( ((IcedTeaScriptableJavaObject*) npobj)->isArray() &&
                     browser_functions.intfromidentifier(name) >= 0) // else if array and requesting index
@@ -761,7 +761,7 @@ IcedTeaScriptableJavaObject::setProperty(NPObject *npobj, NPIdentifier name, con
             java_result = java_request.getArrayLength(instance_id);
             if (java_result->error_occurred)
             {
-                printf("ERROR: Couldn't fetch array length\n");
+                PLUGIN_ERROR("ERROR: Couldn't fetch array length\n");
                 return false;
             }
 
@@ -813,14 +813,14 @@ IcedTeaScriptableJavaObject::setProperty(NPObject *npobj, NPIdentifier name, con
 bool
 IcedTeaScriptableJavaObject::removeProperty(NPObject *npobj, NPIdentifier name)
 {
-	printf ("** Unimplemented: IcedTeaScriptableJavaObject::removeProperty %p\n", npobj);
+	PLUGIN_ERROR ("** Unimplemented: IcedTeaScriptableJavaObject::removeProperty %p\n", npobj);
 	return false;
 }
 
 bool
 IcedTeaScriptableJavaObject::enumerate(NPObject *npobj, NPIdentifier **value, uint32_t *count)
 {
-	printf ("** Unimplemented: IcedTeaScriptableJavaObject::enumerate %p\n", npobj);
+	PLUGIN_ERROR ("** Unimplemented: IcedTeaScriptableJavaObject::enumerate %p\n", npobj);
 	return false;
 }
 

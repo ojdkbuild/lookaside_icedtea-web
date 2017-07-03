@@ -62,10 +62,11 @@ import net.sourceforge.jnlp.ServerAccess;
 import net.sourceforge.jnlp.Version;
 import net.sourceforge.jnlp.cache.UpdatePolicy;
 import net.sourceforge.jnlp.util.StreamUtils;
+import net.sourceforge.jnlp.util.logging.NoStdOutErrTest;
 
 import org.junit.Test;
 
-public class JNLPClassLoaderTest {
+public class JNLPClassLoaderTest extends NoStdOutErrTest{
 
     /* Get the open file-descriptor count for the process.
      * Note that this is specific to Unix-like operating systems.

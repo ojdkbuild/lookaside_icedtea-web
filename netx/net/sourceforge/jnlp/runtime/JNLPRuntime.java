@@ -23,7 +23,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.lang.reflect.Constructor;
-import java.lang.reflect.Method;
 import java.lang.reflect.InvocationTargetException;
 import java.net.Authenticator;
 import java.net.ProxySelector;
@@ -33,8 +32,6 @@ import java.security.AllPermission;
 import java.security.KeyStore;
 import java.security.Policy;
 import java.security.Security;
-import java.security.cert.CertificateException;
-import java.security.cert.X509Certificate;
 import java.text.MessageFormat;
 import java.util.List;
 import java.util.ResourceBundle;
@@ -44,8 +41,6 @@ import javax.naming.ConfigurationException;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLEngine;
-import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
 import javax.swing.UIManager;
@@ -64,7 +59,6 @@ import net.sourceforge.jnlp.config.DeploymentConfiguration;
 import net.sourceforge.jnlp.security.JNLPAuthenticator;
 import net.sourceforge.jnlp.security.KeyStores;
 import net.sourceforge.jnlp.security.SecurityDialogMessageHandler;
-import net.sourceforge.jnlp.security.VariableX509TrustManager;
 import net.sourceforge.jnlp.services.XServiceManagerStub;
 import net.sourceforge.jnlp.util.FileUtils;
 import net.sourceforge.jnlp.util.TeeOutputStream;
@@ -87,15 +81,13 @@ import sun.net.www.protocol.jar.URLJarFile;
  * @version $Revision: 1.19 $
  */
 public class JNLPRuntime {
-    
+
     static {
         loadResources();
     }
 
     /** the localized resource strings */
     private static ResourceBundle resources;
-
-    private static final DeploymentConfiguration config = new DeploymentConfiguration();
 
     /** the security manager */
     private static JNLPSecurityManager security;
@@ -190,18 +182,13 @@ public class JNLPRuntime {
     public static void initialize(boolean isApplication) throws IllegalStateException {
         checkInitialized();
 
-        try {
-            config.load();
-            config.copyTo(System.getProperties());
-        } catch (ConfigurationException e) {
-            /* exit if there is a fatal exception loading the configuration */
-            if (isApplication) {
+        /* exit if there is a fatal exception loading the configuration */
+        if (isApplication && getConfiguration().getLoadingException() != null) {
                 System.out.println(getMessage("RConfigurationError"));
                 System.exit(1);
-            }
         }
 
-        KeyStores.setConfiguration(config);
+        KeyStores.setConfiguration(getConfiguration());
 
         initializeStreams();
 
@@ -362,10 +349,10 @@ public class JNLPRuntime {
      * duplicating them as required.
      */
     private static void initializeStreams() {
-        Boolean enableLogging = Boolean.valueOf(config
+        Boolean enableLogging = Boolean.valueOf(getConfiguration()
                 .getProperty(DeploymentConfiguration.KEY_ENABLE_LOGGING));
         if (redirectStreams || enableLogging) {
-            String logDir = config.getProperty(DeploymentConfiguration.KEY_USER_LOG_DIR);
+            String logDir = getConfiguration().getProperty(DeploymentConfiguration.KEY_USER_LOG_DIR);
 
             try {
                 File errFile = new File(logDir, JNLPRuntime.STDERR_FILE);
@@ -388,13 +375,41 @@ public class JNLPRuntime {
         }
     }
 
+   
+    /**
+     * see https://en.wikipedia.org/wiki/Double-checked_locking#Usage_in_Java
+     * for cases how not to do lazy initialization
+     * and https://en.wikipedia.org/wiki/Initialization_on_demand_holder_idiom
+     * for ITW approach
+     */
+    private static class DeploymentConfigurationHolder {
+
+        private static final DeploymentConfiguration INSTANCE = initConfiguration();
+
+        private static DeploymentConfiguration initConfiguration() {
+            DeploymentConfiguration config = new DeploymentConfiguration();
+            try {
+                config.load();
+                config.copyTo(System.getProperties());
+            } catch (ConfigurationException ex) {
+                ex.printStackTrace();
+                //mark this exceptionas we can die on it later
+                config.setLoadingException(ex);
+            } finally {
+                //noop, 1.5+ starts consumer here
+            }
+            return config;
+        }
+    }
+
     /**
      * Gets the Configuration associated with this runtime
+     *
      * @return a {@link DeploymentConfiguration} object that can be queried to
      * find relevant configuration settings
      */
     public static DeploymentConfiguration getConfiguration() {
-        return config;
+        return DeploymentConfigurationHolder.INSTANCE;
     }
 
     /**
@@ -486,7 +501,7 @@ public class JNLPRuntime {
      *
      * @throws IllegalStateException if caller is not the exit class
      */
-    public static void setExitClass(Class exitClass) {
+    public static void setExitClass(Class<?> exitClass) {
         checkExitClass();
         security.setExitClass(exitClass);
     }

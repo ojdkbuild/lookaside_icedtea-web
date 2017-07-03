@@ -72,15 +72,16 @@ enum CacheLRUWrapper {
 
     /* location of cache directory */
     private final String setCachePath = JNLPRuntime.getConfiguration().getProperty(DeploymentConfiguration.KEY_USER_CACHE_DIR);
-    private final String cacheDir = new File(setCachePath != null ? setCachePath : System.getProperty("java.io.tmpdir")).getPath();
+    String cacheDir = new File(setCachePath != null ? setCachePath : System.getProperty("java.io.tmpdir")).getPath();
 
     /*
      * back-end of how LRU is implemented This file is to keep track of the most
      * recently used items. The items are to be kept with key = (current time
      * accessed) followed by folder of item. value = path to file.
      */
-    private PropertiesFile cacheOrder = new PropertiesFile(
-            new File(cacheDir + File.separator + "recently_used"));
+    PropertiesFile cacheOrder = new PropertiesFile(
+            new File(cacheDir + File.separator + CACHE_INDEX_FILE_NAME));
+    public static final String CACHE_INDEX_FILE_NAME = "recently_used";
 
     private CacheLRUWrapper(){
         File f = cacheOrder.getStoreFile();
@@ -221,8 +222,11 @@ enum CacheLRUWrapper {
      * 
      * @return List of Strings sorted by ascending order.
      */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    //although Properties are pretending to be <object,Object> they are always <String,String>
+    //bug in jdk?
     public synchronized List<Entry<String, String>> getLRUSortedEntries() {
-        ArrayList<Entry<String, String>> entries = new ArrayList(cacheOrder.entrySet());
+        List<Entry<String, String>> entries = new ArrayList(cacheOrder.entrySet());
         // sort by keys in descending order.
         Collections.sort(entries, new Comparator<Entry<String, String>>() {
             @Override

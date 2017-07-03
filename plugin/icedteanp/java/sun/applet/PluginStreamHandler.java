@@ -44,7 +44,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
-import java.net.MalformedURLException;
 import java.nio.charset.Charset;
 
 import javax.swing.SwingUtilities;
@@ -373,7 +372,7 @@ public class PluginStreamHandler {
         return;
     }
 
-    private void showConsole() {
+    public void showConsole() {
         SwingUtilities.invokeLater(new Runnable() {
             public void run() {
                 console.showConsole();

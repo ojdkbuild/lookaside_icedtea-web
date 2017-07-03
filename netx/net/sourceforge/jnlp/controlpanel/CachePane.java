@@ -174,9 +174,12 @@ public class CachePane extends JPanel {
 
                 int row = cacheTable.getSelectedRow();
                 try {
-                    if (fl == null) return;
-                    if (row == -1 || row > cacheTable.getRowCount() - 1)
+                    if (fl == null) {
                         return;
+                    }
+                    if (row == -1 || row > cacheTable.getRowCount() - 1) {
+                        return;
+                    }
                     int modelRow = cacheTable.convertRowIndexToModel(row);
                     DirectoryNode fileNode = ((DirectoryNode) cacheTable.getModel().getValueAt(modelRow, 0));
                     if (fileNode.getFile().delete()) {
@@ -262,8 +265,9 @@ public class CachePane extends JPanel {
      */
     private void populateTable() {
         ((DefaultTableModel) cacheTable.getModel()).setRowCount(0); //Clears the table
-        for (Object[] v : generateData(root))
+        for (Object[] v : generateData(root)) {
             ((DefaultTableModel) cacheTable.getModel()).addRow(v);
+        }
     }
 
     /**

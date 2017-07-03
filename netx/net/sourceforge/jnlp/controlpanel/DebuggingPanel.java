@@ -133,6 +133,7 @@ public class DebuggingPanel extends NamedBorderPanel implements ItemListener {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public void itemStateChanged(ItemEvent e) {
 
         Object o = e.getSource();

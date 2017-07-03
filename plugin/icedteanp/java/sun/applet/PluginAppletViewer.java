@@ -111,10 +111,10 @@ import net.sourceforge.jnlp.PluginParameters;
 import net.sourceforge.jnlp.runtime.JNLPClassLoader;
 import net.sourceforge.jnlp.security.appletextendedsecurity.AppletSecurityLevel;
 import net.sourceforge.jnlp.security.appletextendedsecurity.AppletStartupSecuritySettings;
-import net.sourceforge.jnlp.security.appletextendedsecurity.ExecuteUnsignedApplet;
 import net.sourceforge.jnlp.splashscreen.SplashController;
 import net.sourceforge.jnlp.splashscreen.SplashPanel;
 import net.sourceforge.jnlp.splashscreen.SplashUtils;
+import netscape.javascript.JSObject;
 import sun.awt.AppContext;
 import sun.awt.SunToolkit;
 import sun.awt.X11.XEmbeddedFrame;
@@ -249,14 +249,17 @@ public class PluginAppletViewer extends XEmbeddedFrame
 
         windowEventListener = new WindowAdapter() {
 
+            @Override
             public void windowClosing(WindowEvent evt) {
                 destroyApplet(identifier);
             }
 
+            @Override
             public void windowIconified(WindowEvent evt) {
                 appletStop();
             }
 
+            @Override
             public void windowDeiconified(WindowEvent evt) {
                 appletStart();
             }
@@ -272,6 +275,7 @@ public class PluginAppletViewer extends XEmbeddedFrame
 
     }
 
+    @Override
     public void replaceSplash(final SplashPanel newSplash) {
         if (splashPanel == null) {
             return;
@@ -283,6 +287,7 @@ public class PluginAppletViewer extends XEmbeddedFrame
         try {
             SwingUtilities.invokeAndWait(new Runnable() {
 
+                @Override
                 public void run() {
                     splashPanel.getSplashComponent().setVisible(false);
                     splashPanel.stopAnimation();
@@ -309,6 +314,7 @@ public class PluginAppletViewer extends XEmbeddedFrame
         try {
             SwingUtilities.invokeAndWait(new Runnable() {
 
+                @Override
                 public void run() {
                     splashPanel.getSplashComponent().setVisible(false);
                     splashPanel.stopAnimation();
@@ -355,6 +361,7 @@ public class PluginAppletViewer extends XEmbeddedFrame
             this.appletViewer = appletViewer;
         }
 
+        @Override
         public void appletStateChanged(AppletEvent evt) {
             AppletPanel src = (AppletPanel) evt.getSource();
 
@@ -386,10 +393,12 @@ public class PluginAppletViewer extends XEmbeddedFrame
                     // Swing also maintains a Frame list for the AppContext,
                     // so we will have to rearrange it as well.
                     //
-                    if (a != null)
+                    if (a != null) {
                         AppletPanel.changeFrameAppContext(frame, SunToolkit.targetToAppContext(a));
-                    else
+                    }
+                    else {
                         AppletPanel.changeFrameAppContext(frame, AppContext.getAppContext());
+                    }
 
                     updateStatus(appletViewer.identifier, PAV_INIT_STATUS.INIT_COMPLETE);
 
@@ -434,8 +443,9 @@ public class PluginAppletViewer extends XEmbeddedFrame
         // If there is a key for this status, it means it
         // was either initialized before, or destroy has been
         // processed. Stop moving further.
-        if (updateStatus(identifier, PAV_INIT_STATUS.PRE_INIT) != null)
+        if (updateStatus(identifier, PAV_INIT_STATUS.PRE_INIT) != null) {
             return;
+        }
 
         // Extract the information from the message
         String[] msgParts = new String[4];
@@ -542,8 +552,9 @@ public class PluginAppletViewer extends XEmbeddedFrame
                     ;
 
                 // don't bother processing further for inactive applets
-                if (status.get(identifier).equals(PAV_INIT_STATUS.INACTIVE))
+                if (status.get(identifier).equals(PAV_INIT_STATUS.INACTIVE)) {
                     return;
+                }
 
                 applets.get(identifier).handleMessage(reference, message);
             }
@@ -639,6 +650,7 @@ public class PluginAppletViewer extends XEmbeddedFrame
             PluginDebug.debug("Attempting to destroy panel ", identifier);
 
             SwingUtilities.invokeLater(new Runnable() {
+                @Override
                 public void run() {
                     pav.appletClose();
                 }
@@ -693,6 +705,7 @@ public class PluginAppletViewer extends XEmbeddedFrame
 
             try {
                 SwingUtilities.invokeAndWait(new Runnable() {
+                    @Override
                     public void run() {
 
                         setSize(width, height);
@@ -764,6 +777,7 @@ public class PluginAppletViewer extends XEmbeddedFrame
     /**
      * Get an audio clip.
      */
+    @Override
     public AudioClip getAudioClip(URL url) {
         checkConnect(url);
         synchronized (audioClips) {
@@ -780,6 +794,7 @@ public class PluginAppletViewer extends XEmbeddedFrame
     /**
      * Get an image.
      */
+    @Override
     public Image getImage(URL url) {
         return getCachedImage(url);
     }
@@ -808,8 +823,9 @@ public class PluginAppletViewer extends XEmbeddedFrame
                 JNLPClassLoader loader = (JNLPClassLoader) panel.getAppletClassLoader();
 
                 URL localURL = null;
-                if (loader.resourceAvailableLocally(resourceName))
+                if (loader.resourceAvailableLocally(resourceName)) {
                     url = loader.getResource(resourceName);
+                }
 
                 url = localURL != null ? localURL : url;
             }
@@ -843,6 +859,7 @@ public class PluginAppletViewer extends XEmbeddedFrame
     /**
      * Get an applet by name.
      */
+    @Override
     public Applet getApplet(String name) {
         name = name.toLowerCase();
         SocketPermission panelSp =
@@ -873,6 +890,7 @@ public class PluginAppletViewer extends XEmbeddedFrame
      * Return an enumeration of all the accessible
      * applets on this page.
      */
+    @Override
     public Enumeration<Applet> getApplets() {
         Vector<Applet> v = new Vector<Applet>();
         SocketPermission panelSp =
@@ -894,18 +912,21 @@ public class PluginAppletViewer extends XEmbeddedFrame
         return v.elements();
     }
 
-    /**
-     * Ignore.
-     */
+    @Override
     public void showDocument(URL url) {
         PluginDebug.debug("Showing document...");
         showDocument(url, "_self");
     }
 
-    /**
-     * Ignore.
-     */
+    @Override
     public void showDocument(URL url, String target) {
+        // If it is a javascript document, eval on current page.
+        if ("javascript".equals(url.getProtocol())) {
+            // Snip protocol off string
+            String evalString = url.toString().substring("javascript:".length());
+            eval(getWindow(), evalString);
+            return;
+        }
         try {
             Long reference = getRequestIdentifier();
             write("reference " + reference +  " LoadURL " + UrlUtil.encode(url.toString(), "UTF-8") + " " + target);
@@ -919,6 +940,7 @@ public class PluginAppletViewer extends XEmbeddedFrame
     /**
      * Show status.
      */
+    @Override
     public void showStatus(String status) {
         try {
             // FIXME: change to postCallRequest
@@ -1113,8 +1135,9 @@ public class PluginAppletViewer extends XEmbeddedFrame
             PluginDebug.debug("wait eval request 1");
             synchronized (request) {
                 PluginDebug.debug("wait eval request 2");
-                while (request.isDone() == false)
+                while (request.isDone() == false) {
                     request.wait();
+                }
                 PluginDebug.debug("wait eval request 3");
             }
         } catch (InterruptedException e) {
@@ -1178,8 +1201,9 @@ public class PluginAppletViewer extends XEmbeddedFrame
             PluginDebug.debug("wait call request 1");
             synchronized (request) {
                 PluginDebug.debug("wait call request 2");
-                while (request.isDone() == false)
+                while (request.isDone() == false) {
                     request.wait();
+                }
                 PluginDebug.debug("wait call request 3");
             }
         } catch (InterruptedException e) {
@@ -1213,8 +1237,9 @@ public class PluginAppletViewer extends XEmbeddedFrame
             PluginDebug.debug("wait cookieinfo request 1");
             synchronized (request) {
                 PluginDebug.debug("wait cookieinfo request 2");
-                while (request.isDone() == false)
+                while (request.isDone() == false) {
                     request.wait();
+                }
                 PluginDebug.debug("wait cookieinfo request 3");
             }
         } catch (InterruptedException e) {
@@ -1259,8 +1284,9 @@ public class PluginAppletViewer extends XEmbeddedFrame
             PluginDebug.debug("wait call request 1");
             synchronized (request) {
                 PluginDebug.debug("wait call request 2");
-                while (request.isDone() == false)
+                while (request.isDone() == false) {
                     request.wait();
+                }
                 PluginDebug.debug("wait call request 3");
             }
         } catch (InterruptedException e) {
@@ -1285,8 +1311,9 @@ public class PluginAppletViewer extends XEmbeddedFrame
             PluginDebug.debug("wait finalize request 1");
             synchronized (request) {
                 PluginDebug.debug("wait finalize request 2");
-                while (request.isDone() == false)
+                while (request.isDone() == false) {
                     request.wait();
+                }
                 PluginDebug.debug("wait finalize request 3");
             }
         } catch (InterruptedException e) {
@@ -1325,6 +1352,7 @@ public class PluginAppletViewer extends XEmbeddedFrame
         PluginDebug.debug("WRITING 2 DONE");
     }
 
+    @Override
     public void setStream(String key, InputStream stream) throws IOException {
         // We do nothing.
     }
@@ -1405,6 +1433,7 @@ public class PluginAppletViewer extends XEmbeddedFrame
         }
 
         AccessController.doPrivileged(new PrivilegedAction<Void>() {
+            @Override
             public Void run() {
                 ((AppletViewerPanel)panel).createAppletThread();
                 return null;
@@ -1416,6 +1445,7 @@ public class PluginAppletViewer extends XEmbeddedFrame
         panel.sendEvent(AppletPanel.APPLET_START);
     }
 
+    @Override
     public int print(Graphics graphics, PageFormat pf, int pageIndex) {
         return Printable.NO_SUCH_PAGE;
     }
@@ -1461,13 +1491,15 @@ public class PluginAppletViewer extends XEmbeddedFrame
 
         new Thread(new Runnable() {
             @SuppressWarnings("deprecation")
+            @Override
             public void run() {
                 ClassLoader cl = p.applet.getClass().getClassLoader();
 
                 // Since we want to deal with JNLPClassLoader, extract it if this
                 // is a codebase loader
-                if (cl instanceof JNLPClassLoader.CodeBaseClassLoader)
+                if (cl instanceof JNLPClassLoader.CodeBaseClassLoader) {
                     cl = ((JNLPClassLoader.CodeBaseClassLoader) cl).getParentJNLPClassLoader();
+                }
 
                 appletShutdown(p);
                 appletPanels.removeElement(p);
@@ -1477,6 +1509,7 @@ public class PluginAppletViewer extends XEmbeddedFrame
 
                 try {
                     SwingUtilities.invokeAndWait(new Runnable() {
+                        @Override
                         public void run() {
                             dispose();
                         }
@@ -1517,10 +1550,12 @@ public class PluginAppletViewer extends XEmbeddedFrame
             try {
                 java.security.Permission perm =
                         url.openConnection().getPermission();
-                if (perm != null)
+                if (perm != null) {
                     security.checkPermission(perm);
-                else
+                }
+                else {
                     security.checkConnect(url.getHost(), url.getPort());
+                }
             } catch (java.io.IOException ioe) {
                 security.checkConnect(url.getHost(), url.getPort());
             }
@@ -1534,6 +1569,7 @@ public class PluginAppletViewer extends XEmbeddedFrame
      * the parent class's update() just does a couple of checks (both of
      * which are accounted for) and then calls paint anyway.
      */
+    @Override
     public void paint(Graphics g) {
 
         // If the image or the graphics don't exist, create new ones
@@ -1576,8 +1612,9 @@ public class PluginAppletViewer extends XEmbeddedFrame
                                        long timeout) {
 
         // Can't wait on null. Return 0 indicating no wait happened.
-        if (lock == null)
-            return 0;
+        if (lock == null) {
+                                               return 0;
+                                           }
 
         assert lock.isHeldByCurrentThread();
 
@@ -1601,6 +1638,7 @@ public class PluginAppletViewer extends XEmbeddedFrame
             this.fPanel = fPanel;
         }
 
+        @Override
         public void run() {
             add("Center", fPanel);
             fPanel.setVisible(false);

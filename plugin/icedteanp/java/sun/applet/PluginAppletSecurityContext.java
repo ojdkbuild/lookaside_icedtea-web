@@ -67,7 +67,7 @@ import netscape.javascript.JSUtil;
 class Signature {
     private String signature;
     private int currentIndex;
-    private List<Class> typeList;
+    private List<Class<?>> typeList;
     private static final char ARRAY = '[';
     private static final char OBJECT = 'L';
     private static final char SIGNATURE_ENDCLASS = ';';
@@ -135,18 +135,20 @@ class Signature {
     public Signature(String signature, ClassLoader cl) {
         this.signature = signature;
         currentIndex = 0;
-        typeList = new ArrayList<Class>(10);
+        typeList = new ArrayList<Class<?>>(10);
 
         String elem;
         while (currentIndex < signature.length()) {
             elem = nextTypeName();
 
-            if (elem == null) // end of signature
+            if (elem == null) {
                 continue;
+            }
 
-            Class primitive = primitiveNameToType(elem);
-            if (primitive != null)
+            Class<?> primitive = primitiveNameToType(elem);
+            if (primitive != null) {
                 typeList.add(primitive);
+            }
             else {
                 int dimsize = 0;
                 int n = elem.indexOf('[');
@@ -163,9 +165,10 @@ class Signature {
                     if (primitive != null) {
                         typeList.add(Array.newInstance(primitive, dims)
                                                                 .getClass());
-                    } else
+                    } else {
                         typeList.add(Array.newInstance(
                                                                 getClass(arrayType, cl), dims).getClass());
+                    }
                 } else {
                     typeList.add(getClass(elem, cl));
                 }
@@ -177,9 +180,9 @@ class Signature {
         }
     }
 
-    public static Class getClass(String name, ClassLoader cl) {
+    public static Class<?> getClass(String name, ClassLoader cl) {
 
-        Class c = null;
+        Class<?> c = null;
 
         try {
             c = Class.forName(name);
@@ -196,31 +199,41 @@ class Signature {
         return c;
     }
 
-    public static Class primitiveNameToType(String name) {
-        if (name.equals("void"))
+    public static Class<?> primitiveNameToType(String name) {
+        if (name.equals("void")) {
             return Void.TYPE;
-        else if (name.equals("boolean"))
+        }
+        else if (name.equals("boolean")) {
             return Boolean.TYPE;
-        else if (name.equals("byte"))
+        }
+        else if (name.equals("byte")) {
             return Byte.TYPE;
-        else if (name.equals("char"))
+        }
+        else if (name.equals("char")) {
             return Character.TYPE;
-        else if (name.equals("short"))
+        }
+        else if (name.equals("short")) {
             return Short.TYPE;
-        else if (name.equals("int"))
+        }
+        else if (name.equals("int")) {
             return Integer.TYPE;
-        else if (name.equals("long"))
+        }
+        else if (name.equals("long")) {
             return Long.TYPE;
-        else if (name.equals("float"))
+        }
+        else if (name.equals("float")) {
             return Float.TYPE;
-        else if (name.equals("double"))
+        }
+        else if (name.equals("double")) {
             return Double.TYPE;
-        else
+        }
+        else {
             return null;
+        }
     }
 
-    public Class[] getClassArray() {
-        return typeList.subList(0, typeList.size()).toArray(new Class[] {});
+    public Class<?>[] getClassArray() {
+        return typeList.subList(0, typeList.size()).toArray(new Class<?>[] {});
     }
 }
 
@@ -234,7 +247,7 @@ public class PluginAppletSecurityContext {
     private ClassLoader liveconnectLoader = ClassLoader.getSystemClassLoader();
     int identifier = 0;
 
-    public static PluginStreamHandler streamhandler;
+    private static PluginStreamHandler streamhandler;
 
     long startTime = 0;
 
@@ -263,7 +276,7 @@ public class PluginAppletSecurityContext {
             e.printStackTrace();
         }
 
-        this.classLoaders.put(liveconnectLoader, u);
+        PluginAppletSecurityContext.classLoaders.put(liveconnectLoader, u);
     }
 
     public PluginAppletSecurityContext(int identifier) {
@@ -271,54 +284,72 @@ public class PluginAppletSecurityContext {
     }
 
     private static <V> V parseCall(String s, ClassLoader cl, Class<V> c) {
-        if (c == Integer.class)
+        if (c == Integer.class) {
             return c.cast(new Integer(s));
-        else if (c == String.class)
-            return c.cast(new String(s));
-        else if (c == Signature.class)
+        }
+        else if (c == String.class) {
+            return c.cast(s);
+        }
+        else if (c == Signature.class) {
             return c.cast(new Signature(s, cl));
-        else
+        }
+        else {
             throw new RuntimeException("Unexpected call value.");
+        }
     }
 
-    private Object parseArgs(String s, Class c) {
-        if (c == Boolean.TYPE || c == Boolean.class)
-            return new Boolean(s);
-        else if (c == Byte.TYPE || c == Byte.class)
+    private Object parseArgs(String s, Class<?> c) {
+        if (c == Boolean.TYPE || c == Boolean.class) {
+            return Boolean.valueOf(s);
+        }
+        else if (c == Byte.TYPE || c == Byte.class) {
             return new Byte(s);
+        }
         else if (c == Character.TYPE || c == Character.class) {
             String[] bytes = s.split("_");
             int low = Integer.parseInt(bytes[0]);
             int high = Integer.parseInt(bytes[1]);
             int full = ((high << 8) & 0x0ff00) | (low & 0x0ff);
             return new Character((char) full);
-        } else if (c == Short.TYPE || c == Short.class)
+        } else if (c == Short.TYPE || c == Short.class) {
             return new Short(s);
-        else if (c == Integer.TYPE || c == Integer.class)
+        }
+        else if (c == Integer.TYPE || c == Integer.class) {
             return new Integer(s);
-        else if (c == Long.TYPE || c == Long.class)
+        }
+        else if (c == Long.TYPE || c == Long.class) {
             return new Long(s);
-        else if (c == Float.TYPE || c == Float.class)
+        }
+        else if (c == Float.TYPE || c == Float.class) {
             return new Float(s);
-        else if (c == Double.TYPE || c == Double.class)
+        }
+        else if (c == Double.TYPE || c == Double.class) {
             return new Double(s);
-        else
+        }
+        else {
             return store.getObject(new Integer(s));
+        }
     }
 
     public void associateSrc(ClassLoader cl, URL src) {
         PluginDebug.debug("Associating ", cl, " with ", src);
-        this.classLoaders.put(cl, src);
+        PluginAppletSecurityContext.classLoaders.put(cl, src);
     }
 
     public void associateInstance(Integer i, ClassLoader cl) {
         PluginDebug.debug("Associating ", cl, " with instance ", i);
-        this.instanceClassLoaders.put(i, cl);
+        PluginAppletSecurityContext.instanceClassLoaders.put(i, cl);
     }
 
     public static void setStreamhandler(PluginStreamHandler sh) {
         streamhandler = sh;
     }
+
+    public static PluginStreamHandler getStreamhandler() {
+        return streamhandler;
+    }
+    
+    
 
     public static Map<String, String> getLoaderInfo() {
         Hashtable<String, String> map = new Hashtable<String, String>();
@@ -332,6 +363,7 @@ public class PluginAppletSecurityContext {
 
     private static long privilegedJSObjectUnbox(final JSObject js) {
         return AccessController.doPrivileged(new PrivilegedAction<Long>() {
+            @Override
             public Long run() {  
                 return JSUtil.getJSObjectInternalReference(js); 
             }
@@ -413,8 +445,8 @@ public class PluginAppletSecurityContext {
 
         try {
             if (message.startsWith("FindClass")) {
-                ClassLoader cl = null;
-                Class c = null;
+                ClassLoader cl;
+                Class<?> c;
                 cl = liveconnectLoader;
                 String[] args = message.split(" ");
                 Integer instance = new Integer(args[1]);
@@ -427,7 +459,7 @@ public class PluginAppletSecurityContext {
                     write(reference, "FindClass " + store.getIdentifier(c));
                 } catch (ClassNotFoundException cnfe) {
 
-                    cl = this.instanceClassLoaders.get(instance);
+                    cl = PluginAppletSecurityContext.instanceClassLoaders.get(instance);
                     PluginDebug.debug("Not found. Looking in ", cl);
 
                     if (instance != 0 && cl != null) {
@@ -455,14 +487,16 @@ public class PluginAppletSecurityContext {
 
                 if (message.startsWith("GetStaticMethodID") ||
                                     methodName.equals("<init>") ||
-                                    methodName.equals("<clinit>"))
-                    c = (Class<?>) store.getObject(classID);
-                else
-                    c = store.getObject(classID).getClass();
+                                    methodName.equals("<clinit>")) {
+                                                c = (Class<?>) store.getObject(classID);
+                                            }
+                else {
+                                                c = store.getObject(classID).getClass();
+                                            }
 
-                Method m = null;
-                Constructor cs = null;
-                Object o = null;
+                Method m;
+                Constructor<?> cs;
+                Object o;
                 if (methodName.equals("<init>")
                                                 || methodName.equals("<clinit>")) {
                     o = cs = c.getConstructor(signature.getClassArray());
@@ -484,7 +518,7 @@ public class PluginAppletSecurityContext {
 
                 PluginDebug.debug("GetStaticFieldID/GetFieldID got class=", c.getName());
 
-                Field f = null;
+                Field f;
                 f = c.getField(fieldName);
 
                 store.reference(f);
@@ -503,6 +537,7 @@ public class PluginAppletSecurityContext {
                 checkPermission(src, c, acc);
 
                 Object ret = AccessController.doPrivileged(new PrivilegedAction<Object>() {
+                    @Override
                     public Object run() {
                         try {
                             return f.get(c);
@@ -512,8 +547,9 @@ public class PluginAppletSecurityContext {
                     }
                 }, acc);
 
-                if (ret instanceof Throwable)
+                if (ret instanceof Throwable) {
                     throw (Throwable) ret;
+                }
 
                 String objIDStr = toObjectIDString(ret, f.getType(), false /*do not unbox primitives*/);
                 write(reference, "GetStaticField " + objIDStr);
@@ -542,6 +578,7 @@ public class PluginAppletSecurityContext {
                 checkPermission(src, message.startsWith("SetStaticField") ? (Class) o : o.getClass(), acc);
 
                 Object ret = AccessController.doPrivileged(new PrivilegedAction<Object>() {
+                    @Override
                     public Object run() {
                         try {
                             f.set(o, fValue);
@@ -553,8 +590,9 @@ public class PluginAppletSecurityContext {
                     }
                 }, acc);
 
-                if (ret instanceof Throwable)
+                if (ret instanceof Throwable) {
                     throw (Throwable) ret;
+                }
 
                 write(reference, "SetField");
             } else if (message.startsWith("GetObjectArrayElement")) {
@@ -605,6 +643,7 @@ public class PluginAppletSecurityContext {
                 checkPermission(src, o.getClass(), acc);
 
                 Object ret = AccessController.doPrivileged(new PrivilegedAction<Object>() {
+                    @Override
                     public Object run() {
                         try {
                             return f.get(o);
@@ -614,8 +653,9 @@ public class PluginAppletSecurityContext {
                     }
                 }, acc);
 
-                if (ret instanceof Throwable)
+                if (ret instanceof Throwable) {
                     throw (Throwable) ret;
+                }
 
                 String objIDStr = toObjectIDString(ret, f.getType(), false /*do not unbox primitives*/);
                 write(reference, "GetField " + objIDStr);
@@ -671,6 +711,7 @@ public class PluginAppletSecurityContext {
                 // http://forums.sun.com/thread.jspa?threadID=332001&start=15&tstart=0
                 m.setAccessible(true);
                 Object ret = AccessController.doPrivileged(new PrivilegedAction<Object>() {
+                    @Override
                     public Object run() {
                         try {
                             return m.invoke(callableObject, fArguments);
@@ -680,8 +721,9 @@ public class PluginAppletSecurityContext {
                     }
                 }, acc);
 
-                if (ret instanceof Throwable)
+                if (ret instanceof Throwable) {
                     throw (Throwable) ret;
+                 }
 
                 String retO;
                 if (ret == null) {
@@ -699,8 +741,8 @@ public class PluginAppletSecurityContext {
             } else if (message.startsWith("GetSuperclass")) {
                 String[] args = message.split(" ");
                 Integer classID = parseCall(args[1], null, Integer.class);
-                Class<?> c = null;
-                Class<?> ret = null;
+                Class<?> c;
+                Class<?> ret;
 
                 c = (Class) store.getObject(classID);
                 ret = c.getSuperclass();
@@ -735,7 +777,7 @@ public class PluginAppletSecurityContext {
                 String[] args = message.split(" ");
                 Integer stringID = parseCall(args[1], null, Integer.class);
 
-                String o = null;
+                String o;
                 byte[] b = null;
                 o = (String) store.getObject(stringID);
                 b = o.getBytes("UTF-8");
@@ -745,7 +787,7 @@ public class PluginAppletSecurityContext {
                 String[] args = message.split(" ");
                 Integer stringID = parseCall(args[1], null, Integer.class);
 
-                String o = null;
+                String o;
                 byte[] b = null;
                 o = (String) store.getObject(stringID);
                 b = o.getBytes("UTF-16LE");
@@ -755,22 +797,23 @@ public class PluginAppletSecurityContext {
                 String[] args = message.split(" ");
                 Integer stringID = parseCall(args[1], null, Integer.class);
 
-                String o = null;
+                String o;
                 byte[] b = null;
                 StringBuffer buf = null;
                 o = (String) store.getObject(stringID);
                 b = o.getBytes("UTF-8");
                 buf = new StringBuffer(b.length * 2);
                 buf.append(b.length);
-                for (int i = 0; i < b.length; i++)
+                for (int i = 0; i < b.length; i++) {
                     buf.append(" " + Integer.toString(((int) b[i]) & 0x0ff, 16));
+                }
 
                 write(reference, "GetStringUTFChars " + buf);
             } else if (message.startsWith("GetStringChars")) {
                 String[] args = message.split(" ");
                 Integer stringID = parseCall(args[1], null, Integer.class);
 
-                String o = null;
+                String o;
                 byte[] b = null;
                 StringBuffer buf = null;
                 o = (String) store.getObject(stringID);
@@ -778,8 +821,9 @@ public class PluginAppletSecurityContext {
                 b = o.getBytes("UTF-16LE");
                 buf = new StringBuffer(b.length * 2);
                 buf.append(b.length);
-                for (int i = 0; i < b.length; i++)
+                for (int i = 0; i < b.length; i++) {
                     buf.append(" " + Integer.toString(((int) b[i]) & 0x0ff, 16));
+                }
 
                 PluginDebug.debug("Java: GetStringChars: ", o);
                 PluginDebug.debug("  String BYTES: ", buf);
@@ -788,15 +832,16 @@ public class PluginAppletSecurityContext {
                 String[] args = message.split(" ");
                 Integer objectID = parseCall(args[1], null, Integer.class);
 
-                String o = null;
+                String o;
                 byte[] b = null;
                 StringBuffer buf = null;
                 o = store.getObject(objectID).toString();
                 b = o.getBytes("UTF-8");
                 buf = new StringBuffer(b.length * 2);
                 buf.append(b.length);
-                for (int i = 0; i < b.length; i++)
+                for (int i = 0; i < b.length; i++) {
                     buf.append(" " + Integer.toString(((int) b[i]) & 0x0ff, 16));
+                }
 
                 write(reference, "GetToStringValue " + buf);
             } else if (message.startsWith("NewArray")) {
@@ -804,9 +849,9 @@ public class PluginAppletSecurityContext {
                 String type = parseCall(args[1], null, String.class);
                 Integer length = parseCall(args[2], null, Integer.class);
 
-                Object newArray = null;
+                Object newArray;
 
-                Class c;
+                Class<?> c;
                 if (type.equals("bool")) {
                     c = Boolean.class;
                 } else if (type.equals("double")) {
@@ -821,10 +866,12 @@ public class PluginAppletSecurityContext {
                     c = JSObject.class;
                 }
 
-                if (args.length > 3)
+                if (args.length > 3) {
                     newArray = Array.newInstance(c, new int[] { length, parseCall(args[3], null, Integer.class) });
-                else
+                }
+                else {
                     newArray = Array.newInstance(c, length);
+                }
 
                 store.reference(newArray);
                 write(reference, "NewArray " + store.getIdentifier(newArray));
@@ -833,7 +880,7 @@ public class PluginAppletSecurityContext {
                 Integer classNameID = parseCall(args[1], null, Integer.class);
                 Integer methodNameID = parseCall(args[2], null, Integer.class);
 
-                Class c = (Class<?>) store.getObject(classNameID);
+                Class<?> c = (Class<?>) store.getObject(classNameID);
                 String methodName = (String) store.getObject(methodNameID);
 
                 Method method = null;
@@ -864,7 +911,7 @@ public class PluginAppletSecurityContext {
                 Integer classNameID = parseCall(args[1], null, Integer.class);
                 Integer fieldNameID = parseCall(args[2], null, Integer.class);
 
-                Class c = (Class) store.getObject(classNameID);
+                Class<?> c = (Class<?>) store.getObject(classNameID);
                 String fieldName = (String) store.getObject(fieldNameID);
 
                 Field field = null;
@@ -885,13 +932,14 @@ public class PluginAppletSecurityContext {
                 Integer classID = parseCall(args[2], null, Integer.class);
                 Integer objectID = parseCall(args[3], null, Integer.class);
 
-                Object newArray = null;
+                Object newArray;
                 newArray = Array.newInstance((Class) store.getObject(classID),
                                                 length);
 
                 Object[] array = (Object[]) newArray;
-                for (int i = 0; i < array.length; i++)
+                for (int i = 0; i < array.length; i++) {
                     array[i] = store.getObject(objectID);
+                }
                 store.reference(newArray);
                 write(reference, "NewObjectArray "
                                                 + store.getIdentifier(newArray));
@@ -901,7 +949,7 @@ public class PluginAppletSecurityContext {
                 Integer classID = parseCall(args[1], null, Integer.class);
                 Integer methodID = parseCall(args[2], null, Integer.class);
 
-                final Constructor m = (Constructor) store.getObject(methodID);
+                final Constructor<?> m = (Constructor<?>) store.getObject(methodID);
                 Class[] argTypes = m.getParameterTypes();
 
                 Object[] arguments = new Object[argTypes.length];
@@ -912,10 +960,11 @@ public class PluginAppletSecurityContext {
                 final Object[] fArguments = arguments;
                 AccessControlContext acc = callContext != null ? callContext : getClosedAccessControlContext();
 
-                Class c = (Class) store.getObject(classID);
+                Class<?> c = (Class<?>) store.getObject(classID);
                 checkPermission(src, c, acc);
 
                 Object ret = AccessController.doPrivileged(new PrivilegedAction<Object>() {
+                    @Override
                     public Object run() {
                         try {
                             return m.newInstance(fArguments);
@@ -925,8 +974,9 @@ public class PluginAppletSecurityContext {
                     }
                 }, acc);
 
-                if (ret instanceof Throwable)
+                if (ret instanceof Throwable) {
                     throw (Throwable) ret;
+                }
 
                 store.reference(ret);
 
@@ -964,6 +1014,7 @@ public class PluginAppletSecurityContext {
                 checkPermission(src, c, acc);
 
                 Object ret = AccessController.doPrivileged(new PrivilegedAction<Object>() {
+                    @Override
                     public Object run() {
                         try {
                             return cons.newInstance(castedArgs);
@@ -973,8 +1024,9 @@ public class PluginAppletSecurityContext {
                     }
                 }, acc);
 
-                if (ret instanceof Throwable)
+                if (ret instanceof Throwable) {
                     throw (Throwable) ret;
+                }
 
                 store.reference(ret);
 
@@ -1005,7 +1057,7 @@ public class PluginAppletSecurityContext {
                 Integer strlength = parseCall(args[1], null, Integer.class);
                 int bytelength = 2 * strlength;
                 byte[] byteArray = new byte[bytelength];
-                String ret = null;
+                String ret;
                 for (int i = 0; i < strlength; i++) {
                     int c = parseCall(args[2 + i], null, Integer.class);
                     PluginDebug.debug("char ", i, " ", c);
@@ -1022,13 +1074,15 @@ public class PluginAppletSecurityContext {
 
             } else if (message.startsWith("ExceptionOccurred")) {
                 PluginDebug.debug("EXCEPTION: ", throwable);
-                if (throwable != null)
+                if (throwable != null) {
                     store.reference(throwable);
+                }
                 write(reference, "ExceptionOccurred "
                                                 + store.getIdentifier(throwable));
             } else if (message.startsWith("ExceptionClear")) {
-                if (throwable != null && store.contains(throwable))
+                if (throwable != null && store.contains(throwable)) {
                     store.unreference(store.getIdentifier(throwable));
+                }
                 throwable = null;
                 write(reference, "ExceptionClear");
             } else if (message.startsWith("DeleteGlobalRef")) {
@@ -1078,8 +1132,9 @@ public class PluginAppletSecurityContext {
             // Store the cause as the actual exception. This is needed because
             // the exception we get here will always be an
             // "InvocationTargetException" due to the use of reflection above
-            if (message.startsWith("CallMethod") || message.startsWith("CallStaticMethod"))
+            if (message.startsWith("CallMethod") || message.startsWith("CallStaticMethod")) {
                 throwable = t.getCause();
+            }
         }
 
     }
@@ -1092,7 +1147,7 @@ public class PluginAppletSecurityContext {
      * @param acc AccessControlContext for this execution
      * @throws AccessControlException If the script has insufficient permissions
      */
-    public void checkPermission(String jsSrc, Class target, AccessControlContext acc) throws AccessControlException {
+    public void checkPermission(String jsSrc, Class<?> target, AccessControlContext acc) throws AccessControlException {
         // NPRuntime does not allow cross-site calling. We therefore always
         // allow this, for the time being
         return;
@@ -1175,7 +1230,7 @@ public class PluginAppletSecurityContext {
     private int prepopulateClass(String name) {
         name = name.replace('/', '.');
         ClassLoader cl = liveconnectLoader;
-        Class c = null;
+        Class<?> c = null;
 
         try {
             c = cl.loadClass(name);
@@ -1194,7 +1249,7 @@ public class PluginAppletSecurityContext {
 
         Class<?> c = (Class<?>) store.getObject(classID);
         Method m = null;
-        Constructor cs = null;
+        Constructor<?> cs = null;
 
         try {
             if (methodName.equals("<init>")
@@ -1280,8 +1335,9 @@ public class PluginAppletSecurityContext {
                 // do nothing
             }
 
-            if (src.equals("[System]"))
+            if (src.equals("[System]")) {
                 grantedPermissions.add(new JSObjectCreatePermission());
+            }
 
         } else {
             JSObjectCreatePermission perm = new JSObjectCreatePermission();

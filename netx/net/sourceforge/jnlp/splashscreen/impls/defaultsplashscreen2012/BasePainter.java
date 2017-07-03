@@ -58,6 +58,7 @@ import net.sourceforge.jnlp.splashscreen.SplashUtils.SplashReason;
 import net.sourceforge.jnlp.splashscreen.parts.BasicComponentSplashScreen;
 import net.sourceforge.jnlp.splashscreen.parts.InfoItem;
 import net.sourceforge.jnlp.splashscreen.parts.InformationElement;
+import net.sourceforge.jnlp.splashscreen.parts.extensions.ExtensionManager;
 import net.sourceforge.jnlp.util.ScreenFinder;
 
 public class BasePainter implements Observer {
@@ -71,11 +72,11 @@ public class BasePainter implements Observer {
     private int greyTextIncrment = 15; //how quickly is greyed web moving
     //colors
     protected static final Color TEA_LIVE_COLOR = new Color(205, 1, 3);
-    protected static final Color BACKGROUND_LIVE_COLOR = Color.white;
+    protected static final Color BACKGROUND_LIVE_COLOR = ExtensionManager.getExtension().getBackground();
     protected static final Color TEA_LEAFS_STALKS_LIVE_COLOR = Color.black;
-    protected static final Color PLUGIN_LIVE_COLOR = Color.black;
-    protected static final Color WATER_LIVE_COLOR = new Color(80, 131, 160);
-    protected static final Color PLAIN_TEXT_LIVE_COLOR = Color.black;
+    protected static final Color PLUGIN_LIVE_COLOR = ExtensionManager.getExtension().getPluginTextColor();
+    public static final Color WATER_LIVE_COLOR = new Color(80, 131, 160);
+    protected static final Color PLAIN_TEXT_LIVE_COLOR = ExtensionManager.getExtension().getTextColor();
     protected Color teaColor;
     protected Color backgroundColor;
     protected Color teaLeafsStalksColor;
@@ -224,6 +225,7 @@ public class BasePainter implements Observer {
         this.master = master;
         setColors();
         adjustForSize(master.getSplashWidth(), master.getSplashHeight());
+        ExtensionManager.getExtension().adjustForSize(master.getSplashWidth(), master.getSplashHeight());
         if (startAnimation) {
             startAnimationThreads();
         }
@@ -231,6 +233,7 @@ public class BasePainter implements Observer {
     }
 
     public void increaseAnimationPosition() {
+        ExtensionManager.getExtension().animate();
         animationsPosition += greyTextIncrment;
     }
 
@@ -248,6 +251,7 @@ public class BasePainter implements Observer {
         }
 
         if (showNiceTexts) {
+            ExtensionManager.getExtension().paint(g, this);
             paintNiceTexts(g2d);
         } else {
             paintPlainTexts(g2d);
@@ -262,6 +266,7 @@ public class BasePainter implements Observer {
         //enablings depends on fonts
         setEnablings(width, height, master.getVersion(), master.getInformationElement(), (Graphics2D) (master.getGraphics()));
         prerenderedStuff = prerenderStill();
+        ExtensionManager.getExtension().adjustForSize(width, height);
     }
 
     private void setEnablings(int w, int h, String version, InformationElement ic, Graphics2D g2d) {
@@ -543,6 +548,7 @@ public class BasePainter implements Observer {
 
                 @Override
                 public void run() {
+                    ExtensionManager.getExtension().animate();
                     master.repaint();
                 }
             });
@@ -550,4 +556,14 @@ public class BasePainter implements Observer {
             ex.printStackTrace();
         }
     }
+
+    public Color getWaterColor() {
+        return waterColor;
+    }
+
+    public Color getBackgroundColor() {
+        return backgroundColor;
+    }
+    
+    
 }

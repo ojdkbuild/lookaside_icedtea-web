@@ -38,6 +38,7 @@ exception statement from your version. */
 
 #include <stdio.h>
 #include "IcedTeaRunnable.h"
+#include "IcedTeaPluginUtils.h"
 
 NS_IMPL_ISUPPORTS1 (IcedTeaRunnable, nsIRunnable)
 
@@ -69,7 +70,7 @@ IcedTeaRunnableMethod::~IcedTeaRunnableMethod ()
 NS_IMETHODIMP
 IcedTeaRunnableMethod::Run ()
 {
-    printf("Running method...\n");
+    PLUGIN_DEBUG("Running method...\n");
     (*method) (thread_data, result);
     return NS_OK;
 }

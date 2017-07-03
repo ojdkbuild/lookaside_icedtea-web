@@ -88,6 +88,7 @@ public class AppletEnvironment implements AppletContext, AppletStub {
         // may not need this once security manager can close windows
         // that do not have app code on the stack
         WindowListener closer = new WindowAdapter() {
+            @Override
             public void windowClosing(WindowEvent event) {
                 appletInstance.destroy();
                 System.exit(0);
@@ -104,8 +105,9 @@ public class AppletEnvironment implements AppletContext, AppletStub {
      * @throws IllegalStateException
      */
     private void checkDestroyed() {
-        if (destroyed)
+        if (destroyed) {
             throw new IllegalStateException("Illegal applet stub/context access: applet destroyed.");
+        }
     }
 
     /**
@@ -146,18 +148,21 @@ public class AppletEnvironment implements AppletContext, AppletStub {
     public void startApplet() {
         checkDestroyed();
 
-        if (appletStarted)
+        if (appletStarted) {
             return;
+        }
 
         appletStarted = true;
 
         try {
             AppletDesc appletDesc = file.getApplet();
 
-            if (cont instanceof AppletStub)
+            if (cont instanceof AppletStub) {
                 applet.setStub((AppletStub) cont);
-            else
+            }
+            else {
                 applet.setStub(this);
+            }
 
             cont.setLayout(new BorderLayout());
             cont.add("Center", applet);
@@ -175,6 +180,7 @@ public class AppletEnvironment implements AppletContext, AppletStub {
 
             try {
                 SwingUtilities.invokeAndWait(new Runnable() {
+                    @Override
                     public void run() {
                         // do first because some applets need to be displayed before
                         // starting (they use Component.getImage or something)
@@ -207,13 +213,15 @@ public class AppletEnvironment implements AppletContext, AppletStub {
      * Returns the applet if the applet's name is specified,
      * otherwise return null.
      */
+    @Override
     public Applet getApplet(String name) {
         checkDestroyed();
 
-        if (name != null && name.equals(file.getApplet().getName()))
+        if (name != null && name.equals(file.getApplet().getName())) {
             return applet;
-        else
+        } else {
             return null;
+        }
     }
 
     /**
@@ -234,6 +242,7 @@ public class AppletEnvironment implements AppletContext, AppletStub {
      * Returns an enumeration that contains only the applet
      * from the JNLP file.
      */
+    @Override
     public Enumeration<Applet> getApplets() {
         checkDestroyed();
 
@@ -243,6 +252,7 @@ public class AppletEnvironment implements AppletContext, AppletStub {
     /**
      * Returns an audio clip.
      */
+    @Override
     public AudioClip getAudioClip(URL location) {
         checkDestroyed();
 
@@ -257,6 +267,7 @@ public class AppletEnvironment implements AppletContext, AppletStub {
     /**
      * Return an image loaded from the specified location.
      */
+    @Override
     public Image getImage(URL location) {
         checkDestroyed();
 
@@ -269,6 +280,7 @@ public class AppletEnvironment implements AppletContext, AppletStub {
     /**
      * Not implemented yet.
      */
+    @Override
     public void showDocument(java.net.URL uRL) {
         checkDestroyed();
 
@@ -277,6 +289,7 @@ public class AppletEnvironment implements AppletContext, AppletStub {
     /**
      * Not implemented yet.
      */
+    @Override
     public void showDocument(java.net.URL uRL, java.lang.String str) {
         checkDestroyed();
 
@@ -285,6 +298,7 @@ public class AppletEnvironment implements AppletContext, AppletStub {
     /**
      * Not implemented yet.
      */
+    @Override
     public void showStatus(java.lang.String str) {
         checkDestroyed();
 
@@ -293,6 +307,7 @@ public class AppletEnvironment implements AppletContext, AppletStub {
     /**
      * Required for JRE1.4, but not implemented yet.
      */
+    @Override
     public void setStream(String key, InputStream stream) {
         checkDestroyed();
 
@@ -301,6 +316,7 @@ public class AppletEnvironment implements AppletContext, AppletStub {
     /**
      * Required for JRE1.4, but not implemented yet.
      */
+    @Override
     public InputStream getStream(String key) {
         checkDestroyed();
 
@@ -310,6 +326,7 @@ public class AppletEnvironment implements AppletContext, AppletStub {
     /**
      * Required for JRE1.4, but not implemented yet.
      */
+    @Override
     public Iterator<String> getStreamKeys() {
         checkDestroyed();
 
@@ -318,6 +335,7 @@ public class AppletEnvironment implements AppletContext, AppletStub {
 
     // stub methods
 
+    @Override
     public void appletResize(int width, int height) {
         checkDestroyed();
 
@@ -330,18 +348,21 @@ public class AppletEnvironment implements AppletContext, AppletStub {
         }
     }
 
+    @Override
     public AppletContext getAppletContext() {
         checkDestroyed();
 
         return this;
     }
 
+    @Override
     public URL getCodeBase() {
         checkDestroyed();
 
         return file.getCodeBase();
     }
 
+    @Override
     public URL getDocumentBase() {
         checkDestroyed();
 
@@ -350,16 +371,19 @@ public class AppletEnvironment implements AppletContext, AppletStub {
 
     // FIXME: Sun's applet code forces all parameters to lower case.
     // Does Netx's JNLP code do the same, so we can remove the first lookup?
+    @Override
     public String getParameter(String name) {
         checkDestroyed();
 
-        String s = (String) parameters.get(name);
-        if (s != null)
+        String s = parameters.get(name);
+        if (s != null) {
             return s;
+        }
 
-        return (String) parameters.get(name.toLowerCase());
+        return  parameters.get(name.toLowerCase());
     }
 
+    @Override
     public boolean isActive() {
         checkDestroyed();
 

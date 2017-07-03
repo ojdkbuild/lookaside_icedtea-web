@@ -39,7 +39,6 @@ import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.io.BufferedWriter;
@@ -116,7 +115,6 @@ public class UnsignedAppletsTrustingListPanel extends javax.swing.JPanel {
     private UnsignedAppletActionTableModel currentModel;
     private String lastDoc;
     private String lastCode;
-    private final UnsignedAppletsTrustingListPanel self;
 
 
     /*
@@ -150,7 +148,6 @@ public class UnsignedAppletsTrustingListPanel extends javax.swing.JPanel {
     }
 
     public UnsignedAppletsTrustingListPanel(File globalSettings, File customSettings, DeploymentConfiguration conf) {
-        self = this;
         customBackEnd = new UnsignedAppletActionStorageExtendedImpl(customSettings);
         globalBackEnd = new UnsignedAppletActionStorageExtendedImpl(globalSettings);
         customModel = new UnsignedAppletActionTableModel(customBackEnd);
@@ -763,7 +760,7 @@ public class UnsignedAppletsTrustingListPanel extends javax.swing.JPanel {
     private void removeByBehaviour(ExecuteUnsignedApplet unsignedAppletAction) {
         UnsignedAppletActionEntry[] items = currentModel.back.toArray();
         if (askBeforeActionCheckBox.isSelected()) {
-            List<UnsignedAppletActionEntry> toBeDeleted = new ArrayList();
+            List<UnsignedAppletActionEntry> toBeDeleted = new ArrayList<UnsignedAppletActionEntry>();
             for (int i = 0; i < items.length; i++) {
                 UnsignedAppletActionEntry unsignedAppletActionEntry = items[i];
                 if (unsignedAppletActionEntry.getUnsignedAppletAction() == unsignedAppletAction) {
@@ -879,7 +876,7 @@ public class UnsignedAppletsTrustingListPanel extends javax.swing.JPanel {
         @Override
         public void keyPressed(KeyEvent e) {
             if (e.getKeyCode() == KeyEvent.VK_DELETE && !currentModel.back.isReadOnly()) {
-                removeSelectedFromTable(table, askBeforeActionCheckBox.isSelected(), (UnsignedAppletActionTableModel) table.getModel(), self);
+                removeSelectedFromTable(table, askBeforeActionCheckBox.isSelected(), (UnsignedAppletActionTableModel) table.getModel(), UnsignedAppletsTrustingListPanel.this);
             }
         }
 
