@@ -60,6 +60,7 @@ import net.sourceforge.jnlp.security.viewer.CertificatePane;
 import net.sourceforge.jnlp.util.ImageResources;
 import net.sourceforge.jnlp.util.logging.OutputController;
 import net.sourceforge.swing.SwingUtils;
+import net.sourceforge.jnlp.util.ui.SwingHelpers;
 
 /**
  * This is the control panel for Java. It provides a GUI for modifying the
@@ -413,11 +414,7 @@ public class ControlPanel extends JFrame {
             OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e);
         }
 
-        try {
-            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-        } catch (Exception e) {
-            // ignore; not a big deal
-        }
+        SwingHelpers.enableDefaultLaF();
 
         SwingUtils.invokeLater(new Runnable() {
             @Override

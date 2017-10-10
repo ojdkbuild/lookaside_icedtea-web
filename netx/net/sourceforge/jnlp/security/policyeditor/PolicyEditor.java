@@ -119,6 +119,7 @@ import net.sourceforge.jnlp.util.docprovider.formatters.formatters.PlainTextForm
 import net.sourceforge.jnlp.util.logging.OutputController;
 import net.sourceforge.jnlp.util.optionparser.OptionParser;
 import net.sourceforge.swing.SwingUtils;
+import net.sourceforge.jnlp.util.ui.SwingHelpers;
 import sun.security.provider.PolicyParser;
 
 /**
@@ -1738,11 +1739,7 @@ public class PolicyEditor extends JPanel {
             return;
         }
 
-        try {
-            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-        } catch (final Exception e) {
-            // not really important, so just ignore
-        }
+        SwingHelpers.enableDefaultLaF();
 
         final String filepath = getFilePathArgument(optionParser);
         final String codebase = getCodebaseArgument(optionParser);
