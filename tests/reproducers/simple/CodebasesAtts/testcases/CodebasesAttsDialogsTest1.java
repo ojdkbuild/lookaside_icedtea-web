@@ -87,8 +87,7 @@ public class CodebasesAttsDialogsTest1 extends BrowserTest {
     private static final String appletCloseString = CodebasesAttsNoDialogsTest1.appletCloseString;
     private static final String[] JAVAWS_HTML_ARRAY = CodebasesAttsNoDialogsTest1.JAVAWS_HTML_ARRAY;
     private static final List<String> JAVAWS_HTML_LIST = CodebasesAttsNoDialogsTest1.JAVAWS_HTML_LIST;
-    //disabled - 1.6 specific. We need dialogs to pop up.  Anyway, in 1.6 all such tests are disbaled for runtime anyway
-    private static final String[] JAVAWS_HEADLES_ARRAY = new String[]{};//{OptionsDefinitions.OPTIONS.HTML.HEADLESS.option};
+    private static final String[] JAVAWS_HEADLES_ARRAY = new String[]{OptionsDefinitions.OPTIONS.HTML.HEADLESS.option};
     private static final List<String> JAVAWS_HEADLES_LIST = Arrays.asList(JAVAWS_HEADLES_ARRAY);
 
     private static final String JNLPAPP = CodebasesAttsNoDialogsTest1.JNLPAPP;
@@ -125,21 +124,16 @@ public class CodebasesAttsDialogsTest1 extends BrowserTest {
     public static void resetProperties() throws IOException {
         ensuredDP.restoreProperties();
     }
-    
-    @Test
-    public void allTestsInThisFileAreDisabled(){
-        //because 1.6 do not support headless dialogues
-    }
 
     @NeedsDisplay
-    //@Test
+    @Test
     @Bug(id = "PR2489")
     public void codebasesAttsTestWorksJnlp1_null() throws Exception {
         prepare(null);
         ProcessWrapper pw = new ProcessWrapper(server.getJavawsLocation(), JAVAWS_HEADLES_LIST, server.getUrl(JNLPAPP));
         pw.addStdOutListener(new AutoOkClosingListener());
         pw.addStdErrListener(new AutoErrorClosingListener());
-        //pw.setWriter("YES\nYES\nYES\nYES\n");
+        pw.setWriter("YES\nYES\nYES\nYES\n");
         ProcessResult pr = pw.execute();
         Assert.assertTrue(pr.stdout.contains(appletCloseString));
         Assert.assertTrue(pr.stdout.contains(CodebasesAtts));
@@ -148,14 +142,14 @@ public class CodebasesAttsDialogsTest1 extends BrowserTest {
     }
 
     @NeedsDisplay
-    //@Test
+    @Test
     @Bug(id = "PR2489")
     public void codebasesAttsTestWorksJnlp2_null() throws Exception {
         prepare(null);
         ProcessWrapper pw = new ProcessWrapper(server.getJavawsLocation(), JAVAWS_HEADLES_LIST, server.getUrl(JNLPAPPLET));
         pw.addStdOutListener(new AutoOkClosingListener());
         pw.addStdErrListener(new AutoErrorClosingListener());
-        //pw.setWriter("YES\nYES\nYES\nYES\n");
+        pw.setWriter("YES\nYES\nYES\nYES\n");
         ProcessResult pr = pw.execute();
         Assert.assertTrue(pr.stdout.contains(appletCloseString));
         Assert.assertTrue(pr.stdout.contains(CodebasesAtts));
@@ -164,7 +158,7 @@ public class CodebasesAttsDialogsTest1 extends BrowserTest {
     }
 
     @NeedsDisplay
-    //@Test  //rowsers dont support headless dialogues
+    //@Test  rowsers dont support headless dialogues
     @TestInBrowsers(testIn = Browsers.one)
     @Bug(id = "PR2489")
     public void codebasesAttsTestWorksHtml1_null() throws Exception {
@@ -177,7 +171,7 @@ public class CodebasesAttsDialogsTest1 extends BrowserTest {
     }
 
     @NeedsDisplay
-    //@Test //browsers do not support ehadless dialogues
+    //@Test browsers do not support ehadless dialogues
     @TestInBrowsers(testIn = Browsers.one)
     @Bug(id = "PR2489")
     public void codebasesAttsTestWorksHtml2_null() throws Exception {
@@ -190,7 +184,7 @@ public class CodebasesAttsDialogsTest1 extends BrowserTest {
     }
 
     @NeedsDisplay
-    //@Test
+    @Test
     @Bug(id = "PR2489")
     public void codebasesAttsTestWorksJavawsHtml1_null() throws Exception {
         prepare(null);
@@ -200,7 +194,7 @@ public class CodebasesAttsDialogsTest1 extends BrowserTest {
         ProcessWrapper pw = new ProcessWrapper(server.getJavawsLocation(), HTML_HEADLESS, server.getUrl(HTML));
         pw.addStdOutListener(new AutoOkClosingListener());
         pw.addStdErrListener(new AutoErrorClosingListener());
-        //pw.setWriter("YES\nYES\nYES\nYES\n");
+        pw.setWriter("YES\nYES\nYES\nYES\n");
         ProcessResult pr = pw.execute();
         Assert.assertTrue(pr.stdout.contains(appletCloseString));
         Assert.assertTrue(pr.stdout.contains(CodebasesAtts));
@@ -209,7 +203,7 @@ public class CodebasesAttsDialogsTest1 extends BrowserTest {
     }
 
     @NeedsDisplay
-    //@Test
+    @Test
     @Bug(id = "PR2489")
     public void codebasesAttsTestWorksJavawsHtml2_null() throws Exception {
         prepare(null);
@@ -219,7 +213,7 @@ public class CodebasesAttsDialogsTest1 extends BrowserTest {
         ProcessWrapper pw = new ProcessWrapper(server.getJavawsLocation(), HTML_HEADLESS, server.getUrl(HTMLHREF));
         pw.addStdOutListener(new AutoOkClosingListener());
         pw.addStdErrListener(new AutoErrorClosingListener());
-        //pw.setWriter("YES\nYES\nYES\nYES\n");
+        pw.setWriter("YES\nYES\nYES\nYES\n");
         ProcessResult pr = pw.execute();
         Assert.assertTrue(pr.stdout.contains(appletCloseString));
         Assert.assertTrue(pr.stdout.contains(CodebasesAtts));

@@ -36,7 +36,6 @@ exception statement from your version.
 
 package net.sourceforge.jnlp.security.dialogs.apptrustwarningpanel;
 
-import static net.sourceforge.jnlp.runtime.Translator.R;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -44,7 +43,6 @@ import java.awt.Desktop;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
-import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.IOException;
@@ -54,15 +52,12 @@ import java.util.List;
 
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
-import javax.swing.ButtonGroup;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
-import javax.swing.JCheckBox;
 import javax.swing.JDialog;
 import javax.swing.JEditorPane;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.JRadioButton;
 import javax.swing.SwingConstants;
 import javax.swing.event.HyperlinkEvent;
 import javax.swing.event.HyperlinkListener;
@@ -70,8 +65,15 @@ import javax.swing.event.HyperlinkListener;
 import net.sourceforge.jnlp.JNLPFile;
 import net.sourceforge.jnlp.PluginBridge;
 import static net.sourceforge.jnlp.runtime.Translator.R;
-import net.sourceforge.jnlp.security.appletextendedsecurity.ExecuteAppletAction;
+import net.sourceforge.jnlp.security.SecurityDialog;
 import net.sourceforge.jnlp.security.appletextendedsecurity.ExtendedAppletSecurityHelp;
+import net.sourceforge.jnlp.security.dialogresults.DialogResult;
+import net.sourceforge.jnlp.security.dialogresults.SetValueHandler;
+import net.sourceforge.jnlp.security.dialogresults.YesNoSandboxLimited;
+import net.sourceforge.jnlp.security.dialogs.SecurityDialogPanel;
+import net.sourceforge.jnlp.security.dialogs.remember.RememberPanel;
+import net.sourceforge.jnlp.security.dialogs.remember.RememberPanelResult;
+import net.sourceforge.jnlp.security.dialogs.remember.RememberableDialog;
 import net.sourceforge.jnlp.util.ScreenFinder;
 import net.sourceforge.jnlp.util.logging.OutputController;
 
@@ -83,36 +85,7 @@ import net.sourceforge.jnlp.util.logging.OutputController;
  * plugin applets. New implementations should be added to the unit test at
  * unit/net/sourceforge/jnlp/security/AppTrustWarningPanelTest
  */
-public abstract class AppTrustWarningPanel extends JPanel {
-
-    /*
-     * Details of decided action.
-     */
-    public static class AppSigningWarningAction {
-        private ExecuteAppletAction action;
-        private boolean applyToCodeBase;
-
-        public AppSigningWarningAction(ExecuteAppletAction action,
-                boolean applyToCodeBase) {
-            this.action = action;
-            this.applyToCodeBase = applyToCodeBase;
-        }
-
-        public ExecuteAppletAction getAction() {
-            return action;
-        }
-
-        public boolean rememberForCodeBase() {
-            return applyToCodeBase;
-        }
-    }
-
-    /*
-     * Callback for when action is decided.
-     */
-    public static interface ActionChoiceListener {
-        void actionChosen(AppSigningWarningAction action);
-    }
+public abstract class AppTrustWarningPanel extends SecurityDialogPanel implements RememberableDialog{
 
     protected int PANE_WIDTH = 500;
 
@@ -125,29 +98,30 @@ public abstract class AppTrustWarningPanel extends JPanel {
     protected JButton allowButton;
     protected JButton rejectButton;
     protected JButton helpButton;
-    protected JCheckBox permanencyCheckBox;
-    protected JRadioButton applyToAppletButton;
-    protected JRadioButton applyToCodeBaseButton;
+    protected RememberPanel rememberPanel;
 
     protected JNLPFile file;
-
-    protected ActionChoiceListener actionChoiceListener;
 
     /*
      * Subclasses should call addComponents() IMMEDIATELY after calling the super() constructor!
      */
-    public AppTrustWarningPanel(JNLPFile file, ActionChoiceListener actionChoiceListener) {
+    public AppTrustWarningPanel(JNLPFile file, SecurityDialog securityDialog) {
+        super(securityDialog);
         this.file = file;
-        this.actionChoiceListener = actionChoiceListener;
-        this.buttons = new ArrayList<JButton>();
+        this.parent = securityDialog;
+        rememberPanel = new RememberPanel(file.getCodeBase());
+        this.buttons = new ArrayList<>();
 
         allowButton = new JButton(R("ButProceed"));
         rejectButton = new JButton(R("ButCancel"));
         helpButton = new JButton(R("APPEXTSECguiPanelHelpButton"));
 
-        allowButton.addActionListener(chosenActionSetter(ExecuteAppletAction.YES));
-        rejectButton.addActionListener(chosenActionSetter(ExecuteAppletAction.NO));
 
+        allowButton.addActionListener(SetValueHandler.createSetValueListener(parent,
+                YesNoSandboxLimited.yes()));
+        rejectButton.addActionListener(SetValueHandler.createSetValueListener(parent,
+                YesNoSandboxLimited.no()));
+        
         helpButton.addActionListener(getHelpButtonAction());
 
         buttons.add(allowButton);
@@ -194,10 +168,6 @@ public abstract class AppTrustWarningPanel extends JPanel {
                 d.setVisible(true);
             }
         };
-    }
-
-    protected static String htmlWrap(String text) {
-        return "<html>" + text + "</html>";
     }
 
     private void setupTopPanel() {
@@ -247,9 +217,7 @@ public abstract class AppTrustWarningPanel extends JPanel {
                     if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED) {
                         Desktop.getDesktop().browse(e.getURL().toURI());
                     }
-                } catch (IOException ex) {
-                    OutputController.getLogger().log(ex);
-                } catch (URISyntaxException ex) {
+                } catch (IOException | URISyntaxException ex) {
                     OutputController.getLogger().log(ex);
                 }
             }
@@ -276,37 +244,6 @@ public abstract class AppTrustWarningPanel extends JPanel {
         add(questionPanel);
     }
 
-    private JPanel createMatchOptionsPanel() {
-        JPanel matchOptionsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-
-        ButtonGroup group = new ButtonGroup();
-        applyToAppletButton = new JRadioButton(R("SRememberAppletOnly"));
-        applyToAppletButton.setSelected(true);
-        applyToAppletButton.setEnabled(false); // Start disabled until 'Remember this option' is selected
-
-        applyToCodeBaseButton = new JRadioButton(htmlWrap(R("SRememberCodebase", file.getCodeBase())));
-        applyToCodeBaseButton.setEnabled(false);
-
-        group.add(applyToAppletButton);
-        group.add(applyToCodeBaseButton);
-
-        matchOptionsPanel.add(applyToAppletButton);
-        matchOptionsPanel.add(applyToCodeBaseButton);
-
-        return matchOptionsPanel;
-    }
-
-    private JPanel createCheckBoxPanel() {
-        JPanel checkBoxPanel = new JPanel(new BorderLayout());
-
-        permanencyCheckBox = new JCheckBox(htmlWrap(R("SRememberOption")));
-        permanencyCheckBox.addActionListener(permanencyListener());
-        checkBoxPanel.setBorder(BorderFactory.createEmptyBorder(0, 15, 0, 0));
-        checkBoxPanel.add(permanencyCheckBox,  BorderLayout.SOUTH);
-
-        return checkBoxPanel;
-    }
-
     private JPanel createButtonPanel() {
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
 
@@ -322,11 +259,6 @@ public abstract class AppTrustWarningPanel extends JPanel {
     // Set up 'Remember Option' checkbox & Proceed/Cancel buttons
     private void setupButtonAndCheckBoxPanel() {
         JPanel outerPanel = new JPanel(new BorderLayout());
-        JPanel rememberPanel = new JPanel(new GridLayout(2 /*rows*/, 1 /*column*/));
-        rememberPanel.add(createMatchOptionsPanel());
-        rememberPanel.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 10));
-
-        outerPanel.add(createCheckBoxPanel(), BorderLayout.WEST);
         outerPanel.add(rememberPanel, BorderLayout.SOUTH);
         outerPanel.add(createButtonPanel(), BorderLayout.EAST);
 
@@ -334,8 +266,9 @@ public abstract class AppTrustWarningPanel extends JPanel {
     }
 
     /**
-     * Creates the actual GUI components, and adds it to this panel. This should be called by all subclasses
-     * IMMEDIATELY after calling the super() constructor!
+     * Creates the actual GUI components, and adds it to this panel. This should
+     * be called by all subclasses IMMEDIATELY after calling the super()
+     * constructor!
      */
     protected final void addComponents() {
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
@@ -346,34 +279,44 @@ public abstract class AppTrustWarningPanel extends JPanel {
         setupButtonAndCheckBoxPanel();
     }
 
-    // Toggles whether 'match applet' or 'match codebase' options are greyed out
-    protected ActionListener permanencyListener() {
-        return new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                applyToAppletButton.setEnabled(permanencyCheckBox.isSelected());
-                applyToCodeBaseButton.setEnabled(permanencyCheckBox.isSelected());
-            }
-        };
+    @Override
+    public RememberPanelResult getRemeberAction() {
+        return rememberPanel.getRememberAction();
     }
 
-    protected ActionListener chosenActionSetter(final ExecuteAppletAction action) {
-        return new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                ExecuteAppletAction realAction;
-
-                if (action == ExecuteAppletAction.YES) {
-                    realAction = permanencyCheckBox.isSelected() ? ExecuteAppletAction.ALWAYS : ExecuteAppletAction.YES;
-                } else if (action == ExecuteAppletAction.NO) {
-                    realAction = permanencyCheckBox.isSelected() ? ExecuteAppletAction.NEVER : ExecuteAppletAction.NO;
-                } else {
-                    realAction = action;
-                }
-
-                boolean applyToCodeBase = applyToCodeBaseButton.isSelected();
-                actionChoiceListener.actionChosen(new AppSigningWarningAction(realAction, applyToCodeBase));
-            }
-        };
+    @Override
+    public JNLPFile getFile() {
+        return file;
     }
+
+    @Override
+    public DialogResult getValue() {
+        return parent.getValue();
+    }
+    
+    @Override
+    public DialogResult readValue(String s) {
+        return YesNoSandboxLimited.readValue(s);
+    }
+
+    @Override
+    public DialogResult getDefaultNegativeAnswer() {
+        return YesNoSandboxLimited.no();
+    }
+
+    @Override
+    public DialogResult getDefaultPositiveAnswer() {
+        return YesNoSandboxLimited.yes();
+    }
+
+    @Override
+    public DialogResult readFromStdIn(String what) {
+        return YesNoSandboxLimited.readValue(what);
+    }
+    
+    @Override
+    public String helpToStdIn() {
+        return YesNoSandboxLimited.yes().getAllowedValues().toString();
+    }
+    
 }

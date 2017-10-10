@@ -59,12 +59,22 @@ import javax.swing.JPanel;
 import javax.swing.SwingConstants;
 import javax.swing.event.HyperlinkEvent;
 import javax.swing.event.HyperlinkListener;
+import net.sourceforge.jnlp.JNLPFile;
 import net.sourceforge.jnlp.runtime.Translator;
 import net.sourceforge.jnlp.security.SecurityDialog;
+import net.sourceforge.jnlp.security.dialogresults.BasicDialogValue;
+import net.sourceforge.jnlp.security.dialogresults.DialogResult;
+import net.sourceforge.jnlp.security.dialogresults.SetValueHandler;
+import net.sourceforge.jnlp.security.dialogresults.YesNo;
+import net.sourceforge.jnlp.security.dialogs.remember.RememberPanel;
+import net.sourceforge.jnlp.security.dialogs.remember.RememberPanelResult;
+import net.sourceforge.jnlp.security.dialogs.remember.RememberableDialog;
 import net.sourceforge.jnlp.util.logging.OutputController;
 
-public class MissingPermissionsAttributePanel extends SecurityDialogPanel {
+public class MissingPermissionsAttributePanel extends SecurityDialogPanel implements  RememberableDialog{
 
+    private RememberPanel rememberPanel;
+    
     public MissingPermissionsAttributePanel(SecurityDialog x, String title, String codebase) {
         super(x);
         try {
@@ -73,7 +83,7 @@ public class MissingPermissionsAttributePanel extends SecurityDialogPanel {
             throw new RuntimeException(ex);
         }
         if (x != null) {
-            x.setMinimumSize(new Dimension(400, 300));
+            x.getViwableDialog().setMinimumSize(new Dimension(400, 400));
         }
     }
 
@@ -122,8 +132,9 @@ public class MissingPermissionsAttributePanel extends SecurityDialogPanel {
 
         JButton yes = new JButton(Translator.R("ButYes"));
         JButton no = new JButton(Translator.R("ButNo"));
-        yes.addActionListener(createSetValueListener(parent, 0));
-        no.addActionListener(createSetValueListener(parent, 1));
+        rememberPanel = new RememberPanel(codebase);
+        yes.addActionListener(SetValueHandler.createSetValueListener(parent, YesNo.yes()));
+        no.addActionListener(SetValueHandler.createSetValueListener(parent, YesNo.no()));
         initialFocusComponent = no;
         buttonPanel.add(yes);
         buttonPanel.add(no);
@@ -133,15 +144,58 @@ public class MissingPermissionsAttributePanel extends SecurityDialogPanel {
         add(topPanel);
         add(infoPanel);
         add(buttonPanel);
+        add(rememberPanel);
+        validate();
 
     }
 
     public static void main(String[] args) {
         MissingPermissionsAttributePanel w = new MissingPermissionsAttributePanel(null, "HelloWorld", "http://nbblah.url");
         JFrame f = new JFrame();
-        f.setSize(400, 300);
+        f.setSize(400, 400);
         f.add(w, BorderLayout.CENTER);
         f.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         f.setVisible(true);
     }
+    
+    @Override
+    public RememberPanelResult getRemeberAction() {
+        return rememberPanel.getRememberAction();
+    }
+
+    @Override
+    public DialogResult getValue() {
+        return parent.getValue();
+    }
+
+    @Override
+    public JNLPFile getFile() {
+        return parent.getFile();
+    }
+    
+    @Override
+    public DialogResult readValue(String s) {
+        return YesNo.readValue(s);
+    }
+
+    @Override
+    public DialogResult getDefaultNegativeAnswer() {
+        return YesNo.no();
+    }
+
+    @Override
+    public DialogResult getDefaultPositiveAnswer() {
+        return YesNo.yes();
+    }
+
+    @Override
+    public DialogResult readFromStdIn(String what) {
+        return YesNo.readValue(what);
+    }
+    
+    @Override
+    public String helpToStdIn() {
+        return YesNo.no().getAllowedValues().toString();
+    }
+
 }

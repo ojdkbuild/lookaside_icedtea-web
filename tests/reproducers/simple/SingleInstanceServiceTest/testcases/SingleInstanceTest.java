@@ -167,6 +167,7 @@ public class SingleInstanceTest extends BrowserTest {
     @Test
     @NeedsDisplay
     @TestInBrowsers(testIn = Browsers.one)
+    //known to not work in midori and epihany
     public void htmlpAppletXhtmlpApplet() throws Exception {
         //others really do
         if ((server.getBrowserLocation().endsWith("midori") || server.getBrowserLocation().endsWith("epiphany"))) {
@@ -186,6 +187,7 @@ public class SingleInstanceTest extends BrowserTest {
     @Test
     @NeedsDisplay
     @TestInBrowsers(testIn = Browsers.one)
+    //known to not work in midori and epihany
     public void htmlJnlpHrefAppletXhtmlJnlpHrefApplet() throws Exception {
         //others really do
         if ((server.getBrowserLocation().endsWith("midori") || server.getBrowserLocation().endsWith("epiphany"))) {

@@ -38,12 +38,12 @@ exception statement from your version.
 package net.sourceforge.jnlp.security;
 
 import java.awt.BorderLayout;
-import java.awt.event.ActionListener;
+import java.awt.Component;
+import java.awt.Dialog.ModalityType;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.net.URL;
 import java.security.cert.X509Certificate;
-import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 import javax.swing.JDialog;
 
@@ -51,18 +51,20 @@ import net.sourceforge.jnlp.JNLPFile;
 import net.sourceforge.jnlp.runtime.JNLPClassLoader.SecurityDelegate;
 import net.sourceforge.jnlp.security.SecurityDialogs.AccessType;
 import net.sourceforge.jnlp.security.SecurityDialogs.DialogType;
+import net.sourceforge.jnlp.security.dialogresults.DialogResult;
 import net.sourceforge.jnlp.security.dialogs.AccessWarningPane;
 import net.sourceforge.jnlp.security.dialogs.AppletWarningPane;
 import net.sourceforge.jnlp.security.dialogs.CertWarningPane;
 import net.sourceforge.jnlp.security.dialogs.CertsInfoPane;
+import net.sourceforge.jnlp.security.dialogs.InetSecurity511Panel;
 import net.sourceforge.jnlp.security.dialogs.MissingALACAttributePanel;
 import net.sourceforge.jnlp.security.dialogs.MissingPermissionsAttributePanel;
 import net.sourceforge.jnlp.security.dialogs.MoreInfoPane;
 import net.sourceforge.jnlp.security.dialogs.PasswordAuthenticationPane;
 import net.sourceforge.jnlp.security.dialogs.SecurityDialogPanel;
 import net.sourceforge.jnlp.security.dialogs.SingleCertInfoPane;
+import net.sourceforge.jnlp.security.dialogs.ViwableDialog;
 import net.sourceforge.jnlp.security.dialogs.apptrustwarningpanel.AppTrustWarningDialog;
-import net.sourceforge.jnlp.util.ImageResources;
 import net.sourceforge.jnlp.util.ScreenFinder;
 import net.sourceforge.jnlp.util.logging.OutputController;
 
@@ -74,7 +76,7 @@ import net.sourceforge.jnlp.util.logging.OutputController;
  *
  * @author <a href="mailto:jsumali@redhat.com">Joshua Sumali</a>
  */
-public class SecurityDialog extends JDialog {
+public class SecurityDialog {
 
     /** The type of dialog we want to show */
     private final DialogType dialogType;
@@ -100,19 +102,16 @@ public class SecurityDialog extends JDialog {
     /** Whether or not this object has been fully initialized */
     private boolean initialized = false;
 
-    /**
-     * the return value of this dialog. result: 0 = Yes, 1 = No, 2 = Cancel,
-     * null = Window closed.
-     */
-    private Object value;
+    private DialogResult value;
+    
+    private ViwableDialog viwableDialog;
 
     /** Should show signed JNLP file warning */
     private boolean requiresSignedJNLPWarning;
 
     SecurityDialog(DialogType dialogType, AccessType accessType,
                 JNLPFile file, CertVerifier JarCertVerifier, X509Certificate cert, Object[] extras) {
-        super();
-        setIconImages(ImageResources.INSTANCE.getApplicationImages());
+        this.viwableDialog = new ViwableDialog();
         this.dialogType = dialogType;
         this.accessType = accessType;
         this.file = file;
@@ -130,7 +129,7 @@ public class SecurityDialog extends JDialog {
     /**
      * Construct a SecurityDialog to display some sort of access warning
      */
-    SecurityDialog(DialogType dialogType, AccessType accessType,
+    private SecurityDialog(DialogType dialogType, AccessType accessType,
                         JNLPFile file) {
         this(dialogType, accessType, file, null, null, null);
     }
@@ -138,7 +137,7 @@ public class SecurityDialog extends JDialog {
     /**
      * Create a SecurityDialog to display a certificate-related warning
      */
-    SecurityDialog(DialogType dialogType, AccessType accessType,
+    private SecurityDialog(DialogType dialogType, AccessType accessType,
                         JNLPFile file, CertVerifier certVerifier) {
         this(dialogType, accessType, file, certVerifier, null, null);
     }
@@ -146,7 +145,7 @@ public class SecurityDialog extends JDialog {
     /**
      * Create a SecurityDialog to display a certificate-related warning
      */
-    SecurityDialog(DialogType dialogType, AccessType accessType,
+    private SecurityDialog(DialogType dialogType, AccessType accessType,
                 CertVerifier certVerifier) {
         this(dialogType, accessType, null, certVerifier, null, null);
     }
@@ -155,7 +154,7 @@ public class SecurityDialog extends JDialog {
      * Create a SecurityDialog to display some sort of access warning
      * with more information
      */
-    SecurityDialog(DialogType dialogType, AccessType accessType,
+    private SecurityDialog(DialogType dialogType, AccessType accessType,
                         JNLPFile file, Object[] extras) {
         this(dialogType, accessType, file, null, null, extras);
     }
@@ -164,7 +163,7 @@ public class SecurityDialog extends JDialog {
      * Create a SecurityWarningDailog to display information about a single
      * certificate
      */
-    SecurityDialog(DialogType dialogType, X509Certificate c) {
+    private SecurityDialog(DialogType dialogType, X509Certificate c) {
         this(dialogType, null, null, null, c, null);
     }
 
@@ -189,9 +188,9 @@ public class SecurityDialog extends JDialog {
         SecurityDialog dialog =
                         new SecurityDialog(DialogType.MORE_INFO, null, file,
                                 certVerifier);
-        dialog.setModalityType(ModalityType.APPLICATION_MODAL);
-        dialog.setVisible(true);
-        dialog.dispose();
+        dialog.getViwableDialog().setModalityType(ModalityType.APPLICATION_MODAL);
+        dialog.getViwableDialog().show();
+        dialog.getViwableDialog().dispose();
     }
 
     /**
@@ -201,13 +200,13 @@ public class SecurityDialog extends JDialog {
      * @param parent the parent option pane
      */
     public static void showCertInfoDialog(CertVerifier certVerifier,
-                SecurityDialog parent) {
+                Component parent) {
         SecurityDialog dialog = new SecurityDialog(DialogType.CERT_INFO,
                         null, null, certVerifier);
-        dialog.setLocationRelativeTo(parent);
-        dialog.setModalityType(ModalityType.APPLICATION_MODAL);
-        dialog.setVisible(true);
-        dialog.dispose();
+        dialog.getViwableDialog().setLocationRelativeTo(parent);
+        dialog.getViwableDialog().setModalityType(ModalityType.APPLICATION_MODAL);
+        dialog.getViwableDialog().show();
+        dialog.getViwableDialog().dispose();
     }
 
     /**
@@ -219,41 +218,24 @@ public class SecurityDialog extends JDialog {
     public static void showSingleCertInfoDialog(X509Certificate c,
                         JDialog parent) {
         SecurityDialog dialog = new SecurityDialog(DialogType.SINGLE_CERT_INFO, c);
-        dialog.setLocationRelativeTo(parent);
-        dialog.setModalityType(ModalityType.APPLICATION_MODAL);
-        dialog.setVisible(true);
-        dialog.dispose();
+        dialog.getViwableDialog().setLocationRelativeTo(parent);
+        dialog.getViwableDialog().setModalityType(ModalityType.APPLICATION_MODAL);
+        dialog.getViwableDialog().show();
+        dialog.getViwableDialog().dispose();
     }
 
     private void initDialog() {
-        String dialogTitle = "";
-        if (dialogType == DialogType.CERT_WARNING) {
-            if (accessType == AccessType.VERIFIED)
-                dialogTitle = "Security Approval Required";
-            else
-                dialogTitle = "Security Warning";
-        } else if (dialogType == DialogType.MORE_INFO)
-            dialogTitle = "More Information";
-        else if (dialogType == DialogType.CERT_INFO)
-            dialogTitle = "Details - Certificate";
-        else if (dialogType == DialogType.ACCESS_WARNING)
-            dialogTitle = "Security Warning";
-        else if (dialogType == DialogType.APPLET_WARNING)
-            dialogTitle = "Applet Warning";
-        else if (dialogType == DialogType.PARTIALLYSIGNED_WARNING)
-            dialogTitle = "Security Warning";
-        else if (dialogType == DialogType.AUTHENTICATION)
-            dialogTitle = "Authentication Required";
+        String dialogTitle = createTitle();
 
-        setTitle(dialogTitle);
-        setModalityType(ModalityType.MODELESS);
+        getViwableDialog().setTitle(dialogTitle);
+        getViwableDialog().setModalityType(ModalityType.MODELESS);
 
-        setDefaultCloseOperation(DISPOSE_ON_CLOSE);
+        getViwableDialog().setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
 
         installPanel();
 
-        pack();
-        centerDialog(this);
+        getViwableDialog().pack();
+        getViwableDialog().centerDialog();
 
         WindowAdapter adapter = new WindowAdapter() {
             private boolean gotFocus = false;
@@ -271,13 +253,38 @@ public class SecurityDialog extends JDialog {
             public void windowOpened(WindowEvent e) {
                 if (e.getSource() instanceof SecurityDialog) {
                     SecurityDialog dialog = (SecurityDialog) e.getSource();
-                    dialog.setResizable(true);
+                    dialog.getViwableDialog().setResizable(true);
                     dialog.setValue(null);
                 }
             }
         };
-        addWindowListener(adapter);
-        addWindowFocusListener(adapter);
+        getViwableDialog().addWindowListener(adapter);
+        getViwableDialog().addWindowFocusListener(adapter);
+    }
+
+    private String createTitle() {
+        return createTitle(dialogType, accessType);
+    }
+    private static String createTitle(DialogType dtype, AccessType atype) {
+        String dialogTitle = "";
+        if (dtype == DialogType.CERT_WARNING) {
+            if (atype == AccessType.VERIFIED)
+                dialogTitle = "Security Approval Required";
+            else
+                dialogTitle = "Security Warning";
+        } else if (dtype == DialogType.MORE_INFO)
+            dialogTitle = "More Information";
+        else if (dtype == DialogType.CERT_INFO)
+            dialogTitle = "Details - Certificate";
+        else if (dtype == DialogType.ACCESS_WARNING)
+            dialogTitle = "Security Warning";
+        else if (dtype == DialogType.APPLET_WARNING)
+            dialogTitle = "Applet Warning";
+        else if (dtype == DialogType.PARTIALLYSIGNED_WARNING)
+            dialogTitle = "Security Warning";
+        else if (dtype == DialogType.AUTHENTICATION)
+            dialogTitle = "Authentication Required";
+        return dialogTitle;
     }
 
     public AccessType getAccessType() {
@@ -296,95 +303,111 @@ public class SecurityDialog extends JDialog {
         return cert;
     }
 
-    /**
+    /*
+     * find appropriate JPanel to this Dialog, based on {@link DialogType}.
+     */
+    private SecurityDialogPanel getPanel() {
+        return getPanel(this);
+    }
+    
+    /*
+     * find appropriate JPanel to given Dialog, based on {@link DialogType}.
+     */
+    static SecurityDialogPanel getPanel(SecurityDialog sd) {
+        return getPanel(sd.dialogType, sd);
+    }
+    
+    static SecurityDialogPanel getPanel(DialogType type, SecurityDialog sd) {
+        SecurityDialogPanel lpanel = null;
+        if (type == DialogType.CERT_WARNING) {
+            lpanel = new CertWarningPane(sd, sd.certVerifier, (SecurityDelegate) sd.extras[0]);
+        } else if (type == DialogType.MORE_INFO) {
+            lpanel = new MoreInfoPane(sd, sd.certVerifier);
+        } else if (type == DialogType.CERT_INFO) {
+            lpanel = new CertsInfoPane(sd, sd.certVerifier);
+        } else if (type == DialogType.SINGLE_CERT_INFO) {
+            lpanel = new SingleCertInfoPane(sd, sd.certVerifier);
+        } else if (type == DialogType.ACCESS_WARNING) {
+            lpanel = new AccessWarningPane(sd, sd.extras, sd.certVerifier);
+        } else if (type == DialogType.APPLET_WARNING) {
+            lpanel = new AppletWarningPane(sd, sd.certVerifier);
+        } else if (type == DialogType.PARTIALLYSIGNED_WARNING) {
+            lpanel = AppTrustWarningDialog.partiallySigned(sd, sd.file, (SecurityDelegate) sd.extras[0]);
+        } else if (type == DialogType.UNSIGNED_WARNING) {
+            lpanel = AppTrustWarningDialog.unsigned(sd, sd.file); // Only necessary for applets on 'high security' or above
+        } else if (type == DialogType.AUTHENTICATION) {
+            lpanel = new PasswordAuthenticationPane(sd, sd.extras);
+        } else if (type == DialogType.UNSIGNED_EAS_NO_PERMISSIONS_WARNING) {
+            lpanel = new MissingPermissionsAttributePanel(sd, sd.file.getTitle(), sd.file.getNotNullProbalbeCodeBase().toExternalForm());
+        } else if (type == DialogType.MISSING_ALACA) {
+            lpanel = new MissingALACAttributePanel(sd, sd.file.getTitle(), (String) sd.extras[0], (String) sd.extras[1]);
+        } else if (type == DialogType.MATCHING_ALACA) {
+            lpanel = AppTrustWarningDialog.matchingAlaca(sd, sd.file, (String) sd.extras[0], (String) sd.extras[1]);
+        } else if (type == DialogType.SECURITY_511) {
+            lpanel = new InetSecurity511Panel(sd, (URL) sd.extras[0]);
+        } else {
+            throw new RuntimeException("Unknown value of " + sd.dialogType + ". Panel will be null. Tahts not allowed.");
+        }
+        return lpanel;
+    }
+
+    /*
      * Adds the appropriate JPanel to this Dialog, based on {@link DialogType}.
      */
     private void installPanel() {
-
-        if (dialogType == DialogType.CERT_WARNING)
-            panel = new CertWarningPane(this, this.certVerifier, (SecurityDelegate) extras[0]);
-        else if (dialogType == DialogType.MORE_INFO)
-            panel = new MoreInfoPane(this, this.certVerifier);
-        else if (dialogType == DialogType.CERT_INFO)
-            panel = new CertsInfoPane(this, this.certVerifier);
-        else if (dialogType == DialogType.SINGLE_CERT_INFO)
-            panel = new SingleCertInfoPane(this, this.certVerifier);
-        else if (dialogType == DialogType.ACCESS_WARNING)
-            panel = new AccessWarningPane(this, extras, this.certVerifier);
-        else if (dialogType == DialogType.APPLET_WARNING)
-            panel = new AppletWarningPane(this, this.certVerifier);
-        else if (dialogType == DialogType.PARTIALLYSIGNED_WARNING)
-            panel = AppTrustWarningDialog.partiallySigned(this, file, (SecurityDelegate) extras[0]);
-        else if (dialogType == DialogType.UNSIGNED_WARNING) // Only necessary for applets on 'high security' or above
-            panel = AppTrustWarningDialog.unsigned(this, file);
-        else if (dialogType == DialogType.AUTHENTICATION)
-            panel = new PasswordAuthenticationPane(this, extras);
-        else if (dialogType == DialogType.UNSIGNED_EAS_NO_PERMISSIONS_WARNING)
-            panel = new MissingPermissionsAttributePanel(this, (String) extras[0], (String) extras[1]);
-        else if (dialogType == DialogType.MISSING_ALACA)
-            panel = new MissingALACAttributePanel(this, (String) extras[0], (String) extras[1], (String) extras[2]);
-        else if (dialogType == DialogType.MATCHING_ALACA)
-            panel = AppTrustWarningDialog.matchingAlaca(this, (JNLPFile) extras[0], (String) extras[1], (String) extras[2]);
-
-        add(panel, BorderLayout.CENTER);
-    }
-
-    private static void centerDialog(JDialog dialog) {
-        ScreenFinder.centerWindowsToCurrentScreen(dialog);
+        panel = getPanel();
+        getViwableDialog().add(panel, BorderLayout.CENTER);
     }
 
     private void selectDefaultButton() {
         if (panel == null) {
             OutputController.getLogger().log(OutputController.Level.MESSAGE_ALL, "initial value panel is null");
+        } else {
+            panel.requestFocusOnDefaultButton();
         }
-        panel.requestFocusOnDefaultButton();
     }
 
-    public void setValue(Object value) {
+    public void setValue(DialogResult value) {
         OutputController.getLogger().log("Setting value:" + value);
         this.value = value;
     }
 
-    public Object getValue() {
+    public DialogResult getValue() {
         OutputController.getLogger().log("Returning value:" + value);
         return value;
     }
 
-    /**
-     * Called when the SecurityDialog is hidden - either because the user
-     * made a choice (Ok, Cancel, etc) or closed the window
-     */
-    @Override
-    public void dispose() {
-        notifySelectionMade();
-        super.dispose();
-    }
-
-    private final List<ActionListener> listeners = new CopyOnWriteArrayList<>();
-
-    /**
-     * Notify all the listeners that the user has made a decision using this
-     * security dialog.
-     */
-    public void notifySelectionMade() {
-        for (ActionListener listener : listeners) {
-            listener.actionPerformed(null);
-        }
-    }
-
-    /**
-     * Adds an {@link ActionListener} which will be notified if the user makes a
-     * choice using this SecurityDialog. The listener should use {@link #getValue()}
-     * to actually get the user's response.
-     * @param listener another action listener to be listen to
-     */
-    public void addActionListener(ActionListener listener) {
-        listeners.add(listener);
-    }
     
     public boolean requiresSignedJNLPWarning()
     {
         return requiresSignedJNLPWarning;
     }
 
+    DialogResult getDefaultNegativeAnswer() {
+        return panel.getDefaultNegativeAnswer();
+    }
+
+    DialogResult getDefaultPositiveAnswer() {
+        return  panel.getDefaultPositiveAnswer();
+    }
+
+    String getText() {
+        return panel.getText();
+    }
+
+    DialogResult readFromStdIn(String what){
+        return panel.readFromStdIn(what);
+    }
+
+    String helpToStdIn(){
+        return panel.helpToStdIn();
+    }
+
+    public ViwableDialog getViwableDialog() {
+        return viwableDialog;
+    }
+    
+    public SecurityDialogPanel getSecurityDialogPanel(){
+        return panel;
+    }
 }

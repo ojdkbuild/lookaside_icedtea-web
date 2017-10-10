@@ -2,8 +2,6 @@ package net.sourceforge.jnlp.security.dialogs.apptrustwarningpanel;
 
 import java.io.File;
 import java.io.IOException;
-import net.sourceforge.jnlp.security.dialogs.apptrustwarningpanel.UnsignedAppletTrustWarningPanel;
-import net.sourceforge.jnlp.security.dialogs.apptrustwarningpanel.AppTrustWarningPanel;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -12,6 +10,7 @@ import java.util.Map;
 import javax.swing.JButton;
 import net.sourceforge.jnlp.PluginBridge;
 import net.sourceforge.jnlp.PluginParameters;
+import net.sourceforge.jnlp.security.dialogs.remember.RememberPanel;
 import net.sourceforge.jnlp.browsertesting.browsers.firefox.FirefoxProfilesOperator;
 import net.sourceforge.jnlp.config.PathsAndFiles;
 import net.sourceforge.jnlp.security.dialogs.SecurityDialogPanel;
@@ -78,7 +77,7 @@ public class AppTrustWarningPanelTest {
         mockPluginBridge = new PluginBridge(mockCodebase, mockDocumentBase, mockJar,
                 mockMainClass, mockWidth, mockHeight, mockParameters);
 
-        panelList.add(new UnsignedAppletTrustWarningPanel(null, mockPluginBridge, null));
+        panelList.add(new UnsignedAppletTrustWarningPanel(null, mockPluginBridge));
     }
 
     @Test

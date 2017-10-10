@@ -8,25 +8,25 @@ GX  - http://bugs.gentoo.org/show_bug.cgi?id=X
 
 CVE-XXXX-YYYY: http://www.cve.mitre.org/cgi-bin/cvename.cgi?name=XXXX-YYYY
 
-New in release 1.6.2 (2016-02-03):
+New in release 1.7 (2017-07-19):
+* PR3366 - bash completion file was split to three, and is setup-able by bashcompdir environment variable
+* added experimental support for windows
+* added experimental support for java 9 (linux only)
+* added experimental support for jnlp protocol (see https://bugs.openjdk.java.net/browse/JDK-8055464)
+* restricted to JDK8 and higher
 * all connection restrictions now consider also port
+* Enabled Entry-Point attribute check
+* permissions sandbox and signed app and unsigned app with permissions all-permissions now run in sandbox instead of not at all.
+* fixed DownloadService
 * PR2779: html-gen.sh: Don't try to call hg if .hg directory isn't present
 * PR2591 - IcedTea-Web request resources twice for meta informations and causes ClientAbortException on tomcat in conjunction with JnlpDownloadServlet
 * PR2690 - Can't run BOM into JNLP file
 * PR2669 - remove bash-specific syntax from top level Makefile.am
 * PR2489 - various NPEs when codebase is null
-* NetX
-  - main-class attribute trimmed by default
-  - in strict mode, main-class attribute checked for invalid characters
-* Plugin
-  - RH1273691 - Escaped equals signs in deployment.properties not un-escaped when used
-  - PR2746 - IcedTea-Web Plugin 1.6.1: net.sourceforge.jnlp.LaunchException 
-  - PR2714 - IcedTea-Web plugin sends uninitialized memory garbage across a pipe when NPN_GetValueForURL call fails
-
-New in release 1.6.1 (2015-09-11):
-* Enabled Entry-Point attribute check
-* permissions sandbox and signed app and unsigned app with permissions all-permissions now run in sandbox instead of not at all.
-* fixed DownloadService
+* PR2855 - configure.ac: Remove unnecessary checks for libX11 and zlib
+* PR878 - (http-511) Handle HTTP error 511 Network Authentication Required (standard secure proxy authentification/captive portal detection) 
+* PR1190 - unuseable javaws cache handling 
+* PR3227 - can not save file with query longer then (together with name) then 255 chars 
 * comments in deployment.properties now should persists load/save
 * fixed bug in caching of files with query
 * fixed issues with recreating of existing shortcut
@@ -35,23 +35,45 @@ New in release 1.6.1 (2015-09-11):
 * RH1231441 Unable to read the text of the buttons of the security dialogue
 * Fixed RH1233697 icedtea-web: applet origin spoofing
 * Fixed RH1233667 icedtea-web: unexpected permanent authorization of unsigned applets
+* FIXED PR3263 - Cannot retrieve JavaScript Engine using ScriptEngineManager.getEngineByName 
 * fixed fatal impact of initialization error of FileLog
 * MissingALACAdialog made available also for unsigned applications (but ignoring actual manifest value) and fixed
+* more dialogs got remember me possibility
+  - MissingALACAttributePanel
+  - AccessWarning
+  - MissingPermissionsAttributePanel
+  - MatchingALACAttributePanel
+  - UnsignedAppletTrustWarningPanel
+  - PartiallySignedAppTrustWarningPanel
+* Itw-settings
+  - All rememberable dialogues can have saved value modified
 * NetX
   - fixed issues with -html shortcuts
   - fixed issue with -html receiving garbage in width and height
+  - main-class attribute trimmed by default
+  - in strict mode, main-class attribute checked for invalid characters
+  - added -browser switch as workaround around most uttermost http authentications cornercases
 * PolicyEditor
+  - Entry list is sorted, entries will appear with consistent ordering
   - file flag made to work when used standalone
-  - file flag and main argument cannot be used in combination
+  - file flag cannot be used in combination with main argument
+  - defaultfile flag added
+  - support for SignedBy and Principals along with existing Codebase
+* Plugin
+  - RH1273691 - Escaped equals signs in deployment.properties not un-escaped when used
+  - PR2746 - IcedTea-Web Plugin 1.6.1: net.sourceforge.jnlp.LaunchException 
+  - PR2714 - IcedTea-Web plugin sends uninitialized memory garbage across a pipe when NPN_GetValueForURL call fails
+  - PR3198 - Error in webmin
+  - PR2968 - IcedTea-Web crashes on Dell EqualLogic SAN
 
-New in release 1.6 (2015-04-29):
+New in release 1.6 (2015-XX-XX):
 * Massively improved offline abilities. Added Xoffline switch to force work without inet connection.
 * Improved to be able to run with any JDK
 * JDK 6 and older no longer supported
 * JDK 8 support added (URLPermission granted if applicable)
-* JDK 9 supported 
+* JDK 9 supported
 * Added support for Entry-Point manifest attribute
-* Added KEY_ENABLE_MANIFEST_ATTRIBUTES_CHECK deployment property to control scan of Manifest file 
+* Added KEY_ENABLE_MANIFEST_ATTRIBUTES_CHECK deployment property to control scan of Manifest file
 * starting arguments now accept also -- abbreviations
 * Added new documentation
 * Added support for menu shortcuts - both javaws applications/applets and html applets are supported
@@ -215,7 +237,7 @@ Common
 
 New in release 1.1 (2011-XX-XX):
 * Security updates
-  - S6983554, CVE-2010-4450: Launcher incorrect processing of empty library path entries 
+  - S6983554, CVE-2010-4450: Launcher incorrect processing of empty library path entries
   - RH677332, CVE-2011-0706: IcedTea multiple signers privilege escalation
 * New Features
   - IcedTea-Web now installs to a FHS-compliant location

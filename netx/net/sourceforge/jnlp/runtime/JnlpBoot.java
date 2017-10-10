@@ -61,12 +61,13 @@ public final class JnlpBoot {
         }
         try {
             OutputController.getLogger().log("Proceeding with jnlp");
-            Launcher launcher = new Launcher(false);
+            Launcher launcher = new Launcher(true);
             launcher.setParserSettings(settings);
             launcher.setInformationToMerge(extra);
             launcher.launch(Boot.getFileLocation());
         } catch (LaunchException ex) {
             // default handler prints this
+            JNLPRuntime.exit(1);
         } catch (Exception ex) {
             OutputController.getLogger().log(ex);
             Boot.fatalError(R("RUnexpected", ex.toString(), ex.getStackTrace()[0]));

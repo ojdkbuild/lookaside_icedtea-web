@@ -48,9 +48,9 @@ AC_DEFUN_ONCE([IT_CHECK_FOR_JDK],
               ])
   if test -z "${SYSTEM_JDK_DIR}"; then
     for dir in /etc/alternatives/java_sdk \
-               /usr/lib/jvm/java-1.7.0-openjdk \
-               /usr/lib/jvm/icedtea7 \
-               /usr/lib/jvm/java-7-openjdk \
+               /usr/lib/jvm/java-1.9.0-openjdk \
+               /usr/lib/jvm/icedtea9 \
+               /usr/lib/jvm/java-9-openjdk \
                /usr/lib/jvm/java-1.8.0-openjdk \
                /usr/lib/jvm/icedtea8 \
                /usr/lib/jvm/java-8-openjdk \
@@ -65,11 +65,24 @@ AC_DEFUN_ONCE([IT_CHECK_FOR_JDK],
        fi
     done
   fi
+  AM_COND_IF([WINDOWS], [
+    # does not work, use which instead
+    # AC_CHECK_PROGS([SYSTEM_JAVA_IN_PATH], [java.exe]) 
+    SYSTEM_JAVA_IN_PATH=$(which java 2>&AS_MESSAGE_LOG_FD)
+    if test x"${SYSTEM_JAVA_IN_PATH}" != x ; then
+      SYSTEM_JDK_DIR=$(dirname $(dirname ${SYSTEM_JAVA_IN_PATH}))
+    fi
+  ])
   if ! test -d "${SYSTEM_JDK_DIR}"; then
     AC_MSG_ERROR("A JDK home directory could not be found. ${SYSTEM_JDK_DIR}")
   else
-    READ=`readlink -f ${SYSTEM_JDK_DIR}`
-    AC_MSG_RESULT(${SYSTEM_JDK_DIR} (link to ${READ}))
+    AM_COND_IF([WINDOWS], [
+      SYSTEM_JDK_DIR=$(cygpath -m ${SYSTEM_JDK_DIR})
+      AC_MSG_RESULT(${SYSTEM_JDK_DIR})
+    ], [
+      READ=`readlink -f ${SYSTEM_JDK_DIR}`
+      AC_MSG_RESULT(${SYSTEM_JDK_DIR} (link to ${READ}))
+    ])
   fi
   AC_SUBST(SYSTEM_JDK_DIR)
 ])
@@ -98,7 +111,7 @@ AC_DEFUN_ONCE([IT_CHECK_FOR_JRE],
     # still not found?
     if test -z "${SYSTEM_JRE_DIR}" ; then
       # try modular, jdk9 or higher compliant
-      if test -d "${SYSTEM_JRE_DIR_MODULAR}" -a -f "${SYSTEM_JRE_DIR_MODULAR}/bin/java" -a -d "${SYSTEM_JRE_DIR_MODULAR}/lib/modules" ; then
+      if test -d "${SYSTEM_JRE_DIR_MODULAR}" -a -f "${SYSTEM_JRE_DIR_MODULAR}/bin/java" -a -e "${SYSTEM_JRE_DIR_MODULAR}/lib/modules" ; then
         SYSTEM_JRE_DIR="${SYSTEM_JRE_DIR_MODULAR}"
       fi
     fi
@@ -356,6 +369,11 @@ AC_DEFUN([IT_FIND_OPTIONAL_JAR],
   if test x"${$2_JAR}" = "xyes"; then
     $2_JAR=no
   fi
+  AM_COND_IF([WINDOWS], [
+    if test x"${$2_JAR}" != "xno"; then
+      $2_JAR=$(cygpath -m ${$2_JAR})
+    fi
+  ])
   AC_MSG_RESULT(${$2_JAR})
   AM_CONDITIONAL(WITH_$2, test x"${$2_JAR}" != "xno")
   # Clear $2_JAR if it doesn't contain a valid filename
@@ -371,22 +389,35 @@ AC_DEFUN([IT_FIND_OPTIONAL_JAR],
   AC_SUBST($2_AVAILABLE)
 ])
 
-AC_DEFUN_ONCE([IT_CHECK_PLUGIN],
+AC_DEFUN_ONCE([IT_CHECK_NATIVE_PLUGIN],
 [
 AC_MSG_CHECKING([whether to build the browser plugin])
-AC_ARG_ENABLE([plugin],
-              [AS_HELP_STRING([--disable-plugin],
+AC_ARG_ENABLE([native_plugin],
+              [AS_HELP_STRING([--disable-native-plugin],
                               [Disable compilation of browser plugin])],
-              [enable_plugin="${enableval}"], [enable_plugin="yes"])
-AC_MSG_RESULT(${enable_plugin})
+              [enable_native_plugin="${enableval}"], [
+                  AM_COND_IF([WINDOWS], [enable_native_plugin="no"], [enable_native_plugin="yes"])
+              ])
+AC_MSG_RESULT(${enable_native_plugin})
 ])
 
-AC_DEFUN_ONCE([IT_CHECK_PLUGIN_DEPENDENCIES],
+AC_DEFUN_ONCE([IT_CHECK_PLUGINJAR],
+[
+AC_MSG_CHECKING([whether to build plugin jar for javaws -html])
+AC_ARG_ENABLE([pluginjar],
+              [AS_HELP_STRING([--disable-pluginjar],
+                              [Disable compilation of plugin.jar for javaws -html])],
+              [enable_pluginjar="${enableval}"], [enable_pluginjar="yes"])
+AC_MSG_RESULT(${enable_pluginjar})
+AM_CONDITIONAL(ENABLE_PLUGINJAR, test "x${enable_pluginjar}" = "xyes")
+])
+
+AC_DEFUN_ONCE([IT_CHECK_NATIVE_PLUGIN_DEPENDENCIES],
 [
 dnl Check for plugin support headers and libraries.
 dnl FIXME: use unstable
-AC_REQUIRE([IT_CHECK_PLUGIN])
-if test "x${enable_plugin}" = "xyes" ; then
+AC_REQUIRE([IT_CHECK_NATIVE_PLUGIN])
+if test "x${enable_native_plugin}" = "xyes" ; then
   PKG_CHECK_MODULES(GLIB, glib-2.0)
   AC_SUBST(GLIB_CFLAGS)
   AC_SUBST(GLIB_LIBS)
@@ -403,13 +434,13 @@ if test "x${enable_plugin}" = "xyes" ; then
   AC_SUBST(MOZILLA_CFLAGS)
   AC_SUBST(MOZILLA_LIBS)
 fi
-AM_CONDITIONAL(ENABLE_PLUGIN, test "x${enable_plugin}" = "xyes")
+AM_CONDITIONAL(ENABLE_NATIVE_PLUGIN, test "x${enable_native_plugin}" = "xyes")
 ])
 
 AC_DEFUN_ONCE([IT_CHECK_XULRUNNER_VERSION],
 [
-AC_REQUIRE([IT_CHECK_PLUGIN_DEPENDENCIES])
-if test "x${enable_plugin}" = "xyes"
+AC_REQUIRE([IT_CHECK_NATIVE_PLUGIN_DEPENDENCIES])
+if test "x${enable_native_plugin}" = "xyes"
 then
   AC_CACHE_CHECK([for xulrunner version], [xulrunner_cv_collapsed_version],[
     if pkg-config --modversion libxul >/dev/null 2>&1
@@ -445,6 +476,9 @@ AC_DEFUN_ONCE([IT_CHECK_FOR_TAGSOUP],
       fi
     done
   fi
+  AM_COND_IF([WINDOWS], [
+    TAGSOUP_JAR=$(cygpath -m ${TAGSOUP_JAR})
+  ])
   AC_MSG_RESULT(${TAGSOUP_JAR})
   if test -z "${TAGSOUP_JAR}"; then
     AC_MSG_RESULT(***********************************************)
@@ -465,14 +499,23 @@ dnl Test class has to be in sun.applet for some internal classes
 AC_DEFUN([IT_CHECK_FOR_CLASS],[
 AC_REQUIRE([IT_FIND_JAVAC])
 AC_REQUIRE([IT_FIND_JAVA])
-AC_CACHE_CHECK([if $2 is available], it_cv_$1, [
-CLASS=sun/applet/Test.java
+AC_CACHE_CHECK([if $2 is available from $3 (module "$4")], it_cv_$1, [
+# first is the variableto save in, second  param is name of class to find,
+# third  is name of package to make check in.
+# mostly some.pkg is ok, but some tests must bedone in sun.applet or other special directory
+# fourth, optional is module
+MODULE_NAME="$4"
+if test -n "$MODULE_NAME" ; then
+  PATCH_MODULE="--patch-module $MODULE_NAME=."
+fi
+PKGPATH=`echo $3 | sed "s;\\.;/;g" `
+CLASS=$PKGPATH/Test.java
 BYTECODE=$(echo $CLASS|sed 's#\.java##')
 mkdir -p tmp.$$/$(dirname $CLASS)
 cd tmp.$$
 cat << \EOF > $CLASS
 [/* [#]line __oline__ "configure" */
-package sun.applet;
+package $3;
 
 import $2;
 
@@ -486,8 +529,8 @@ public class Test
 }
 ]
 EOF
-if $JAVAC -cp . $JAVACFLAGS -nowarn $CLASS >&AS_MESSAGE_LOG_FD 2>&1; then
-  if $JAVA -classpath . $BYTECODE >&AS_MESSAGE_LOG_FD 2>&1; then
+if $JAVAC $PATCH_MODULE -cp . $JAVACFLAGS -nowarn $CLASS >&AS_MESSAGE_LOG_FD 2>&1; then
+  if $JAVA $PATCH_MODULE -classpath . $BYTECODE >&AS_MESSAGE_LOG_FD 2>&1; then
       it_cv_$1=yes;
   else
       it_cv_$1=no;
@@ -501,59 +544,12 @@ cd ..
 # should be rmdir but has to be rm -rf due to sun.applet usage
 rm -rf tmp.$$
 if test x"${it_cv_$1}" = "xno"; then
-   AC_MSG_ERROR([$2 not found.])
+  AC_MSG_ERROR([$2 not found.])
 fi
+AC_SUBST([$1], [${it_cv_$1}])
 AC_PROVIDE([$0])dnl
 ])
 
-dnl Macro to check for a Java class HexDumpEncoder
-AC_DEFUN([IT_CHECK_FOR_HEXDUMPENCODER],[
-AC_REQUIRE([IT_FIND_JAVAC])
-AC_REQUIRE([IT_FIND_JAVA])
-AC_CACHE_CHECK([if HexDumpEncoder is available], it_cv_HEXDUMPENCODER, [
-CLASS=sun/applet/Test.java
-BYTECODE=$(echo $CLASS|sed 's#\.java##')
-mkdir -p tmp.$$/$(dirname $CLASS)
-cd tmp.$$
-cat << \EOF > $CLASS
-[/* [#]line __oline__ "configure" */
-package sun.applet;
-
-import sun.misc.*;
-import sun.security.util.*;
-
-public class Test
-{
-  public static void main(String[] args)
-    throws Exception
-  {
-    try {
-      System.out.println(Class.forName("sun.misc.HexDumpEncoder"));
-    } catch (ClassNotFoundException e) {
-      System.out.println(Class.forName("sun.security.util.HexDumpEncoder"));
-    }
-  }
-}
-]
-EOF
-if $JAVAC -cp . $JAVACFLAGS -nowarn $CLASS >&AS_MESSAGE_LOG_FD 2>&1; then
-  if $JAVA -classpath . $BYTECODE >&AS_MESSAGE_LOG_FD 2>&1; then
-      it_cv_HEXDUMPENCODER=yes;
-  else
-      it_cv_HEXDUMPENCODER=no;
-  fi
-else
-  it_cv_HEXDUMPENCODER=no;
-fi
-])
-rm -f $CLASS *.class
-cd ..
-# should be rmdir but has to be rm -rf due to sun.applet usage
-rm -rf tmp.$$
-if test x"${it_cv_HEXDUMPENCODER}" = "xno"; then
-   AC_MSG_ERROR([HexDumpEncoder not found.])
-fi
-])
 
 AC_DEFUN_ONCE([IT_CHECK_FOR_MERCURIAL],
 [
@@ -775,7 +771,7 @@ AC_DEFUN_ONCE([IT_FIND_JAVA],
   AC_REQUIRE([IT_CHECK_FOR_JRE])
   AC_MSG_CHECKING([for a Java virtual machine])
   AC_ARG_WITH([java],
-              [AS_HELP_STRING(--with-java, specify location of the Java 1.7 VM)],
+              [AS_HELP_STRING(--with-java, specify location of the Java 1.8 or better VM)],
   [
     JAVA="${withval}"
   ],
@@ -789,7 +785,7 @@ AC_DEFUN_ONCE([IT_FIND_JAVA],
     AC_PATH_PROG(JAVA, "java")
   fi
   if test -z "${JAVA}"; then
-    AC_MSG_ERROR("A 1.7+-compatible Java VM is required.")
+    AC_MSG_ERROR("A 1.8+-compatible Java VM is required.")
   fi
   AC_MSG_RESULT(${JAVA})
   AC_SUBST(JAVA)
@@ -799,13 +795,12 @@ AC_DEFUN_ONCE([IT_CHECK_JAVA_VERSION],
 [
   AC_REQUIRE([IT_FIND_JAVA])
   AC_MSG_CHECKING([JDK version])
-  JAVA_VERSION=`$JAVA -version 2>&1 | sed -n '1s/@<:@^"@:>@*"\(.*\)"$/\1/p'`
+  JAVA_VERSION=`$JAVA -version 2>&1`
   AC_MSG_RESULT($JAVA_VERSION)
-  HAVE_JAVA7=`echo $JAVA_VERSION | awk '{if ($(0) >= 1.7) print "yes"}'`
-  HAVE_JAVA8=`echo $JAVA_VERSION | awk '{if ($(0) >= 1.8) print "yes"}'`
-  HAVE_JAVA9=`echo $JAVA_VERSION | awk '{if ($(0) >= 1.9) print "yes"}'`
-  if test -z "$HAVE_JAVA7"; then
-    AC_MSG_ERROR([JDK7 or newer is required, detected was: $JAVA_VERSION])
+  HAVE_JAVA8=`if echo $JAVA_VERSION | grep -q -e 1.8.0 ; then echo yes ; fi`
+  HAVE_JAVA9=`if echo $JAVA_VERSION | grep -q -e 1.9.0 -e \"9 -e "build 9" ; then echo yes ; fi `
+  if test -z "$HAVE_JAVA8" -a -z "$HAVE_JAVA9"; then
+    AC_MSG_ERROR([JDK8 or newer is required, detected was: $JAVA_VERSION])
   fi
   if ! test -z "$HAVE_JAVA8"; then
     VERSION_DEFS="-DHAVE_JAVA8"
@@ -814,7 +809,6 @@ AC_DEFUN_ONCE([IT_CHECK_JAVA_VERSION],
     VERSION_DEFS="-DHAVE_JAVA9"
   fi
   AC_SUBST(VERSION_DEFS)
-  AM_CONDITIONAL([HAVE_JAVA7], test x"${HAVE_JAVA7}" = "xyes")
   AM_CONDITIONAL([HAVE_JAVA8], test x"${HAVE_JAVA8}" = "xyes")
   AM_CONDITIONAL([HAVE_JAVA9], test x"${HAVE_JAVA9}" = "xyes")
 ])
@@ -1098,4 +1092,29 @@ AC_DEFUN_ONCE([IT_SET_GLOBAL_BROWSERTESTS_BEHAVIOUR],
   esac
   AC_MSG_RESULT(${BROWSER_SWITCH})
   AC_SUBST(BROWSER_TESTS_MODIFICATION)
+])
+
+AC_DEFUN_ONCE([IT_CHECK_FOR_WIX],
+[
+  AC_MSG_CHECKING([for a WiX Toolset directory])
+  AC_ARG_WITH([wix],
+             [AS_HELP_STRING([--with-wix],
+                             [WiX Toolset directory (candle.exe, light.exe)])],
+             [
+                 WIX_TOOLSET_DIR=${withval}
+             ])
+  if test x"${WIX_TOOLSET_DIR}" = x; then
+    SYSTEM_CANDLE_IN_PATH="$(which candle.exe 2>&AS_MESSAGE_LOG_FD)"
+    if test -f "${SYSTEM_CANDLE_IN_PATH}" ; then
+        WIX_TOOLSET_DIR="$(dirname "$(cygpath -m "${SYSTEM_CANDLE_IN_PATH}")")"
+    fi
+  fi
+  if ! test -d "${WIX_TOOLSET_DIR}"; then
+    AC_MSG_WARN("A WiX Toolset directory could not be found. ${WIX_TOOLSET_DIR}")
+    AC_MSG_WARN(["You can build itw, but can not generate MSI"])
+    AC_MSG_WARN(["you can get WiX tools at http://wixtoolset.org/"])
+  else
+    AC_MSG_RESULT(${WIX_TOOLSET_DIR})
+    AC_SUBST(WIX_TOOLSET_DIR)
+  fi
 ])

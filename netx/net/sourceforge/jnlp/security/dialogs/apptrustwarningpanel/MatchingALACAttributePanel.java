@@ -50,10 +50,9 @@ import net.sourceforge.jnlp.ParseException;
 import net.sourceforge.jnlp.runtime.Translator;
 import static net.sourceforge.jnlp.runtime.Translator.R;
 import net.sourceforge.jnlp.security.SecurityDialog;
-import net.sourceforge.jnlp.security.appletextendedsecurity.AppletSecurityActions;
-import net.sourceforge.jnlp.security.appletextendedsecurity.ExecuteAppletAction;
 import net.sourceforge.jnlp.security.appletextendedsecurity.UnsignedAppletActionEntry;
 import net.sourceforge.jnlp.security.appletextendedsecurity.UnsignedAppletTrustConfirmation;
+import net.sourceforge.jnlp.security.dialogs.remember.ExecuteAppletAction;
 import net.sourceforge.jnlp.util.UrlUtils;
 
 /**
@@ -65,15 +64,15 @@ public class MatchingALACAttributePanel extends AppTrustWarningPanel {
     private final String codebase;
     private final String remoteUrls;
 
-    public MatchingALACAttributePanel(SecurityDialog x, JNLPFile file, String codebase, String remoteUrls, ActionChoiceListener actionChoiceListener) {
-        super(file, actionChoiceListener);
+    public MatchingALACAttributePanel(SecurityDialog securityDialog, JNLPFile file, String codebase, String remoteUrls) {
+        super(file, securityDialog);
         this.title = super.getAppletTitle();
         this.codebase = codebase;
         this.remoteUrls = remoteUrls;
         TOP_PANEL_HEIGHT = 250;
         addComponents();
-        if (x != null) {
-            x.setMinimumSize(new Dimension(600, 400));
+        if (securityDialog != null) {
+            securityDialog.getViwableDialog().setMinimumSize(new Dimension(600, 400));
         }
     }
 
@@ -91,9 +90,9 @@ public class MatchingALACAttributePanel extends AppTrustWarningPanel {
     @Override
     protected String getInfoPanelText() {
         String r = Translator.R("ALACAMatchingInfo");
-        UnsignedAppletActionEntry rememberedEntry = UnsignedAppletTrustConfirmation.getStoredEntry(file, AppletSecurityActions.MATCHING_ALACA_ACTION);
+        UnsignedAppletActionEntry rememberedEntry = UnsignedAppletTrustConfirmation.getStoredEntry(file, this.getClass());
         if (rememberedEntry != null) {
-            ExecuteAppletAction rememberedAction = rememberedEntry.getAppletSecurityActions().getMatchingAlacaAction();
+            ExecuteAppletAction rememberedAction = rememberedEntry.getAppletSecurityActions().getAction(this.getClass());
             if (rememberedAction == ExecuteAppletAction.YES) {
                 r += "<br>" + R("SUnsignedAllowedBefore", rememberedEntry.getLocalisedTimeStamp());
             } else if (rememberedAction == ExecuteAppletAction.NO) {
@@ -114,16 +113,10 @@ public class MatchingALACAttributePanel extends AppTrustWarningPanel {
     }
 
     public static void main(String[] args) throws MalformedURLException, IOException, ParseException {
-        Set<URL> s = new HashSet<URL>();
+        Set<URL> s = new HashSet<>();
         s.add(new URL("http:/blah.com/blah"));
         s.add(new URL("http:/blah.com/blah/blah"));
-        MatchingALACAttributePanel w = new MatchingALACAttributePanel(null, new JNLPFile(new URL("http://www.geogebra.org/webstart/geogebra.jnlp")), "http://nbblah.url", UrlUtils.setOfUrlsToHtmlList(s), new ActionChoiceListener() {
-
-            @Override
-            public void actionChosen(AppSigningWarningAction action) {
-
-            }
-        });
+        MatchingALACAttributePanel w = new MatchingALACAttributePanel(null, new JNLPFile(new URL("http://www.geogebra.org/webstart/geogebra.jnlp")), "http://nbblah.url", UrlUtils.setOfUrlsToHtmlList(s));
         JFrame f = new JFrame();
         f.setSize(600, 400);
         f.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);

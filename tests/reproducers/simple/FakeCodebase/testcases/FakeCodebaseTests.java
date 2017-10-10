@@ -37,6 +37,7 @@
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.util.Arrays;
 import net.sourceforge.jnlp.OptionsDefinitions;
 import static org.junit.Assert.assertTrue;
@@ -56,9 +57,9 @@ import net.sourceforge.jnlp.config.DeploymentConfiguration;
 import net.sourceforge.jnlp.config.PathsAndFiles;
 import net.sourceforge.jnlp.runtime.ManifestAttributesChecker;
 import net.sourceforge.jnlp.security.appletextendedsecurity.AppletSecurityLevel;
+import net.sourceforge.jnlp.security.appletextendedsecurity.impl.UnsignedAppletActionStorageImpl;
 import net.sourceforge.jnlp.tools.DeploymentPropertiesModifier;
 import net.sourceforge.jnlp.util.FileUtils;
-import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -112,11 +113,6 @@ public class FakeCodebaseTests extends BrowserTest {
 
     }
 
-    //placeholder to make unittest happy
-    @Test
-    public void FakeCodebaseTestFake() throws Exception {
-    }
-
     //headless dialogues now works only for javaws.
     //@Test
     @TestInBrowsers(testIn = {Browsers.all})
@@ -133,9 +129,7 @@ public class FakeCodebaseTests extends BrowserTest {
             ProcessResult pr1 = server.executeBrowser("/" + ORIG_BASE, AutoClose.CLOSE_ON_CORRECT_END);
             assertTrue(pr1.stdout.contains(AutoOkClosingListener.MAGICAL_OK_CLOSING_STRING));
             //the record was added to .appletSecuritySettings
-            String s2 = FileUtils.loadFileAsString(PathsAndFiles.APPLET_TRUST_SETTINGS_USER.getFile()).trim();
-            String[] ss2 = s2.split("\n");
-            Assert.assertEquals(1, ss2.length);
+            assertRecordsCountInAppletTrustSettings(1);
             //create atacker
             String htmlin = FileUtils.loadFileAsString(new File(server.getDir(), HTMLIN + ".in"));
             //now change codebase to be same as ^ but launch applet from  evilServer1
@@ -154,12 +148,103 @@ public class FakeCodebaseTests extends BrowserTest {
             );
             //this  MUST ask for permissions to run, otherwise fail
             assertTrue(pr2.stdout.contains(AutoOkClosingListener.MAGICAL_OK_CLOSING_STRING));
-            String s1 = FileUtils.loadFileAsString(PathsAndFiles.APPLET_TRUST_SETTINGS_USER.getFile()).trim();
-            String[] ss1 = s1.split("\n");
-            Assert.assertEquals(2, ss1.length);
+            assertRecordsCountInAppletTrustSettings(2);
         } finally {
             dp.restoreProperties();
         }
     }
 
+    @Test
+    @NeedsDisplay
+    public void FakeCodebaseTestJavawsRemberCodebaseAndPassBoth() throws Exception {
+        testJavaws(true);
+    }
+
+    @Test
+    @NeedsDisplay
+    public void FakeCodebaseTestJavawsRemberCodebaseAndFailSecond() throws Exception {
+        testJavaws(true, true);
+    }
+
+    @Test
+    @NeedsDisplay
+    public void FakeCodebaseTestJavawsRemeberFileAndPassSecond() throws Exception {
+        testJavaws(false);
+    }
+
+    @Test
+    @NeedsDisplay
+    public void FakeCodebaseTestJavawsRemeberFileAndFailSecond() throws Exception {
+        testJavaws(false, true);
+    }
+
+    public void testJavaws(boolean codebase) throws Exception {
+        testJavaws(codebase, false);
+    }
+
+    public void testJavaws(boolean codebase, boolean stopSecond) throws Exception {
+        DeploymentPropertiesModifier dp = new DeploymentPropertiesModifier();
+        dp.setProperties(DeploymentConfiguration.KEY_ENABLE_MANIFEST_ATTRIBUTES_CHECK, ManifestAttributesChecker.MANIFEST_ATTRIBUTES_CHECK.PERMISSIONS.name());
+        try {
+            String ob1 = FileUtils.loadFileAsString(new File(server.getDir(), JORIG_BASE));
+            assertTrue(ob1.contains("FakeCodebase0")); //check orig.html is correct one
+            PathsAndFiles.APPLET_TRUST_SETTINGS_USER.getFile().delete(); //clean file is an must
+            ProcessWrapper pw1 = new ProcessWrapper(
+                    server.getJavawsLocation(),
+                    Arrays.asList(OptionsDefinitions.OPTIONS.HEADLESS.option),
+                    server.getUrl("/" + JORIG_BASE));
+            if (codebase) {
+                pw1.setWriter("RC YES");
+            } else {
+                pw1.setWriter("R YES");
+            }
+            ProcessResult pr1 = pw1.execute();
+            Assert.assertTrue(pr1.stdout.contains(AutoOkClosingListener.MAGICAL_OK_CLOSING_STRING));
+            //the record was added to .appletSecuritySettings
+            String s2 = FileUtils.loadFileAsString(PathsAndFiles.APPLET_TRUST_SETTINGS_USER.getFile()).trim();
+            Assert.assertNotEquals("on codebase only, the file must not be stroed, stright save, it must be", codebase, s2.contains(JORIG_BASE));
+            assertRecordsCountInAppletTrustSettings(1);
+            //create atacker
+            String htmlin = FileUtils.loadFileAsString(new File(server.getDir(), JHTMLIN + ".in"));
+            //now change codebase to be same as ^ but launch applet from  evilServer1
+            htmlin = htmlin.replaceAll("EVILURL2", server.getUrl().toExternalForm());
+            //and as bonus get resources from evilServer2
+            htmlin = htmlin.replaceAll("EVILURL1", evilServer2.getUrl().toExternalForm());
+            FileUtils.saveFile(htmlin, new File(server.getDir(), JHTMLIN));
+            String ob2 = FileUtils.loadFileAsString(new File(server.getDir(), JHTMLIN));
+            assertTrue(ob2.contains("FakeCodebase1"));
+            ProcessWrapper pw2 = new ProcessWrapper(
+                    server.getJavawsLocation(),
+                    Arrays.asList(OptionsDefinitions.OPTIONS.HEADLESS.option),
+                    evilServer1.getUrl("/" + JHTMLIN)
+            );
+            String word = "YES";
+            if (stopSecond) {
+                word = "NO";
+            }
+            if (codebase) {
+                pw2.setWriter("RC " + word);
+            } else {
+                pw2.setWriter("R " + word);
+            }
+            ProcessResult pr2 = pw2.execute();
+            //this  MUST ask for permissions to run, otherwise fail
+            Assert.assertNotEquals("if second was run, correct end must be printed, otherwise mus tnot be printed",stopSecond, pr2.stdout.contains(AutoOkClosingListener.MAGICAL_OK_CLOSING_STRING));
+            String s1 = FileUtils.loadFileAsString(PathsAndFiles.APPLET_TRUST_SETTINGS_USER.getFile()).trim();
+            Assert.assertNotEquals("on codebase only, the file must not be stroed, stright save, it must be", codebase, s1.contains(JHTMLIN));
+            Assert.assertNotEquals("on codebase only, the file must not be stroed, stright save, it must be", codebase, s1.contains(JORIG_BASE));
+            assertRecordsCountInAppletTrustSettings(2);
+        } finally {
+            dp.restoreProperties();
+        }
+    }
+private void assertRecordsCountInAppletTrustSettings(int expected) throws Exception{
+     UnsignedAppletActionStorageImpl i1 = new UnsignedAppletActionStorageImpl(PathsAndFiles.APPLET_TRUST_SETTINGS_USER.getFile());
+      //i1.readContents();
+     Method readContents = UnsignedAppletActionStorageImpl.class.getDeclaredMethod("readContents");
+     readContents.setAccessible(true);
+     readContents.invoke(i1);
+     Assert.assertEquals(expected, i1.getMatchingItems(null, null, null).size());
+    
+}
 }

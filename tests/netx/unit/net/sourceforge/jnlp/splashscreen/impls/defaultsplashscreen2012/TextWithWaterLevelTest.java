@@ -36,7 +36,6 @@ obligated to do so.  If you do not wish to do so, delete this
 exception statement from your version. */
 package net.sourceforge.jnlp.splashscreen.impls.defaultsplashscreen2012;
 
-import net.sourceforge.jnlp.splashscreen.impls.defaultsplashscreen2012.TextWithWaterLevel;
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.Graphics2D;
@@ -45,6 +44,14 @@ import org.junit.Assert;
 import org.junit.Test;
 
 public class TextWithWaterLevelTest {
+
+    static final double firstLetterMiddleWidth  = 0.1947565543;
+    static final double firstLetterLowerHeight  = 0.934210526;
+    static final double secondLetterLeftWidth  = 0.63670412;
+    static final double secondLetterMiddleHeight  = 0.723684211;
+    static final double firstLetterUpperHeight  = 0.43902439;
+    static final double secondLetterRightWidth  = 0.917602996;
+    static final double secondLetterUpperHeight  = 0.559210526;
 
     @Test
     public void setGetTest() {
@@ -111,12 +118,12 @@ public class TextWithWaterLevelTest {
         BufferedImage bic = ifc.getBackground();
         int w = bic.getWidth();
         int h = bic.getHeight();
-        bic = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        bic = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB); 
         ifc.cutTo(bic.createGraphics(), 0, h);
-        Assert.assertEquals(Color.blue, new Color(bic.getRGB(52, 142)));
-        Assert.assertEquals(Color.blue, new Color(bic.getRGB(170, 110)));
-        Assert.assertEquals(Color.white, new Color(bic.getRGB(52, 62)));
-        Assert.assertEquals(Color.white, new Color(bic.getRGB(245, 85)));
+        Assert.assertEquals(Color.blue, new Color(bic.getRGB((int) (w * firstLetterMiddleWidth), (int) (h * firstLetterLowerHeight))));
+        Assert.assertEquals(Color.blue, new Color(bic.getRGB((int) (w * secondLetterLeftWidth), (int) (h * secondLetterMiddleHeight))));
+        Assert.assertEquals(Color.white, new Color(bic.getRGB((int) (w * firstLetterMiddleWidth), (int) (h * firstLetterUpperHeight))));
+        Assert.assertEquals(Color.white, new Color(bic.getRGB((int) (w * secondLetterRightWidth), (int) (h * secondLetterUpperHeight))));
 
         //well this should be acctually rgba 0,0,0,0 but somehow this was no passig
         //you can confirm with:

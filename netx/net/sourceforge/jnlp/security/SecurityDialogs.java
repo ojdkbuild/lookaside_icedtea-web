@@ -1,40 +1,39 @@
 /* SecurityDialogs.java
-   Copyright (C) 2010 Red Hat, Inc.
+ Copyright (C) 2010 Red Hat, Inc.
 
-This file is part of IcedTea.
+ This file is part of IcedTea.
 
-IcedTea is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License as published by
-the Free Software Foundation, version 2.
+ IcedTea is free software; you can redistribute it and/or
+ modify it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, version 2.
 
-IcedTea is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-General Public License for more details.
+ IcedTea is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ General Public License for more details.
 
-You should have received a copy of the GNU General Public License
-along with IcedTea; see the file COPYING.  If not, write to
-the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
-02110-1301 USA.
+ You should have received a copy of the GNU General Public License
+ along with IcedTea; see the file COPYING.  If not, write to
+ the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+ 02110-1301 USA.
 
-Linking this library statically or dynamically with other modules is
-making a combined work based on this library.  Thus, the terms and
-conditions of the GNU General Public License cover the whole
-combination.
+ Linking this library statically or dynamically with other modules is
+ making a combined work based on this library.  Thus, the terms and
+ conditions of the GNU General Public License cover the whole
+ combination.
 
-As a special exception, the copyright holders of this library give you
-permission to link this library with independent modules to produce an
-executable, regardless of the license terms of these independent
-modules, and to copy and distribute the resulting executable under
-terms of your choice, provided that you also meet, for each linked
-independent module, the terms and conditions of the license of that
-module.  An independent module is a module which is not derived from
-or based on this library.  If you modify this library, you may extend
-this exception to your version of the library, but you are not
-obligated to do so.  If you do not wish to do so, delete this
-exception statement from your version.
-*/
-
+ As a special exception, the copyright holders of this library give you
+ permission to link this library with independent modules to produce an
+ executable, regardless of the license terms of these independent
+ modules, and to copy and distribute the resulting executable under
+ terms of your choice, provided that you also meet, for each linked
+ independent module, the terms and conditions of the license of that
+ module.  An independent module is a module which is not derived from
+ or based on this library.  If you modify this library, you may extend
+ this exception to your version of the library, but you are not
+ obligated to do so.  If you do not wish to do so, delete this
+ exception statement from your version.
+ */
 package net.sourceforge.jnlp.security;
 
 import java.awt.Dialog.ModalityType;
@@ -51,15 +50,15 @@ import javax.swing.JDialog;
 import javax.swing.SwingUtilities;
 
 import net.sourceforge.jnlp.JNLPFile;
-import net.sourceforge.jnlp.config.DeploymentConfiguration;
+import net.sourceforge.jnlp.cache.Resource;
 import net.sourceforge.jnlp.runtime.JNLPClassLoader.SecurityDelegate;
 import net.sourceforge.jnlp.runtime.JNLPRuntime;
-import net.sourceforge.jnlp.security.appletextendedsecurity.AppletSecurityActions;
-import net.sourceforge.jnlp.security.appletextendedsecurity.ExecuteAppletAction;
-import net.sourceforge.jnlp.security.appletextendedsecurity.UnsignedAppletTrustConfirmation;
-import static net.sourceforge.jnlp.security.appletextendedsecurity.UnsignedAppletTrustConfirmation.getStoredAction;
-import net.sourceforge.jnlp.security.dialogs.AccessWarningPaneComplexReturn;
-import net.sourceforge.jnlp.security.dialogs.apptrustwarningpanel.AppTrustWarningPanel.AppSigningWarningAction;
+import net.sourceforge.jnlp.security.dialogresults.AccessWarningPaneComplexReturn;
+import net.sourceforge.jnlp.security.dialogresults.DialogResult;
+import net.sourceforge.jnlp.security.dialogresults.NamePassword;
+import net.sourceforge.jnlp.security.dialogresults.YesCancel;
+import net.sourceforge.jnlp.security.dialogresults.YesNoSandbox;
+import net.sourceforge.jnlp.security.dialogresults.YesNoSandboxLimited;
 import net.sourceforge.jnlp.util.UrlUtils;
 import net.sourceforge.jnlp.util.logging.OutputController;
 
@@ -77,24 +76,32 @@ import net.sourceforge.jnlp.util.logging.OutputController;
  * </p>
  */
 public class SecurityDialogs {
-    /** Types of dialogs we can create */
+
+    /**
+     * Types of dialogs we can create
+     */
     public static enum DialogType {
+
         CERT_WARNING,
         MORE_INFO,
         CERT_INFO,
         SINGLE_CERT_INFO,
         ACCESS_WARNING,
         PARTIALLYSIGNED_WARNING,
-        UNSIGNED_WARNING,   /* requires confirmation with 'high-security' setting */
+        UNSIGNED_WARNING, /* requires confirmation with 'high-security' setting */
         APPLET_WARNING,
         AUTHENTICATION,
-        UNSIGNED_EAS_NO_PERMISSIONS_WARNING,   /* when Extended applet security is at High Security and no permission attribute is find, */
+        UNSIGNED_EAS_NO_PERMISSIONS_WARNING, /* when Extended applet security is at High Security and no permission attribute is find, */
         MISSING_ALACA, /*alaca - Application-Library-Allowable-Codebase Attribute*/
-        MATCHING_ALACA
+        MATCHING_ALACA,
+        SECURITY_511
     }
 
-    /** The types of access which may need user permission. */
+    /**
+     * The types of access which may need user permission.
+     */
     public static enum AccessType {
+
         READ_FILE,
         WRITE_FILE,
         CREATE_DESTKOP_SHORTCUT,
@@ -105,26 +112,8 @@ public class SecurityDialogs {
         VERIFIED,
         UNVERIFIED,
         PARTIALLYSIGNED,
-        UNSIGNED,           /* requires confirmation with 'high-security' setting */
+        UNSIGNED, /* requires confirmation with 'high-security' setting */
         SIGNING_ERROR
-    }
-
-    public static enum AppletAction {
-        RUN,
-        SANDBOX,
-        CANCEL;
-        public static AppletAction fromInteger(int i) {
-            switch (i) {
-                case 0:
-                    return RUN;
-                case 1:
-                    return SANDBOX;
-                case 2:
-                    return CANCEL;
-                default:
-                    return CANCEL;
-            }
-        }
     }
 
     /**
@@ -133,124 +122,38 @@ public class SecurityDialogs {
      *
      * @param accessType the type of system access requested.
      * @param file the jnlp file associated with the requesting application.
+     * @param extras array of objects used as extra.toString or similarly later
      * @return true if permission was granted by the user, false otherwise.
      */
-    public static boolean showAccessWarningDialogB(AccessType accessType, JNLPFile file) {
-        return showAccessWarningDialogB(accessType, file, null);
-    }
-    
-     public static boolean showAccessWarningDialogB(AccessType accessType, JNLPFile file,  final Object[] extras) {
-        Object o = showAccessWarningDialog(accessType, file, extras);
-        if (o instanceof Boolean){
-            return (Boolean) o;
-        }
-        if (o instanceof Integer){
-            return getIntegerResponseAsBoolean(o);
-        }
-        if (o instanceof AccessWarningPaneComplexReturn){
-            return getIntegerResponseAsBoolean(((AccessWarningPaneComplexReturn)o).getRegularReturn());
-        }
-        return false;
-    }
-    
-    /**
-     * unlike showAccessWarningDialogB this is returning raw int code
-     * @param accessType type of dialogue
-     * @param file file for which thsi dialogue is built for
-     * @return return from dialogue
-     */
-     public static int showAccessWarningDialogI(AccessType accessType, JNLPFile file) {
-        Object o = showAccessWarningDialog(accessType, file, null);
-        if (o instanceof Boolean){
-            boolean b =(Boolean) o;
-            if (b){
-                return 0;
-            } else {
-                return 1;
-            }
-        }
-        if (o instanceof Integer){
-            return (Integer)o;
-        }
-        if (o instanceof AccessWarningPaneComplexReturn){
-            return ((AccessWarningPaneComplexReturn)o).getRegularReturn();
-        }
-        return 1;
-    }
-     
-      public static AccessWarningPaneComplexReturn showAccessWarningDialogComplexReturn(AccessType accessType, JNLPFile file) {
-        Object o = showAccessWarningDialog(accessType, file, null);
-        if (o instanceof AccessWarningPaneComplexReturn){
-            return (AccessWarningPaneComplexReturn)o;
-        }
-          if (o instanceof Boolean) {
-              boolean b = (Boolean) o;
-              if (b) {
-                  return new AccessWarningPaneComplexReturn(0);
-              } else {
-                  return new AccessWarningPaneComplexReturn(1);
-              }
-          }
-          if (o instanceof Integer) {
-              return new AccessWarningPaneComplexReturn((int) o);
-          }
-       return new  AccessWarningPaneComplexReturn(1);
-    }
-
-                 
-    /**
-     * unlike showAccessWarningDialogB this is returning raw int code
-     * @param accessType type of dialogue
-     * @param file file for which thsi dialogue is built for
-     * @param extras aditional parameters to dialogue
-     * @return return from dialogue
-     */
-    public static Object showAccessWarningDialog(final AccessType accessType,
+    public static AccessWarningPaneComplexReturn showAccessWarningDialog(final AccessType accessType,
             final JNLPFile file, final Object[] extras) {
 
-        if (!shouldPromptUser()) {
-            if (JNLPRuntime.isTrustAll()) {
-                return 0;
-            } else {
-                return 1;
-            }
-        }
-
-        final SecurityDialogMessage message = new SecurityDialogMessage();
+        final SecurityDialogMessage message = new SecurityDialogMessage(file);
 
         message.dialogType = DialogType.ACCESS_WARNING;
         message.accessType = accessType;
-        message.file = file;
         message.extras = extras;
 
-        return getUserResponse(message);
+        return (AccessWarningPaneComplexReturn) getUserResponse(message);
 
-      
     }
 
     /**
-     * Shows a warning dialog for when a plugin applet is unsigned.
-     * This is used with 'high-security' setting.
+     * Shows a warning dialog for when a plugin applet is unsigned. This is used
+     * with 'high-security' setting.
      *
      * @param file the file to be base as information source for this dialogue
      * @return true if permission was granted by the user, false otherwise.
      */
-    public static AppSigningWarningAction showUnsignedWarningDialog(JNLPFile file) {
+    public static YesNoSandboxLimited showUnsignedWarningDialog(JNLPFile file) {
 
-        if (!shouldPromptUser()) {
-            if (JNLPRuntime.isTrustAll()) {
-                return new AppSigningWarningAction(ExecuteAppletAction.YES, false);
-            } else {
-                return new AppSigningWarningAction(ExecuteAppletAction.NO, false);
-            }
-        }
-
-        final SecurityDialogMessage message = new SecurityDialogMessage();
+        final SecurityDialogMessage message = new SecurityDialogMessage(file);
         message.dialogType = DialogType.UNSIGNED_WARNING;
         message.accessType = AccessType.UNSIGNED;
-        message.file = file;
 
-        return (AppSigningWarningAction) getUserResponse(message);
+        DialogResult r = getUserResponse(message);
+
+        return (YesNoSandboxLimited) r;
     }
 
     /**
@@ -268,56 +171,40 @@ public class SecurityDialogs {
      * wants the applet to run with only sandbox permissions, or CANCEL if the
      * user did not accept running the applet
      */
-    public static AppletAction showCertWarningDialog(AccessType accessType,
+    public static YesNoSandbox showCertWarningDialog(AccessType accessType,
             JNLPFile file, CertVerifier certVerifier, SecurityDelegate securityDelegate) {
 
-        if (!shouldPromptUser()) {
-            if (JNLPRuntime.isTrustAll()) {
-                return AppletAction.RUN;
-            } else {
-                return AppletAction.CANCEL;
-            }
-        }
-
-        final SecurityDialogMessage message = new SecurityDialogMessage();
+        final SecurityDialogMessage message = new SecurityDialogMessage(file);
         message.dialogType = DialogType.CERT_WARNING;
         message.accessType = accessType;
-        message.file = file;
         message.certVerifier = certVerifier;
-        message.extras = new Object[] { securityDelegate };
+        message.extras = new Object[]{securityDelegate};
 
-        Object selectedValue = getUserResponse(message);
+        DialogResult selectedValue = getUserResponse(message);
 
-        return getIntegerResponseAsAppletAction(selectedValue);
+        return (YesNoSandbox) selectedValue;
     }
 
     /**
-     * Shows a warning dialog for when an applet or application is partially signed.
+     * Shows a warning dialog for when an applet or application is partially
+     * signed.
      *
      * @param file the JNLPFile associated with this warning
      * @param certVerifier the JarCertVerifier used to verify this application
      * @param securityDelegate the delegate for security atts.
      * @return true if permission was granted by the user, false otherwise.
      */
-    public static AppSigningWarningAction showPartiallySignedWarningDialog(JNLPFile file, CertVerifier certVerifier,
+    public static YesNoSandbox showPartiallySignedWarningDialog(JNLPFile file, CertVerifier certVerifier,
             SecurityDelegate securityDelegate) {
 
-        if (!shouldPromptUser()) {
-            if (JNLPRuntime.isTrustAll()) {
-                return new AppSigningWarningAction(ExecuteAppletAction.YES, false);
-            } else {
-                return new AppSigningWarningAction(ExecuteAppletAction.NO, false);
-            }
-        }
-
-        final SecurityDialogMessage message = new SecurityDialogMessage();
+        final SecurityDialogMessage message = new SecurityDialogMessage(file);
         message.dialogType = DialogType.PARTIALLYSIGNED_WARNING;
         message.accessType = AccessType.PARTIALLYSIGNED;
-        message.file = file;
         message.certVerifier = certVerifier;
-        message.extras = new Object[] { securityDelegate };
+        message.extras = new Object[]{securityDelegate};
 
-        return (AppSigningWarningAction) getUserResponse(message);
+        DialogResult r = getUserResponse(message);
+        return (YesNoSandbox) r;
     }
 
     /**
@@ -330,133 +217,84 @@ public class SecurityDialogs {
      * @param prompt The prompt (realm) as presented by the server
      * @param type The type of server (proxy/web)
      * @return an array of objects representing user's authentication tokens
-     * @throws SecurityException if the caller does not have the appropriate permissions.
+     * @throws SecurityException if the caller does not have the appropriate
+     * permissions.
      */
-    public static Object[] showAuthenicationPrompt(String host, int port, String prompt, String type) {
+    public static NamePassword showAuthenicationPrompt(String host, int port, String prompt, String type) {
 
-        if (!shouldPromptUser()){
-            return null;
-        }
-        
         SecurityManager sm = System.getSecurityManager();
         if (sm != null) {
             NetPermission requestPermission
-                = new NetPermission("requestPasswordAuthentication");
+                    = new NetPermission("requestPasswordAuthentication");
             sm.checkPermission(requestPermission);
         }
 
-        final SecurityDialogMessage message = new SecurityDialogMessage();
+        final SecurityDialogMessage message = new SecurityDialogMessage(null);
 
         message.dialogType = DialogType.AUTHENTICATION;
-        message.extras = new Object[] { host, port, prompt, type };
+        message.extras = new Object[]{host, port, prompt, type};
 
-        Object response = getUserResponse(message);
-        return (Object[]) response;
+        DialogResult response = getUserResponse(message);
+        OutputController.getLogger().log(OutputController.Level.MESSAGE_DEBUG, "Decided action for matching alaca at  was " + response);
+        return (NamePassword) response;
     }
 
-     public static boolean  showMissingALACAttributePanel(String title, URL codeBase, Set<URL> remoteUrls) {
+    public static boolean showMissingALACAttributePanel(JNLPFile file, URL codeBase, Set<URL> remoteUrls) {
 
-         if (!shouldPromptUser()) {
-             if (JNLPRuntime.isTrustAll()) {
-                 return true;
-             } else {
-                 return false;
-             }
-         }
-
-        SecurityDialogMessage message = new SecurityDialogMessage();
+        SecurityDialogMessage message = new SecurityDialogMessage(file);
         message.dialogType = DialogType.MISSING_ALACA;
-         String urlToShow = "unknown url";
-         if (codeBase != null) {
-             urlToShow = codeBase.toString();
-         } else {
-             OutputController.getLogger().log("Warning, null codebase wants to show in ALACA!");
-         }
-        message.extras = new Object[]{title, urlToShow, UrlUtils.setOfUrlsToHtmlList(remoteUrls)};
-        Object selectedValue = getUserResponse(message);
-        return getIntegerResponseAsBoolean(selectedValue);
-    } 
-     
-     public static boolean showMatchingALACAttributePanel(JNLPFile file, URL codeBase, Set<URL> remoteUrls) {
-
-        ExecuteAppletAction storedAction = getStoredAction(file, AppletSecurityActions.MATCHING_ALACA_ACTION);
-        OutputController.getLogger().log(OutputController.Level.ERROR_DEBUG, "Stored action for matching alaca at " + file.getCodeBase() +" was " + storedAction);
-        
-        if (storedAction != null){
-            if (storedAction == ExecuteAppletAction.ALWAYS){
-                return true;
-            }
-            if (storedAction == ExecuteAppletAction.NEVER){
-                return false;
-            }
-        }
-        
-
-         if (!shouldPromptUser()) {
-               if (JNLPRuntime.isTrustAll()) {
-                return true;
-            } else {
-                return false;
-            }
-        }
-
-         SecurityDialogMessage message = new SecurityDialogMessage();
-         message.dialogType = DialogType.MATCHING_ALACA;
-         message.extras = new Object[]{file, codeBase.toString(), UrlUtils.setOfUrlsToHtmlList(remoteUrls)};
-         AppSigningWarningAction selectedValue = (AppSigningWarningAction) getUserResponse(message);
-
-         if (selectedValue != null) {
-             OutputController.getLogger().log(OutputController.Level.ERROR_DEBUG, "Decided action for matching alaca at " + file.getCodeBase() + " was " + selectedValue.getAction());
-             UnsignedAppletTrustConfirmation.updateAppletAction(file, selectedValue.getAction(), selectedValue.rememberForCodeBase(), AppletSecurityActions.MATCHING_ALACA_ACTION);
-             return selectedValue.getAction() == ExecuteAppletAction.ALWAYS || selectedValue.getAction() == ExecuteAppletAction.YES;
-         }
-
-         OutputController.getLogger().log(OutputController.Level.ERROR_DEBUG, "Decided action for matching alaca at " + file.getCodeBase() + " was " + null);
-         return false;
-
-    }
-     
-    /**
-     * FIXME This is unused. Remove it?
-     * @return (0, 1, 2) =&gt; (Yes, No, Cancel)
-     */
-    public static int showAppletWarning() {
-
-        if (!shouldPromptUser()) {
-            return 2;
-        }
-
-        SecurityDialogMessage message = new SecurityDialogMessage();
-        message.dialogType = DialogType.APPLET_WARNING;
-
-        Object selectedValue = getUserResponse(message);
-
-        // result 0 = Yes, 1 = No, 2 = Cancel
-        if (selectedValue instanceof Integer) {
-            // If the selected value can be cast to Integer, use that value
-            return ((Integer) selectedValue);
+        String urlToShow = file.getNotNullProbalbeCodeBase().toExternalForm();
+        if (codeBase != null) {
+            urlToShow = codeBase.toString();
         } else {
-            // Otherwise default to "cancel"
-            return 2;
+            OutputController.getLogger().log("Warning, null codebase wants to show in ALACA!");
         }
+        message.extras = new Object[]{urlToShow, UrlUtils.setOfUrlsToHtmlList(remoteUrls)};
+        DialogResult selectedValue = getUserResponse(message);
+
+        OutputController.getLogger().log(OutputController.Level.MESSAGE_DEBUG, "Decided action for matching alaca at " + file.getCodeBase() + " was " + selectedValue);
+
+        if (selectedValue == null) {
+            return false;
+        }
+        return selectedValue.toBoolean();
     }
 
-     public static boolean showMissingPermissionsAttributeDialogue(String title, String codeBase) {
+    public static boolean showMatchingALACAttributePanel(JNLPFile file, URL documentBase, Set<URL> remoteUrls) {
 
-         if (!shouldPromptUser()) {
-             if (JNLPRuntime.isTrustAll()) {
-                 return true;
-             } else {
-                 return false;
-             }
-         }
+        SecurityDialogMessage message = new SecurityDialogMessage(file);
+        message.dialogType = DialogType.MATCHING_ALACA;
+        String docBaseString = "null-documentbase";
+        if (documentBase != null) {
+            docBaseString = documentBase.toString();
+        }
+        message.extras = new Object[]{docBaseString, UrlUtils.setOfUrlsToHtmlList(remoteUrls)};
+        DialogResult selectedValue = getUserResponse(message);
 
-         SecurityDialogMessage message = new SecurityDialogMessage();
-         message.dialogType = DialogType.UNSIGNED_EAS_NO_PERMISSIONS_WARNING;
-         message.extras = new Object[]{title, codeBase};
-         Object selectedValue = getUserResponse(message);
-         return SecurityDialogs.getIntegerResponseAsBoolean(selectedValue);
+        OutputController.getLogger().log(OutputController.Level.MESSAGE_DEBUG, "Decided action for matching alaca at " + file.getCodeBase() + " was " + selectedValue);
+
+        if (selectedValue != null) {
+            return selectedValue.toBoolean();
+        }
+
+        return false;
+
     }
+
+    public static boolean showMissingPermissionsAttributeDialogue(JNLPFile file) {
+
+        SecurityDialogMessage message = new SecurityDialogMessage(file);
+        message.dialogType = DialogType.UNSIGNED_EAS_NO_PERMISSIONS_WARNING;
+        DialogResult selectedValue = getUserResponse(message);
+        OutputController.getLogger().log(OutputController.Level.MESSAGE_DEBUG, "Decided action for missing permissions at " + file.getCodeBase() + " was " + selectedValue);
+
+        if (selectedValue != null) {
+            return selectedValue.toBoolean();
+        }
+
+        return false;
+    }
+
     /**
      * Posts the message to the SecurityThread and gets the response. Blocks
      * until a response has been recieved. It's safe to call this from an
@@ -468,7 +306,7 @@ public class SecurityDialogs {
      * type of message, but generally an Integer corresponding to the value 0
      * indicates success/proceed, and everything else indicates failure
      */
-    private static Object getUserResponse(final SecurityDialogMessage message) {
+    private static DialogResult getUserResponse(final SecurityDialogMessage message) {
         /*
          * Want to show a security warning, while blocking the client
          * application. This would be easy except there is a bug in showing
@@ -533,50 +371,20 @@ public class SecurityDialogs {
             }
 
         }
-
         return message.userResponse;
     }
 
-    /**
-     * Returns true iff the given Object reference can be cast to Integer and that Integer's
-     * intValue is 0.
-     * @param ref the Integer (hopefully) reference
-     * @return whether the given reference is both an Integer type and has intValue of 0
-     */
-    public static boolean getIntegerResponseAsBoolean(Object ref) {
-        boolean isInteger = ref instanceof Integer;
-        if (isInteger) {
-            Integer i = (Integer) ref;
-            return i == 0;
+    // false = termiante ITW
+    // true = continue
+    public static boolean show511Dialogue(Resource r) {
+        SecurityDialogMessage message = new SecurityDialogMessage(null);
+        message.dialogType = DialogType.SECURITY_511;
+        message.extras = new Object[]{r.getLocation()};
+        DialogResult selectedValue = getUserResponse(message);
+        if (selectedValue != null && selectedValue.equals(YesCancel.cancel())) {
+            return false; //kill command
         }
-        return false;
+        return true;
     }
 
-    public static AppletAction getIntegerResponseAsAppletAction(Object ref) {
-        if (ref instanceof Integer) {
-            return AppletAction.fromInteger((Integer) ref);
-        }
-        return AppletAction.CANCEL;
-    }
-
-    /**
-     * Returns whether the current runtime configuration allows prompting user
-     * for security warnings.
-     *
-     * @return true if security warnings should be shown to the user. false of 
-     * otherwise or runtime is headless
-     */
-    private static boolean shouldPromptUser() {
-        return AccessController.doPrivileged(new PrivilegedAction<Boolean >() {
-            @Override
-            public Boolean run() {
-                if (JNLPRuntime.isHeadless()){
-                    return false;
-                }
-                return Boolean.valueOf(JNLPRuntime.getConfiguration()
-                        .getProperty(DeploymentConfiguration.KEY_SECURITY_PROMPT_USER));
-            }
-        });
-    }
-    
 }

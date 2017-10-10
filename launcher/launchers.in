@@ -1,7 +1,8 @@
 #!/bin/bash
 
+NASHORN=lib/ext/nashorn.jar
 JAVA=@JAVA@
-LAUNCHER_BOOTCLASSPATH=@LAUNCHER_BOOTCLASSPATH@
+LAUNCHER_BOOTCLASSPATH='@LAUNCHER_BOOTCLASSPATH@'
 LAUNCHER_FLAGS=-Xms8m
 CLASSNAME=@MAIN_CLASS@
 BINARY_LOCATION=@BIN_LOCATION@
@@ -25,13 +26,21 @@ if [ "x$CUSTOM_JRE" = "x" ] ; then
   CUSTOM_JRE=`grep "$CUSTOM_JRE_REGEX" /etc/.java/.deploy/deployment.properties 2>/dev/null |  sed "s/$CUSTOM_JRE_REGEX//g"`
 fi;
 if [ "x$CUSTOM_JRE" != "x" ] ; then
-  if [ -e  "$CUSTOM_JRE" -a -e "$CUSTOM_JRE/bin/java" -a -e "$CUSTOM_JRE/lib/rt.jar" ] ; then
+  if [ -e  "$CUSTOM_JRE" -a -e "$CUSTOM_JRE/bin/java" ] ; then
     JAVA=$CUSTOM_JRE/bin/java
     CP=$CUSTOM_JRE/lib/rt.jar:$CUSTOM_JRE/lib/jfxrt.jar
+    LAUNCHER_BOOTCLASSPATH=$LAUNCHER_BOOTCLASSPATH:$CUSTOM_JRE/$NASHORN
   else
     echo "Your custom JRE $CUSTOM_JRE read from deployment.properties under key $PROPERTY_NAME as $CUSTOM_JRE is not valid. Using default ($JAVA, $CP) in attempt to start. Please fix this."
   fi
+else
+  LAUNCHER_BOOTCLASSPATH="$LAUNCHER_BOOTCLASSPATH:@JRE@/$NASHORN"
 fi;
+
+JDK9="NO"
+if ${JAVA} -version 2>&1 | grep -q "version \"9-" ; then
+  JDK9="YES"
+fi
 
 JAVA_ARGS=( )
 ARGS=( )
@@ -72,6 +81,95 @@ COMMAND[k]="${LAUNCHER_BOOTCLASSPATH}"
 k=$((k+1))
 COMMAND[k]="${LAUNCHER_FLAGS}"
 k=$((k+1))
+
+if [ "x$JDK9" == "xYES" ] ; then
+COMMAND[k]="--patch-module"
+k=$((k+1))
+COMMAND[k]="java.desktop=@PLUGIN_JAR@:@NETX_JAR@"
+k=$((k+1))
+# jsobject must be pathched separately from plugin
+# otherwise netscape pkg would be shared by two modules, which is forbiden
+JSOBJECT_JAR=@JSOBJECT_JAR@
+# plugin jar may not be built
+if [ ! "x$JSOBJECT_JAR" == "x" ] ; then
+  COMMAND[k]="--patch-module"
+  k=$((k+1))
+  COMMAND[k]="jdk.jsobject=$JSOBJECT_JAR"
+  k=$((k+1))
+fi
+
+COMMAND[k]="--add-reads"
+k=$((k+1))
+COMMAND[k]="java.base=ALL-UNNAMED,java.desktop"
+k=$((k+1))
+COMMAND[k]="--add-reads"
+k=$((k+1))
+COMMAND[k]="java.desktop=ALL-UNNAMED,java.naming"
+k=$((k+1))
+COMMAND[k]="--add-reads"
+k=$((k+1))
+COMMAND[k]="java.naming=ALL-UNNAMED,java.desktop"
+k=$((k+1))
+
+COMMAND[k]="--add-exports"
+k=$((k+1))
+COMMAND[k]="java.desktop/sun.awt=ALL-UNNAMED,java.desktop"
+k=$((k+1))
+COMMAND[k]="--add-exports"
+k=$((k+1))
+COMMAND[k]="java.desktop/javax.jnlp=ALL-UNNAMED,java.desktop"
+k=$((k+1))
+COMMAND[k]="--add-exports"
+k=$((k+1))
+COMMAND[k]="java.base/sun.security.provider=ALL-UNNAMED,java.desktop"
+k=$((k+1))
+COMMAND[k]="--add-exports"
+k=$((k+1))
+COMMAND[k]="java.base/sun.security.util=ALL-UNNAMED,java.desktop"
+k=$((k+1))
+COMMAND[k]="--add-exports"
+k=$((k+1))
+COMMAND[k]="java.base/sun.security.x509=ALL-UNNAMED,java.desktop"
+k=$((k+1))
+COMMAND[k]="--add-exports"
+k=$((k+1))
+COMMAND[k]="java.base/jdk.internal.util.jar=ALL-UNNAMED,java.desktop"
+k=$((k+1))
+COMMAND[k]="--add-exports"
+k=$((k+1))
+COMMAND[k]="java.base/sun.security.validator=ALL-UNNAMED,java.desktop"
+k=$((k+1))
+COMMAND[k]="--add-exports"
+k=$((k+1))
+COMMAND[k]="java.base/com.sun.net.ssl.internal.ssl=ALL-UNNAMED,java.desktop"
+k=$((k+1))
+COMMAND[k]="--add-exports"
+k=$((k+1))
+COMMAND[k]="java.base/sun.net.www.protocol.jar=ALL-UNNAMED,java.desktop"
+k=$((k+1))
+COMMAND[k]="--add-exports"
+k=$((k+1))
+COMMAND[k]="java.desktop/sun.awt.X11=ALL-UNNAMED,java.desktop"
+k=$((k+1))
+COMMAND[k]="--add-exports"
+k=$((k+1))
+COMMAND[k]="java.naming/com.sun.jndi.toolkit.url=ALL-UNNAMED,java.desktop"
+k=$((k+1))
+COMMAND[k]="--add-exports"
+k=$((k+1))
+COMMAND[k]="java.desktop/sun.applet=ALL-UNNAMED,java.desktop"
+k=$((k+1))
+COMMAND[k]="--add-exports"
+k=$((k+1))
+COMMAND[k]="java.base/sun.security.action=ALL-UNNAMED,java.desktop"
+k=$((k+1))
+COMMAND[k]="--add-exports"
+k=$((k+1))
+COMMAND[k]="java.base/sun.net.www.protocol.http=ALL-UNNAMED,java.desktop"
+k=$((k+1))
+fi
+
+
 i=0
 while [ "$i" -lt "${#JAVA_ARGS[@]}" ]; do
   COMMAND[k]="${JAVA_ARGS[$i]}"

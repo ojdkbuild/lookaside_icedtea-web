@@ -39,17 +39,16 @@ import java.util.Date;
 import javax.swing.event.TableModelEvent;
 import javax.swing.table.AbstractTableModel;
 import net.sourceforge.jnlp.runtime.Translator;
-import net.sourceforge.jnlp.security.appletextendedsecurity.AppletSecurityActions;
-import net.sourceforge.jnlp.security.appletextendedsecurity.ExecuteAppletAction;
 import net.sourceforge.jnlp.security.appletextendedsecurity.UnsignedAppletActionEntry;
 import net.sourceforge.jnlp.security.appletextendedsecurity.UrlRegEx;
 import net.sourceforge.jnlp.security.appletextendedsecurity.impl.UnsignedAppletActionStorageExtendedImpl;
+import net.sourceforge.jnlp.security.dialogs.remember.AppletSecurityActions;
+import net.sourceforge.jnlp.security.dialogs.remember.ExecuteAppletAction;
 
 public class UnsignedAppletActionTableModel extends AbstractTableModel {
 
     final UnsignedAppletActionStorageExtendedImpl back;
-    private final String[] columns = new String[]{Translator.R("APPEXTSECguiTableModelTableColumnActionUA"),
-        Translator.R("APPEXTSECguiTableModelTableColumnActionMatchALACA"),
+    private final String[] columns = new String[]{Translator.R("APPEXTSECguiTableModelTableColumnRD"),
         Translator.R("APPEXTSECguiTableModelTableColumnDateOfAction"),
         Translator.R("APPEXTSECguiTableModelTableColumnDocumentBase"),
         Translator.R("APPEXTSECguiTableModelTableColumnCodeBase"),
@@ -80,18 +79,15 @@ public class UnsignedAppletActionTableModel extends AbstractTableModel {
             return AppletSecurityActions.class;
         }
         if (columnIndex == 1) {
-            return AppletSecurityActions.class;
+            return Date.class;
         }
         if (columnIndex == 2) {
-            return Date.class;
+            return UrlRegEx.class;
         }
         if (columnIndex == 3) {
             return UrlRegEx.class;
         }
         if (columnIndex == 4) {
-            return UrlRegEx.class;
-        }
-        if (columnIndex == 5) {
             return String.class;
         }
          return Object.class;
@@ -102,11 +98,12 @@ public class UnsignedAppletActionTableModel extends AbstractTableModel {
         if (back.isReadOnly()) {
             return false;
         }
-        if (columnIndex == 2) {
+        if (columnIndex == 1) {
             return false;
         }
+        //FIXME add editor
         if (columnIndex == 0) {
-            return true;
+            return false; 
         }
         if (getValueAt(rowIndex, columnIndex - 1) == null || getValueAt(rowIndex, columnIndex - 1).toString().trim().isEmpty()) {
             return false;
@@ -116,24 +113,21 @@ public class UnsignedAppletActionTableModel extends AbstractTableModel {
 
     @Override
     public Object getValueAt(int rowIndex, int columnIndex) {
-
+        //tis returns copy, so we can save/cancel
         UnsignedAppletActionEntry source = back.toArray()[rowIndex];
         if (columnIndex == 0) {
-            return source.getAppletSecurityActions().getUnsignedAppletAction();
+            return source.getAppletSecurityActions();
         }
         if (columnIndex == 1) {
-            return source.getAppletSecurityActions().getMatchingAlacaAction();
-        }
-        if (columnIndex == 2) {
             return source.getTimeStamp();
         }
-        if (columnIndex == 3) {
+        if (columnIndex == 2) {
             return source.getDocumentBase();
         }
-        if (columnIndex == 4) {
+        if (columnIndex == 3) {
             return source.getCodeBase();
         }
-        if (columnIndex == 5) {
+        if (columnIndex == 4) {
             return UnsignedAppletActionEntry.createArchivesString(source.getArchives());
         }
         return null;
@@ -142,7 +136,7 @@ public class UnsignedAppletActionTableModel extends AbstractTableModel {
     @Override
     public void setValueAt(final Object aValue, final int rowIndex, final int columnIndex) {
         final UnsignedAppletActionEntry source = back.toArray()[rowIndex];
-        back.modify(source, columnIndex, aValue);
+        back.modify(source, columnIndex, aValue.toString());
 
     }
 
@@ -150,7 +144,7 @@ public class UnsignedAppletActionTableModel extends AbstractTableModel {
         int i = getRowCount()-1;
         String s = "http://localhost:80/";
         back.add(new UnsignedAppletActionEntry(
-                AppletSecurityActions.createDefault(),
+                new AppletSecurityActions(),
                 new Date(),
                 UrlRegEx.quoteAndStar(s),
                 UrlRegEx.quoteAndStar(s),

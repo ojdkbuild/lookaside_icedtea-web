@@ -46,11 +46,15 @@ import java.awt.Font;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
+import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import net.sourceforge.jnlp.runtime.Translator;
 import net.sourceforge.jnlp.security.CertVerifier;
 import net.sourceforge.jnlp.security.SecurityDialog;
+import net.sourceforge.jnlp.security.dialogresults.DialogResult;
+import net.sourceforge.jnlp.security.dialogresults.SetValueHandler;
+import net.sourceforge.jnlp.security.dialogresults.YesNoCancel;
 
 public class AppletWarningPane extends SecurityDialogPanel {
 
@@ -91,9 +95,9 @@ public class AppletWarningPane extends SecurityDialogPanel {
         JButton yes = new JButton(Translator.R("ButYes"));
         JButton no = new JButton(Translator.R("ButNo"));
         JButton cancel = new JButton(Translator.R("ButCancel"));
-        yes.addActionListener(createSetValueListener(parent, 0));
-        no.addActionListener(createSetValueListener(parent, 1));
-        cancel.addActionListener(createSetValueListener(parent, 2));
+        yes.addActionListener(SetValueHandler.createSetValueListener(parent,  YesNoCancel.yes()));
+        no.addActionListener(SetValueHandler.createSetValueListener(parent,  YesNoCancel.no()));
+        cancel.addActionListener(SetValueHandler.createSetValueListener(parent,  YesNoCancel.cancel()));
         initialFocusComponent = cancel;
         buttonPanel.add(yes);
         buttonPanel.add(no);
@@ -106,6 +110,34 @@ public class AppletWarningPane extends SecurityDialogPanel {
         add(infoPanel);
         add(buttonPanel);
 
+    }
+
+    @Override
+    public DialogResult getDefaultNegativeAnswer() {
+        return YesNoCancel.no();
+    }
+
+    @Override
+    public DialogResult getDefaultPositiveAnswer() {
+        return YesNoCancel.yes();
+    }
+
+    @Override
+    public DialogResult readFromStdIn(String what) {
+        return YesNoCancel.readValue(what);
+    }
+    @Override
+    public String helpToStdIn() {
+        return YesNoCancel.cancel().getAllowedValues().toString();
+    }
+    
+     public static void main(String[] args)  {
+        AppletWarningPane w = new AppletWarningPane(null, null);
+         JFrame f = new JFrame();
+        f.setSize(600, 400);
+        f.add(w, BorderLayout.CENTER);
+        f.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        f.setVisible(true);
     }
 
 }

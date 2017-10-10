@@ -1,4 +1,4 @@
-/* AccessWarningPane.java
+/* 
    Copyright (C) 2008 Red Hat, Inc.
 
 This file is part of IcedTea.
@@ -68,11 +68,20 @@ import net.sourceforge.jnlp.PluginBridge;
 import net.sourceforge.jnlp.ShortcutDesc;
 import net.sourceforge.jnlp.config.DeploymentConfiguration;
 import net.sourceforge.jnlp.runtime.JNLPRuntime;
+import net.sourceforge.jnlp.runtime.Translator;
 import net.sourceforge.jnlp.security.CertVerifier;
 import net.sourceforge.jnlp.security.SecurityDialog;
 import net.sourceforge.jnlp.security.SecurityDialogs.AccessType;
+import net.sourceforge.jnlp.security.dialogresults.AccessWarningPaneComplexReturn;
+import net.sourceforge.jnlp.security.dialogresults.BasicDialogValue;
+import net.sourceforge.jnlp.security.dialogresults.DialogResult;
+import net.sourceforge.jnlp.security.dialogresults.YesNo;
+import net.sourceforge.jnlp.security.dialogs.remember.RememberPanelResult;
+import net.sourceforge.jnlp.security.dialogs.remember.RememberableDialog;
 import net.sourceforge.jnlp.util.FileUtils;
 import net.sourceforge.jnlp.util.XDesktopEntry;
+import net.sourceforge.jnlp.util.docprovider.formatters.formatters.PlainTextFormatter;
+import net.sourceforge.jnlp.jdk89acesses.SunMiscLauncher;
 
 /**
  * Provides a panel to show inside a SecurityDialog. These dialogs are
@@ -82,7 +91,7 @@ import net.sourceforge.jnlp.util.XDesktopEntry;
  *
  * @author <a href="mailto:jsumali@redhat.com">Joshua Sumali</a>
  */
-public class AccessWarningPane extends SecurityDialogPanel {
+public class AccessWarningPane extends SecurityDialogPanel implements RememberableDialog{
 
     private Object[] extras;
     private JCheckBox desktopCheck;
@@ -90,6 +99,7 @@ public class AccessWarningPane extends SecurityDialogPanel {
     HtmlShortcutPanel htmlPanelDesktop;
     HtmlShortcutPanel htmlPanelMenu;
     RememberPanel rememberPanel;
+
     public AccessWarningPane(SecurityDialog x, CertVerifier certVerifier) {
         super(x, certVerifier);
         addComponents();
@@ -168,7 +178,7 @@ public class AccessWarningPane extends SecurityDialogPanel {
                     topLabelText = R("SNetworkAccess", "(address here)");
         }
 
-        ImageIcon icon = new ImageIcon((new sun.misc.Launcher()).getClassLoader().getResource("net/sourceforge/jnlp/resources/question.png"));
+        ImageIcon icon = SunMiscLauncher.getSecureImageIcon("net/sourceforge/jnlp/resources/question.png");
         JLabel topLabel = new JLabel(htmlWrap(topLabelText), icon, SwingConstants.LEFT);
         topLabel.setFont(new Font(topLabel.getFont().toString(),
                         Font.BOLD, 12));
@@ -280,7 +290,7 @@ public class AccessWarningPane extends SecurityDialogPanel {
                 negateVisibility(rememberPanel);
                 negateVisibility(htmlPanelDesktop);
                 negateVisibility(htmlPanelMenu);
-                AccessWarningPane.this.parent.pack();
+                AccessWarningPane.this.parent.getViwableDialog().pack();
                 
             }
 
@@ -291,22 +301,20 @@ public class AccessWarningPane extends SecurityDialogPanel {
             }
         }
         );
-        //override the  createSetValueListener mechanism
-        //TODO get rid of createSetValueListener completely.
         run.addActionListener(new ActionListener() {
 
             @Override
             public void actionPerformed(ActionEvent e) {
-                parent.setValue(getModifier(0)); //according to  createSetValueListener 0 is ok and 1 cancel
-                parent.dispose();
+                parent.setValue(getModifier(BasicDialogValue.Primitive.YES));
+                parent.getViwableDialog().dispose();
             }
         });
         cancel.addActionListener(new ActionListener() {
 
             @Override
             public void actionPerformed(ActionEvent e) {
-                parent.setValue(getModifier(1)); //according to  createSetValueListener 0 is ok and 1 cancel
-                parent.dispose();
+                parent.setValue(getModifier(BasicDialogValue.Primitive.NO));
+                parent.getViwableDialog().dispose();
             }
         });
         initialFocusComponent = cancel;
@@ -322,11 +330,11 @@ public class AccessWarningPane extends SecurityDialogPanel {
         add(buttonPanel);
         
         rememberPanel.setVisible(false);
-        this.parent.pack();
+        this.parent.getViwableDialog().pack();
 
     }
 
-    private AccessWarningPaneComplexReturn getModifier(int button) {
+    private AccessWarningPaneComplexReturn getModifier(BasicDialogValue.Primitive button) {
         AccessWarningPaneComplexReturn ar = new AccessWarningPaneComplexReturn(button);
         if (desktopCheck != null) {
             if (htmlPanelDesktop != null) {
@@ -346,17 +354,10 @@ public class AccessWarningPane extends SecurityDialogPanel {
                 ar.setMenu(new AccessWarningPaneComplexReturn.ShortcutResult(menuCheck.isSelected()));
             }
         }
-        if (rememberPanel != null) {
-            ar.setRember(rememberPanel.getShortcutResult());
-        }
         return ar;
     }
 
     private class RememberPanel extends JPanel {
-        // TODO: somehow tell the ApplicationInstance
-        // to stop asking for permission
-        // will be implemented likeALACAcanrember decission 
-        // must be encoded in similar way as AWP is doing
 
         final JRadioButton byApp = new JRadioButton(R("EXAWrememberByApp"));
         final JRadioButton byPage = new JRadioButton(R("EXAWrememberByPage"));
@@ -379,16 +380,15 @@ public class AccessWarningPane extends SecurityDialogPanel {
 
         }
 
-        public AccessWarningPaneComplexReturn.RemeberType getShortcutResult() {
-            if (byApp.isSelected()) {
-                return AccessWarningPaneComplexReturn.RemeberType.REMEMBER_BY_APP;
-            } else if (byPage.isSelected()) {
-                return AccessWarningPaneComplexReturn.RemeberType.REMEMBER_BY_DOMAIN;
-            } else if (dont.isSelected()) {
-                return AccessWarningPaneComplexReturn.RemeberType.REMEMBER_DONT;
-            } else {
-                return AccessWarningPaneComplexReturn.RemeberType.REMEMBER_DONT;
-            }
+        private boolean isRemembered(){
+            return !dont.isSelected();
+        }
+        private boolean isRememebredForCodebase(){
+            return byPage.isSelected();
+        }
+
+        private RememberPanelResult getResult() {
+            return new RememberPanelResult(isRemembered(), isRememebredForCodebase());
         }
 
     }
@@ -491,5 +491,53 @@ public class AccessWarningPane extends SecurityDialogPanel {
         }
 
     }
+    
+    
+     @Override
+    public RememberPanelResult getRemeberAction() {
+       return rememberPanel.getResult();
+    }
 
+    @Override
+    public DialogResult getValue() {
+        return parent.getValue();
+    }
+    
+    @Override
+    public JNLPFile getFile() {
+        return parent.getFile();
+    }
+
+    @Override
+    public DialogResult readValue(String s) {
+        return AccessWarningPaneComplexReturn.readValue(s);
+    }
+
+    @Override
+    public DialogResult getDefaultNegativeAnswer() {
+        return new AccessWarningPaneComplexReturn(false);
+    }
+
+    @Override
+    public DialogResult getDefaultPositiveAnswer() {
+        return new AccessWarningPaneComplexReturn(true);
+    }
+
+    @Override
+    public DialogResult readFromStdIn(String what) {
+        return AccessWarningPaneComplexReturn.readValue(what);
+    }
+
+    @Override
+    public String helpToStdIn() {
+        if (parent.getAccessType() == AccessType.CREATE_DESTKOP_SHORTCUT){
+            return Translator.R("AWPstdoutHint1") + PlainTextFormatter.getLineSeparator()
+                    + Translator.R("AWPstdoutHint2") + PlainTextFormatter.getLineSeparator()
+                    + Translator.R("AWPstdoutHint3", AccessWarningPaneComplexReturn.ShortcutResult.Shortcut.allValues()) + PlainTextFormatter.getLineSeparator()
+                    + Translator.R("AWPstdoutHint1") + PlainTextFormatter.getLineSeparator();
+        } else {
+            return YesNo.yes().getAllowedValues().toString();
+        }
+    }
+    
 }
