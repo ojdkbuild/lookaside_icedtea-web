@@ -60,6 +60,7 @@ import javax.swing.JPopupMenu;
 import net.sourceforge.jnlp.JNLPFile;
 import net.sourceforge.jnlp.config.PathsAndFiles;
 import net.sourceforge.jnlp.runtime.JNLPClassLoader.SecurityDelegate;
+import net.sourceforge.jnlp.runtime.JNLPRuntime;
 import net.sourceforge.jnlp.security.policyeditor.PolicyEditor;
 import net.sourceforge.jnlp.security.policyeditor.PolicyEditor.PolicyEditorWindow;
 import net.sourceforge.jnlp.security.policyeditor.PolicyEditorPermissions;
@@ -108,11 +109,13 @@ public class TemporaryPermissionsButton extends JButton {
     private JPopupMenu createPolicyPermissionsMenu() {
         final JPopupMenu policyMenu = new JPopupMenu();
 
-        final JMenuItem launchPolicyEditor = new JMenuItem(R("CertWarnPolicyEditorItem"));
-        launchPolicyEditor.addActionListener(new PolicyEditorLaunchListener());
-        policyMenu.add(launchPolicyEditor);
+        if (!JNLPRuntime.isWindows()) {
+            final JMenuItem launchPolicyEditor = new JMenuItem(R("CertWarnPolicyEditorItem"));
+            launchPolicyEditor.addActionListener(new PolicyEditorLaunchListener());
+            policyMenu.add(launchPolicyEditor);
 
-        policyMenu.addSeparator();
+            policyMenu.addSeparator();
+        }
 
         final JCheckBoxMenuItem networkAccess = new JCheckBoxMenuItem(R("STempNetwork"));
         networkAccess.addActionListener(new TemporaryPermissionsListener(TemporaryPermissions.getPermissions(PolicyEditorPermissions.NETWORK)));
