@@ -240,7 +240,10 @@ public class OutputController {
         Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
             @Override
             public void run() {
-                flush();
+                if (!JNLPRuntime.isWindows()) {
+                    flush();
+                }
+                // windows: hang with Exception in thread "AWT-Windows" java.lang.IllegalStateException: Shutdown in progress
             }
         }));
     }
