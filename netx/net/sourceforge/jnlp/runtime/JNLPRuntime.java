@@ -170,6 +170,9 @@ public class JNLPRuntime {
 
     private static Boolean onlineDetected = null;
 
+    /** help URL to open in browser */
+    private static String helpUrl = "https://icedtea.classpath.org/wiki/IcedTea-Web#Common_Issues";
+
 
     /** 
      * Header is not checked and so eg
@@ -876,6 +879,14 @@ public class JNLPRuntime {
 
     public static void setIgnoreHeaders(boolean ignoreHeaders) {
         JNLPRuntime.ignoreHeaders = ignoreHeaders;
+    }
+
+    public static void setHelpUrl(String helpUrl) {
+        JNLPRuntime.helpUrl = helpUrl;
+    }
+
+    public static String getHelpUrl() {
+        return JNLPRuntime.helpUrl;
     }
 
     private static boolean isPluginDebug() {

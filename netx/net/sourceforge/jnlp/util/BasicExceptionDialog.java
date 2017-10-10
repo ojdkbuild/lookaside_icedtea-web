@@ -37,30 +37,22 @@ exception statement from your version. */
 
 package net.sourceforge.jnlp.util;
 
+import net.sourceforge.jnlp.runtime.JNLPRuntime;
 import net.sourceforge.jnlp.util.logging.OutputController;
 import static net.sourceforge.jnlp.runtime.Translator.R;
 
-import java.awt.BorderLayout;
-import java.awt.Component;
-import java.awt.Dimension;
+import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import javax.swing.BorderFactory;
-import javax.swing.BoxLayout;
-import javax.swing.JButton;
-import javax.swing.JComponent;
-import javax.swing.JDialog;
-import javax.swing.JLabel;
-import javax.swing.JOptionPane;
-import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.JTextArea;
-import javax.swing.SwingUtilities;
+import javax.swing.*;
+
 import net.sourceforge.jnlp.controlpanel.CachePane;
 import net.sourceforge.jnlp.util.logging.JavaConsole;
+import net.sourceforge.jnlp.util.ui.Boxer;
 import net.sourceforge.jnlp.util.ui.SwingUtils;
+import sun.swing.SwingAccessor;
 
 /**
  * A dialog that displays some basic information about an exception
@@ -77,48 +69,49 @@ public class BasicExceptionDialog {
     public static void show(Exception exception) {
         SwingUtils.enableDefaultLaF();
 
+        String errorText = exception.getMessage();
+        String shortText = SwingUtils.shortenText(errorText, 1 << 8);
+        String labelText = SwingUtils.wrapLabelText(shortText);
         String detailsText = OutputController.exceptionToString(exception);
 
-        final JPanel mainPanel = new JPanel(new BorderLayout());
+        final JPanel mainPanel = Boxer.verticalPanel();
         mainPanel.setBorder(BorderFactory.createEmptyBorder(5,5,5,5));
 
         JOptionPane optionPane = new JOptionPane(mainPanel, JOptionPane.ERROR_MESSAGE);
         final JDialog errorDialog = optionPane.createDialog(R("Error"));
         errorDialog.setIconImages(ImageResources.INSTANCE.getApplicationImages());
 
-        final JPanel quickInfoPanelAll = new JPanel();
-        final JPanel quickInfoPanelMessage = new JPanel();
-        final JPanel quickInfoPanelButtons = new JPanel();
-        BoxLayout layoutAll = new BoxLayout(quickInfoPanelAll, BoxLayout.Y_AXIS);
-        BoxLayout layoutMessage = new BoxLayout(quickInfoPanelMessage, BoxLayout.X_AXIS);
-        BoxLayout layoutButtons = new BoxLayout(quickInfoPanelButtons, BoxLayout.X_AXIS);
-        quickInfoPanelAll.setLayout(layoutAll);
-        quickInfoPanelMessage.setLayout(layoutMessage);
-        quickInfoPanelButtons.setLayout(layoutButtons);
-        mainPanel.add(quickInfoPanelAll, BorderLayout.PAGE_START);
-        quickInfoPanelAll.add(quickInfoPanelMessage);
-        quickInfoPanelAll.add(quickInfoPanelButtons);
+        final JPanel quickInfoPanelAll = Boxer.verticalPanel(mainPanel);
+        final JPanel quickInfoPanelMessage = Boxer.horizontalPanel(quickInfoPanelAll);
+        quickInfoPanelAll.add(Box.createVerticalStrut(10));
+        final JPanel linkPanel = Boxer.horizontalPanel(quickInfoPanelAll);
+        linkPanel.add(new JLabel(R("PEHelpMenu") + ":"));
+        linkPanel.add(Box.createHorizontalStrut(10));
+        JLabel urlLabel = new JLabel(SwingUtils.linkify(JNLPRuntime.getHelpUrl()));
+        urlLabel.addMouseListener(new SwingUtils.OpenUrlInBrowserListener(JNLPRuntime.getHelpUrl()));
+        urlLabel.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        linkPanel.add(urlLabel);
+        quickInfoPanelAll.add(Box.createVerticalStrut(10));
+        final JPanel quickInfoPanelButtons = Boxer.horizontalPanel(quickInfoPanelAll);
 
-        JLabel errorLabel = new JLabel(exception.getMessage());
-        errorLabel.setAlignmentY(JComponent.LEFT_ALIGNMENT);
+        JLabel errorLabel = new JLabel(labelText);
         quickInfoPanelMessage.add(errorLabel);
+        quickInfoPanelMessage.setPreferredSize(new Dimension(480, 50));
 
         final JButton viewDetails = new JButton(R("ButShowDetails"));
-        viewDetails.setAlignmentY(JComponent.LEFT_ALIGNMENT);
         viewDetails.setActionCommand("show");
         quickInfoPanelButtons.add(viewDetails);
 
-        final JButton cacheButton = getClearCacheButton(errorDialog);
-        cacheButton.setAlignmentY(JComponent.LEFT_ALIGNMENT);
-        quickInfoPanelButtons.add(cacheButton);
+        if (!JNLPRuntime.isWindows()) {
+            final JButton cacheButton = getClearCacheButton(errorDialog);
+            quickInfoPanelButtons.add(cacheButton);
+        }
 
-        final JButton consoleButton = getShowButton(errorDialog);
-        consoleButton.setAlignmentY(JComponent.LEFT_ALIGNMENT);
-        quickInfoPanelButtons.add(consoleButton);
-
-        final JPanel fillRest = new JPanel();
-        fillRest.setAlignmentY(JComponent.LEFT_ALIGNMENT);
-        quickInfoPanelButtons.add(fillRest);
+        if (JavaConsole.isEnabled()) {
+            final JButton consoleButton = getShowButton(errorDialog);
+            quickInfoPanelButtons.add(consoleButton);
+        }
+        quickInfoPanelButtons.add(Box.createHorizontalGlue());
 
         JTextArea textArea = new JTextArea();
         textArea.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
@@ -131,7 +124,7 @@ public class BasicExceptionDialog {
             @Override
             public void actionPerformed(ActionEvent e) {
                 if (viewDetails.getActionCommand().equals("show")) {
-                    mainPanel.add(scrollPane, BorderLayout.CENTER);
+                    mainPanel.add(scrollPane);
                     viewDetails.setActionCommand("hide");
                     viewDetails.setText(R("ButHideDetails"));
                     errorDialog.pack();
@@ -144,8 +137,8 @@ public class BasicExceptionDialog {
             }
         });
 
-        errorDialog.pack();
         errorDialog.setResizable(true);
+        errorDialog.pack();
         ScreenFinder.centerWindowsToCurrentScreen(errorDialog);
         errorDialog.setVisible(true);
         errorDialog.dispose();
