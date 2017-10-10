@@ -64,6 +64,7 @@ public class PathsAndFiles {
     private static final String XDG_DATA_HOME = "XDG_DATA_HOME";
     private static final String TMP_PROP = "java.io.tmpdir";
     private static final String HOME_PROP = "user.home";
+    private static final String ITW_USERDATA_PROP = "itw.userdata";
     private static final String JAVA_PROP = "java.home";
     private static final String USER_PROP = "user.name";
     private static final String VARIABLE = JNLPRuntime.isWindows() ? "%" : "$";
@@ -72,9 +73,11 @@ public class PathsAndFiles {
     public static final String CACHE_INDEX_FILE_NAME = "recently_used";
 
     static {
-        String configHome = System.getProperty(HOME_PROP) + File.separator + ".config";
-        String cacheHome = System.getProperty(HOME_PROP) + File.separator + ".cache";
-        String dataHome = System.getProperty(HOME_PROP) +  File.separator + ".local" + File.separator + "share";
+        String itwDataRootProp = System.getProperty(ITW_USERDATA_PROP);
+        String itwDataRoot = null != itwDataRootProp ? itwDataRootProp : System.getProperty(HOME_PROP);
+        String configHome = itwDataRoot + File.separator + ".config";
+        String cacheHome = itwDataRoot + File.separator + ".cache";
+        String dataHome = itwDataRoot +  File.separator + ".local" + File.separator + "share";
         String runtimeHome = System.getProperty(TMP_PROP);
         String xdg_config_home = System.getenv(XDG_CONFIG_HOME_VAR);
         String xdg_cache_home = System.getenv(XDG_CACHE_HOME_VAR);
