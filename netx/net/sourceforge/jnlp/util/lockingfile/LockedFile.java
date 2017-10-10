@@ -113,16 +113,16 @@ public class LockedFile {
      * Lock access to the file. Lock is reentrant.
      */
     public void lock() throws IOException {
-        if (JNLPRuntime.isWindows()) {
-            return;
-        }
         // Create if does not already exist, cannot lock non-existing file
-        if (!isReadOnly()) {
+        if (!JNLPRuntime.isWindows() && !isReadOnly()) {
             this.file.createNewFile();
         }
 
         this.threadLock.lock();
 
+        if (JNLPRuntime.isWindows()) {
+            return;
+        }
         lockProcess();
     }
 
@@ -153,10 +153,10 @@ public class LockedFile {
      * Unlock access to the file. Lock is reentrant. Does not do anything if not holding the lock.
      */
     public void unlock() throws IOException {
-        if (JNLPRuntime.isWindows() || !this.threadLock.isHeldByCurrentThread()) {
+        if (!this.threadLock.isHeldByCurrentThread()) {
             return;
         }
-        boolean releaseProcessLock = (this.threadLock.getHoldCount() == 1);
+        boolean releaseProcessLock = (!JNLPRuntime.isWindows() && this.threadLock.getHoldCount() == 1);
         try {
             if (releaseProcessLock) {
                 if (this.processLock != null){
