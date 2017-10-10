@@ -332,7 +332,7 @@ public class Defaults {
                                 DeploymentConfiguration.CONSOLE_SHOW_PLUGIN,
                                 DeploymentConfiguration.CONSOLE_SHOW_JAVAWS
                         }),
-                        DeploymentConfiguration.CONSOLE_HIDE
+                        DeploymentConfiguration.CONSOLE_DISABLE
                 },
                 {
                         DeploymentConfiguration.KEY_ENABLE_LOGGING,

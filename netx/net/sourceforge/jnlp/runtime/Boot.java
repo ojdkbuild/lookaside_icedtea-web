@@ -198,6 +198,9 @@ public final class Boot implements PrivilegedAction<Void> {
         if (optionParser.hasOption(OptionsDefinitions.OPTIONS.REDIRECT)) {
             JNLPRuntime.setAllowRedirect(true);
         }
+        if (optionParser.hasOption(OptionsDefinitions.OPTIONS.HELP_URL)) {
+            JNLPRuntime.setHelpUrl(optionParser.getParam(OptionsDefinitions.OPTIONS.HELP_URL));
+        }
 
         //if it is browser go by ots own, otherwise procedd with normal ITW logic
         if (optionParser.hasOption(OptionsDefinitions.OPTIONS.BROWSER)) {
