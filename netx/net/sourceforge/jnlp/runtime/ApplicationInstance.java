@@ -142,7 +142,9 @@ public class ApplicationInstance {
      */
     public void initialize() {
         installEnvironment();
-        addMenuAndDesktopEntries();
+        if (!JNLPRuntime.isWindows()) {
+            addMenuAndDesktopEntries();
+        }
     }
 
     /**
