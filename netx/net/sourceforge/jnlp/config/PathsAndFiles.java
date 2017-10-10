@@ -74,7 +74,8 @@ public class PathsAndFiles {
 
     static {
         String itwDataRootProp = System.getProperty(ITW_USERDATA_PROP);
-        String itwDataRoot = null != itwDataRootProp ? itwDataRootProp : System.getProperty(HOME_PROP);
+        String itwDataRootBadslash = null != itwDataRootProp ? itwDataRootProp : System.getProperty(HOME_PROP);
+        String itwDataRoot = itwDataRootBadslash.replace("/", "\\");
         String configHome = itwDataRoot + File.separator + ".config";
         String cacheHome = itwDataRoot + File.separator + ".cache";
         String dataHome = itwDataRoot +  File.separator + ".local" + File.separator + "share";
