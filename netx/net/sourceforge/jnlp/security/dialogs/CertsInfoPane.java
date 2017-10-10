@@ -59,6 +59,7 @@ import java.awt.datatransfer.StringSelection;
 import java.lang.reflect.Method;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.TreeSelectionModel;
+import net.sourceforge.jnlp.runtime.JNLPRuntime;
 import net.sourceforge.jnlp.security.CertVerifier;
 import net.sourceforge.jnlp.security.SecurityDialog;
 import net.sourceforge.jnlp.security.SecurityUtil;
@@ -254,11 +255,13 @@ public class CertsInfoPane extends SecurityDialogPanel {
 
         JPanel buttonPane = new JPanel(new BorderLayout());
         JButton close = new JButton(R("ButClose"));
-        JButton copyToClipboard = new JButton(R("ButCopy"));
-        close.addActionListener(SetValueHandler.createSetValueListener(parent, new Yes()));
-        copyToClipboard.addActionListener(new CopyToClipboardHandler());
         buttonPane.add(close, BorderLayout.EAST);
-        buttonPane.add(copyToClipboard, BorderLayout.WEST);
+        close.addActionListener(SetValueHandler.createSetValueListener(parent, new Yes()));
+        if (!JNLPRuntime.isWindows()) {
+            JButton copyToClipboard = new JButton(R("ButCopy"));
+            copyToClipboard.addActionListener(new CopyToClipboardHandler());
+            buttonPane.add(copyToClipboard, BorderLayout.WEST);
+        }
         buttonPane.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
 
         add(mainPane, BorderLayout.CENTER);
