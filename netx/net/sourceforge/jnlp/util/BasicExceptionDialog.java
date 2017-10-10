@@ -60,6 +60,7 @@ import javax.swing.JTextArea;
 import javax.swing.SwingUtilities;
 import net.sourceforge.jnlp.controlpanel.CachePane;
 import net.sourceforge.jnlp.util.logging.JavaConsole;
+import net.sourceforge.jnlp.util.ui.SwingUtils;
 
 /**
  * A dialog that displays some basic information about an exception
@@ -74,6 +75,8 @@ public class BasicExceptionDialog {
      * @param exception the exception to indicate
      */
     public static void show(Exception exception) {
+        SwingUtils.enableDefaultLaF();
+
         String detailsText = OutputController.exceptionToString(exception);
 
         final JPanel mainPanel = new JPanel(new BorderLayout());

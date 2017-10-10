@@ -120,6 +120,7 @@ import net.sourceforge.jnlp.util.docprovider.TextsProvider;
 import net.sourceforge.jnlp.util.docprovider.formatters.formatters.PlainTextFormatter;
 import net.sourceforge.jnlp.util.logging.OutputController;
 import net.sourceforge.jnlp.util.optionparser.OptionParser;
+import net.sourceforge.jnlp.util.ui.SwingUtils;
 import sun.security.provider.PolicyParser;
 
 /**
@@ -1756,11 +1757,7 @@ public class PolicyEditor extends JPanel {
             return;
         }
 
-        try {
-            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-        } catch (final Exception e) {
-            // not really important, so just ignore
-        }
+        SwingUtils.enableDefaultLaF();
 
         final String filepath = getFilePathArgument(optionParser);
         final String codebase = getCodebaseArgument(optionParser);

@@ -42,6 +42,7 @@ import net.sourceforge.jnlp.util.logging.OutputController;
 import net.sourceforge.jnlp.util.optionparser.InvalidArgumentException;
 import net.sourceforge.jnlp.util.optionparser.OptionParser;
 import net.sourceforge.jnlp.util.optionparser.UnevenParameterException;
+import net.sourceforge.jnlp.util.ui.SwingUtils;
 import sun.awt.AppContext;
 import sun.awt.SunToolkit;
 
@@ -150,11 +151,7 @@ public final class Boot implements PrivilegedAction<Void> {
             if (JNLPRuntime.isHeadless()) {
                 JNLPRuntime.exit(0);
             } else {
-                try {
-                    UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-                } catch (Exception e) {
-                    OutputController.getLogger().log("Unable to set system look and feel");
-                }
+                SwingUtils.enableDefaultLaF();
                 OutputController.getLogger().printOutLn(R("BLaunchAbout"));
                 AboutDialog.display(TextsProvider.JAVAWS);
                 return;

@@ -73,6 +73,7 @@ import net.sourceforge.jnlp.util.FileUtils;
 import net.sourceforge.jnlp.util.logging.JavaConsole;
 import net.sourceforge.jnlp.util.logging.LogConfig;
 import net.sourceforge.jnlp.util.logging.OutputController;
+import net.sourceforge.jnlp.util.ui.SwingUtils;
 import sun.net.www.protocol.jar.URLJarFile;
 
 /**
@@ -216,11 +217,7 @@ public class JNLPRuntime {
     public static void initialize(boolean isApplication) throws IllegalStateException {
         checkInitialized();
 
-        try {
-            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-        } catch (Exception e) {
-            OutputController.getLogger().log("Unable to set system look and feel");
-        }
+        SwingUtils.enableDefaultLaF();
 
         if (JavaConsole.canShowOnStartup(isApplication)) {
             JavaConsole.getConsole().showConsoleLater();
