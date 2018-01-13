@@ -87,6 +87,7 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
+@ENABLE_DOCS_TRUE@@HAVE_JAVA9_TRUE@am__append_1 = -source $(IT_LANGUAGE_SOURCE_VERSION)
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/acinclude.m4 \
@@ -253,7 +254,6 @@ SUN_NET_WWW_PROTOCOL_HTTP_HANDLER = @SUN_NET_WWW_PROTOCOL_HTTP_HANDLER@
 SUN_NET_WWW_PROTOCOL_JAR_URLJARFILE = @SUN_NET_WWW_PROTOCOL_JAR_URLJARFILE@
 SUN_NET_WWW_PROTOCOL_JAR_URLJARFILECALLBACK = @SUN_NET_WWW_PROTOCOL_JAR_URLJARFILECALLBACK@
 SUN_SECURITY_ACTION_GETPROPERTYACTION = @SUN_SECURITY_ACTION_GETPROPERTYACTION@
-SUN_SECURITY_PROVIDER_X509FACTORY = @SUN_SECURITY_PROVIDER_X509FACTORY@
 SUN_SECURITY_UTIL_HOSTNAMECHECKER = @SUN_SECURITY_UTIL_HOSTNAMECHECKER@
 SUN_SECURITY_UTIL_SECURITYCONSTANTS = @SUN_SECURITY_UTIL_SECURITYCONSTANTS@
 SUN_SECURITY_VALIDATOR_VALIDATOREXCEPTION = @SUN_SECURITY_VALIDATOR_VALIDATOREXCEPTION@
@@ -343,9 +343,10 @@ JUNIT_RUNTIME := $(JUNIT_JAR) $(HAMCREST_JAR)
 @CP_SUPPORTS_REFLINK_TRUE@REFLINK = --reflink=auto
 @SRC_DIR_HARDLINKABLE_FALSE@SRC_DIR_LINK = $(REFLINK)
 @SRC_DIR_HARDLINKABLE_TRUE@SRC_DIR_LINK = -l
-@ENABLE_DOCS_TRUE@JAVADOC_OPTS = -use -keywords -encoding UTF-8 -splitIndex \
-@ENABLE_DOCS_TRUE@ -bottom '<font size="-1"> <a href="http://icedtea.classpath.org/bugzilla">Submit a bug or feature</a></font>'
-
+@ENABLE_DOCS_TRUE@JAVADOC_OPTS = -use -keywords -encoding UTF-8 \
+@ENABLE_DOCS_TRUE@	-splitIndex -bottom '<font size="-1"> <a \
+@ENABLE_DOCS_TRUE@	href="http://icedtea.classpath.org/bugzilla">Submit \
+@ENABLE_DOCS_TRUE@	a bug or feature</a></font>' $(am__append_1)
 @ENABLE_DOCS_TRUE@@JAVADOC_SUPPORTS_J_OPTIONS_TRUE@JAVADOC_MEM_OPTS = -J-Xmx1024m -J-Xms128m
 
 # if you create netx-dist-tests-whitelist in top directory, and place "expr match" regexes
@@ -1312,6 +1313,7 @@ stamps/generate-docs.stamp: stamps/netx.stamp
 	HTML_DOCS_TARGET_DIR="$(DOCS_DIR)/html"  ; \
 	PLAIN_DOCS_TARGET_DIR="$(DOCS_DIR)/plain" ; \
 	MAN_DOCS_TARGET_DIR="$(DOCS_DIR)/man"  ; \
+	AUTHORS_FILE_TARGET="$(TOP_SRC_DIR)/AUTHORS" ; \
 	mkdir "$$HTML_DOCS_TARGET_DIR" ; \
 	mkdir "$$PLAIN_DOCS_TARGET_DIR" ; \
 	mkdir "$$MAN_DOCS_TARGET_DIR" ; \
@@ -1327,16 +1329,16 @@ stamps/generate-docs.stamp: stamps/netx.stamp
 	  export LANG=$$LANG_ID; \
 	  mkdir "$$HTML_DOCS_TARGET_DIR/$$ID" ; \
 	  echo "<li><a href='$$ID/icedtea-web.html'>$$LANG_ID</a></li>"  >> "$$HTML_DOCS_INDEX" ; \
-	  $$TP_COMMAND html "$$HTML_DOCS_TARGET_DIR/$$ID" $$TP_TAIL ; \
+	  $$TP_COMMAND html "$$HTML_DOCS_TARGET_DIR/$$ID" $$TP_TAIL "-authorFile=$$AUTHORS_FILE_TARGET" ; \
 	  mkdir "$$PLAIN_DOCS_TARGET_DIR/$$ID" ; \
-	  $$TP_COMMAND plain "$$PLAIN_DOCS_TARGET_DIR/$$ID" 160 $$TP_TAIL; \
+	  $$TP_COMMAND plain "$$PLAIN_DOCS_TARGET_DIR/$$ID" 160 $$TP_TAIL "-authorFile=$$AUTHORS_FILE_TARGET" ; \
 	  if [ $$ID = "en" ] ; then \
 	    MAN_DESC="$$MAN_DOCS_TARGET_DIR/man1" ; \
 	  else \
 	    MAN_DESC="$$MAN_DOCS_TARGET_DIR/$$ID/man1" ; \
 	  fi ; \
 	  mkdir -p "$$MAN_DESC" ; \
-	  $$TP_COMMAND man $$ENCOD "$$MAN_DESC" $$TP_TAIL ; \
+	  $$TP_COMMAND man $$ENCOD "$$MAN_DESC" $$TP_TAIL "-authorFile=$$AUTHORS_FILE_TARGET" ; \
 	  $$TP_COMMAND htmlIntro "$(NETX_DIR)/net/sourceforge/jnlp/resources/about_$$ID.html" $$TP_TAIL; \
 	done ; \
 	export LANG=$$LANG_BACKUP ; \
@@ -1348,7 +1350,7 @@ stamps/netx-html-gen.stamp:
 	mkdir -p html-gen; \
 	cp AUTHORS NEWS COPYING ChangeLog html-gen/; \
 	export HTML_GEN_DEBUG=true; \
-	${SHELL} html-gen.sh 236; \
+	${SHELL} html-gen.sh 7; \
 	unset HTML_GEN_DEBUG)
 	${INSTALL_DATA} $(NETX_SRCDIR)/../html-gen/*.html $(NETX_RESOURCE_DIR)
 	rm -r $(NETX_SRCDIR)/../html-gen/
