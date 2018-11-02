@@ -223,7 +223,7 @@ public class Defaults {
                 {
                         DeploymentConfiguration.KEY_HTTPS_DONT_ENFORCE,
                         BasicValueValidators.getBooleanValidator(),
-                        String.valueOf(false)
+                        String.valueOf(true)
                 },
                 {
                         DeploymentConfiguration.KEY_SECURITY_ITW_IGNORECERTISSUES,
