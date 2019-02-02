@@ -1,1 +1,4 @@
 /netx/net/sourceforge/jnlp/resources/netx-icon.png
+/.idea
+/*.iml
+/out
