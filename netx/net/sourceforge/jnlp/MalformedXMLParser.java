@@ -108,6 +108,7 @@ public class MalformedXMLParser extends XMLParser {
             reader.setContentHandler(x);
 
             InputSource s = new InputSource(original);
+            s.setEncoding("UTF-8");
 
             reader.parse(s);
             return new ByteArrayInputStream(out.toByteArray());
