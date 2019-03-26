@@ -210,7 +210,7 @@ public class SplashUtils {
         } else {
             sp = new DefaultSplashScreen2012(width, height, splashReason);
         }
-        sp.setVersion(Boot.version);
+        //sp.setVersion(Boot.version);
         return sp;
     }
 }
