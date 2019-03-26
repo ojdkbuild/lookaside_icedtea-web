@@ -117,14 +117,14 @@ import net.sourceforge.jnlp.util.UrlUtils;
 import net.sourceforge.jnlp.util.logging.OutputController;
 import sun.awt.AppContext;
 import sun.awt.SunToolkit;
-import sun.awt.X11.XEmbeddedFrame;
+import sun.awt.windows.WEmbeddedFrame;
 
 /*
  * Waring! Warious EmbeddedFrames are sedded during windows builds!
  */
 // FIXME: declare JSProxy implementation
 @SuppressWarnings("serial")
-public class PluginAppletViewer extends XEmbeddedFrame
+public class PluginAppletViewer extends WEmbeddedFrame
         implements AppletContext, Printable, SplashController {
 
     /**
@@ -239,7 +239,7 @@ public class PluginAppletViewer extends XEmbeddedFrame
     private PluginAppletViewer(long handle, final int identifier,
                                NetxPanel appletPanel) {
 
-        super(handle, true);
+        super(handle);
         this.identifier = identifier;
         this.panel = appletPanel;
 
