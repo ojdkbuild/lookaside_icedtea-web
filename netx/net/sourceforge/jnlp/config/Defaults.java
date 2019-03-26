@@ -226,6 +226,11 @@ public class Defaults {
                         String.valueOf(false)
                 },
                 {
+                        DeploymentConfiguration.KEY_SECURITY_ITW_IGNORECERTISSUES,
+                        BasicValueValidators.getBooleanValidator(),
+                        String.valueOf(false)
+                },
+                {
                         DeploymentConfiguration.KEY_SECURITY_PROMPT_USER_FOR_JNLP,
                         BasicValueValidators.getBooleanValidator(),
                         String.valueOf(true)
@@ -398,7 +403,7 @@ public class Defaults {
                 /* browser selection */
                 {
                         DeploymentConfiguration.KEY_BROWSER_PATH,
-                        BasicValueValidators.getFilePathValidator(),
+                        BasicValueValidators.getBrowserPathValidator(),
                         null
                 },
                 /* check for update timeout */
@@ -406,6 +411,11 @@ public class Defaults {
                         DeploymentConfiguration.KEY_UPDATE_TIMEOUT,
                         BasicValueValidators.getRangedIntegerValidator(0, 10000),
                         String.valueOf(500)
+                },
+                {
+                        DeploymentConfiguration.IGNORE_HEADLESS_CHECK,
+                        BasicValueValidators.getBooleanValidator(),
+                        String.valueOf(false)
                 },
                 //JVM arguments for plugin
                 {
@@ -430,7 +440,58 @@ public class Defaults {
                         DeploymentConfiguration.KEY_ENABLE_MANIFEST_ATTRIBUTES_CHECK,
                         BasicValueValidators.getManifestAttributeCheckValidator(),
                         String.valueOf(ManifestAttributesChecker.MANIFEST_ATTRIBUTES_CHECK.ALL)
+                },
+                {
+                        DeploymentConfiguration.KEY_SYSTEM_CONFIG,
+                        BasicValueValidators.getUrlValidator(),
+                        null
+                },
+                {
+                        DeploymentConfiguration.KEY_SYSTEM_CONFIG_MANDATORY,
+                        BasicValueValidators.getBooleanValidator(),
+                        String.valueOf(false)
+                } ,
+                {
+                        DeploymentConfiguration.KEY_SMALL_SIZE_OVERRIDE_WIDTH,
+                        BasicValueValidators.getRangedIntegerValidator(-9999, +9999),
+                        String.valueOf(800)//0 is disabling it; negative is enforcing it
+                },
+                {
+                        DeploymentConfiguration.KEY_SMALL_SIZE_OVERRIDE_HEIGHT,
+                        BasicValueValidators.getRangedIntegerValidator(-9999, +9999),
+                        String.valueOf(600)//0 is disabling it; negative is enforcing it
+                },
+                {
+                        DeploymentConfiguration.KEY_SMALL_SIZE_OVERRIDE_TRESHOLD,
+                        BasicValueValidators.getRangedIntegerValidator(0, 1000),
+                        String.valueOf(10)// treshold when applet is considered as too small
+                },
+                //**************
+                //* Native (rust) only - beggin
+                //**************
+                {
+                        "deployment.launcher.rust.cp.add",
+                       new BasicValueValidators.RustCpValidator(),
+                        ""
+                },
+                {
+                        "deployment.launcher.rust.cp.remove",
+                        new BasicValueValidators.RustCpValidator(),
+                        ""
+                },
+                {
+                        "deployment.launcher.rust.bootcp.add",
+                        new BasicValueValidators.RustCpValidator(),
+                        null
+                },
+                {
+                        "deployment.launcher.rust.bootcp.remove",
+                        new BasicValueValidators.RustCpValidator(),
+                        ""
                 }
+                //**************
+                //* Native (rust) only - end
+                //**************
         };
 
         HashMap<String, Setting<String>> result = new HashMap<>();

@@ -20,6 +20,7 @@ import java.text.MessageFormat;
 import java.util.Locale;
 import java.util.MissingResourceException;
 import java.util.ResourceBundle;
+import net.sourceforge.jnlp.config.DeploymentConfiguration;
 
 /**
  * Utility class to provide simple methods to help localize messages
@@ -51,7 +52,7 @@ public class Translator {
             resources = ResourceBundle.getBundle(s);
         } catch (Exception ex) {
             throw new IllegalStateException("No bundles found for Locale: " + Locale.getDefault().toString()
-                    + "and missing base resource bundle in netx.jar:net/sourceforge/jnlp/resource/Messages.properties");
+                    + "and missing base resource bundle in javaws.jar:net/sourceforge/jnlp/resource/Messages.properties");
         }
     }
 
@@ -79,6 +80,20 @@ public class Translator {
      */
     public static String R(String message, Object... params) {
         return getInstance().getMessage(message, params);
+    }
+     
+    /**
+     * convenient method to show VVPossibleBrowserValues with all four params
+     *
+     * @return translation of VVPossibleBrowserValues with all params in
+     */
+    public static String VVPossibleBrowserValues() {
+        return R("VVPossibleBrowserValues", DeploymentConfiguration.LEGACY_WIN32_URL__HANDLER,
+                DeploymentConfiguration.BROWSER_ENV_VAR,
+                DeploymentConfiguration.INTERNAL_HTML,
+                DeploymentConfiguration.ALWAYS_ASK,
+                DeploymentConfiguration.KEY_BROWSER_PATH
+        );
     }
 
    
