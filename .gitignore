@@ -2,3 +2,4 @@
 /.idea
 *.iml
 /netx/net/sourceforge/jnlp/resources/netx-icon.png
+/logs
