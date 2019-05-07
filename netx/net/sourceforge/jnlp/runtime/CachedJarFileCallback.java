@@ -43,6 +43,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.security.AccessController;
@@ -103,8 +104,14 @@ final class CachedJarFileCallback implements URLJarFileCallBack {
 
         if (UrlUtils.isLocalFile(localUrl)) {
             // if it is known to us, just return the cached file
-            JarFile returnFile = new JarFile(localUrl.getPath());
-            
+            JarFile returnFile = null;
+            try {
+                returnFile = new JarFile(localUrl.toURI().getPath());
+            } catch (URISyntaxException e) {
+                OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e.getMessage());
+                return null;
+            }
+
             try {
                 
                 // Blank out the class-path because:

@@ -185,9 +185,9 @@ public class JNLPPolicy extends Policy {
         Policy policy = null;
         if (policyLocation != null) {
             try {
-                URI policyUri = new URI(policyLocation.replace("\\","/"));
+                URI policyUri = new File(policyLocation.replace("\\","/")).toURI();
                 policy = getInstance("JavaPolicy", new URIParameter(policyUri));
-            } catch (IllegalArgumentException | NoSuchAlgorithmException | URISyntaxException e) {
+            } catch (IllegalArgumentException | NoSuchAlgorithmException e) {
                 OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e);
             }
         }
