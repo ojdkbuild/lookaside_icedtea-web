@@ -125,7 +125,7 @@ class KeystorePasswordAttempter {
 
     }
     //static final KeystorePasswordAttempter INSTANCE = new KeystorePasswordAttempter(new SavedPassword(getTrustedCertsPassword()), new AllmightyPassword());
-    static final KeystorePasswordAttempter INSTANCE = new KeystorePasswordAttempter(new SavedPassword(getTrustedCertsPassword()));
+    static final KeystorePasswordAttempter INSTANCE = new KeystorePasswordAttempter(new SavedPassword(getTrustedCertsPassword()), new SavedPassword("".toCharArray()));
     private final List<SavedPassword> passes;
     private final Map<KeyStore, SavedPassword> sucesfullPerKeystore = new HashMap<>();
 
