@@ -738,8 +738,10 @@ public final class Parser {
         int height = 0;
 
         try {
-            width = Integer.parseInt(getRequiredAttribute(node, "width", "100"));
-            height = Integer.parseInt(getRequiredAttribute(node, "height", "100"));
+            String widthStr = getRequiredAttribute(node, "width", "100");
+            width = widthStr.endsWith("%") ? 640 : Integer.parseInt(widthStr);
+            String heightStr = getRequiredAttribute(node, "height", "100");
+            height = heightStr.endsWith("%") ? 480 : Integer.parseInt(heightStr);
         } catch (NumberFormatException nfe) {
             if (width <= 0) {
                 throw new ParseException(R("PBadWidth"));
