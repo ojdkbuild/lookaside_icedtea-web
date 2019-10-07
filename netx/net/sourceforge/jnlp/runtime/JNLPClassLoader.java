@@ -312,7 +312,7 @@ public class JNLPClassLoader extends URLClassLoader {
 
         this.nativeLibraryStorage = new NativeLibraryStorage(tracker);
 
-        this.mainClass = mainName;
+        this.mainClass = cleanupClassName(mainName);
 
         this.enableCodeBase = enableCodeBase;
 
@@ -564,10 +564,10 @@ public class JNLPClassLoader extends URLClassLoader {
 
             if (obj instanceof ApplicationDesc) {
                 ApplicationDesc ad = (ApplicationDesc) file.getLaunchInfo();
-                mainClass = ad.getMainClass();
+                mainClass = cleanupClassName(ad.getMainClass());
             } else if (obj instanceof AppletDesc) {
                 AppletDesc ad = (AppletDesc) file.getLaunchInfo();
-                mainClass = ad.getMainClass();
+                mainClass = cleanupClassName(ad.getMainClass());
             }
         }
 
@@ -936,13 +936,13 @@ public class JNLPClassLoader extends URLClassLoader {
         if (mainClass == null) {
             LaunchDesc launchDesc = file.getLaunchInfo();
             if (launchDesc != null) {
-                mainClass = launchDesc.getMainClass();
+                mainClass = cleanupClassName(launchDesc.getMainClass());
             }
         }
 
         // The main class may be specified in the manifest
         if (mainClass == null) {
-            mainClass = checkForAttributeInJars(jars, Attributes.Name.MAIN_CLASS);
+            mainClass = cleanupClassName(checkForAttributeInJars(jars, Attributes.Name.MAIN_CLASS));
         }
 
         String desiredJarEntryName = mainClass + ".class";
@@ -1557,7 +1557,8 @@ public class JNLPClassLoader extends URLClassLoader {
      * jarLocationSecurityMap
      */
     @Override
-    public Class<?> loadClass(String name) throws ClassNotFoundException {
+    public Class<?> loadClass(String nameRaw) throws ClassNotFoundException {
+        String name = cleanupClassName(nameRaw);
         Class<?> result = findLoadedClassAll(name);
 
         // try parent classloader
@@ -2361,6 +2362,17 @@ public class JNLPClassLoader extends URLClassLoader {
 
     public String getMainClass() {
         return mainClass;
+    }
+
+    private static String cleanupClassName(String name) {
+        if (null == name) {
+            return null;
+        }
+        String nameClassless = name;
+        if(name.endsWith(".class")) {
+            nameClassless = name.substring(0, name.length() - 6);
+        }
+        return nameClassless.replace("/", ".");
     }
 
     /**
