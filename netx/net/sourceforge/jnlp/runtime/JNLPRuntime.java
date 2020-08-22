@@ -221,6 +221,15 @@ public class JNLPRuntime {
     public static void initialize(boolean isApplication) throws IllegalStateException {
         checkInitialized();
 
+        // see https://github.com/AdoptOpenJDK/icedtea-web/issues/95
+        if (Boolean.valueOf(JNLPRuntime.getConfiguration().getProperty(DeploymentConfiguration.KEY_RH_DISABLE_URL_CONNECTION_CACHES))) {
+            try {
+                new URL("jar:http://itwdummyhost/itwdummy.jar!/itwdummy.entry").openConnection().setDefaultUseCaches(false);
+            } catch (IOException e) {
+                throw new IllegalStateException(e);
+            }
+        }
+
         SwingHelpers.enableDefaultLaF();
 
         if (JavaConsole.canShowOnStartup(isApplication)) {

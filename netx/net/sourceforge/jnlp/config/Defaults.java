@@ -466,6 +466,17 @@ public class Defaults {
                         BasicValueValidators.getRangedIntegerValidator(0, 1000),
                         String.valueOf(10)// treshold when applet is considered as too small
                 },
+                // RH options
+                {
+                        DeploymentConfiguration.KEY_RH_SIGNED_UNSIGNED_JARS_PROMPT,
+                        BasicValueValidators.getBooleanValidator(),
+                        String.valueOf(false)
+                },
+                {
+                        DeploymentConfiguration.KEY_RH_DISABLE_URL_CONNECTION_CACHES,
+                        BasicValueValidators.getBooleanValidator(),
+                        String.valueOf(false)
+                },
                 //**************
                 //* Native (rust) only - beggin
                 //**************

@@ -345,8 +345,9 @@ public class JNLPClassLoader extends URLClassLoader {
     }
 
     public static boolean isCertUnderestimated() {
-        return Boolean.valueOf(JNLPRuntime.getConfiguration().getProperty(DeploymentConfiguration.KEY_SECURITY_ITW_IGNORECERTISSUES))
-                && !JNLPRuntime.isSecurityEnabled();
+        return (Boolean.valueOf(JNLPRuntime.getConfiguration().getProperty(DeploymentConfiguration.KEY_SECURITY_ITW_IGNORECERTISSUES))
+                && !JNLPRuntime.isSecurityEnabled()) ||
+                Boolean.valueOf(JNLPRuntime.getConfiguration().getProperty(DeploymentConfiguration.KEY_RH_SIGNED_UNSIGNED_JARS_PROMPT));
     }
 
     private static void consultCertificateSecurityException(LaunchException ex) throws LaunchException {
