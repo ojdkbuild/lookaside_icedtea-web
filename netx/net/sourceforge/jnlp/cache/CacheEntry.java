@@ -50,6 +50,8 @@ public class CacheEntry {
     /** info about the cached file */
     private final PropertiesFile properties;
 
+    private File localFile;
+
     /**
      * Create a CacheEntry for the resources specified as a remote
      * URL.
@@ -68,8 +70,8 @@ public class CacheEntry {
      * Seam for testing
      */
     PropertiesFile readCacheEntryInfo() {
-        File infoFile = CacheUtil.getCacheFile(location, version);
-        infoFile = new File(infoFile.getPath() + CacheDirectory.INFO_SUFFIX); // replace with something that can't be clobbered
+        this.localFile = CacheUtil.getCacheFile(location, version);
+        File infoFile = new File(localFile.getPath() + CacheDirectory.INFO_SUFFIX); // replace with something that can't be clobbered
 
         return new PropertiesFile(infoFile, R("CAutoGen"));
     }
@@ -164,7 +166,11 @@ public class CacheEntry {
      * @return whether the cache contains the version
      */
     public boolean isCurrent(long lastModified) {
-        boolean cached = isCached();
+        return isCurrent(lastModified, null);
+    }
+
+    public boolean isCurrent(long lastModified, File cachedFile) {
+        boolean cached = isCached(cachedFile);
         OutputController.getLogger().log("isCurrent:isCached " + cached);
 
         if (!cached) {
@@ -187,7 +193,16 @@ public class CacheEntry {
      * @return true if the resource is in the cache
      */
     public boolean isCached() {
-        File localFile = getCacheFile();
+        return isCached(null);
+    }
+
+    public boolean isCached(File cachedFile) {
+        final File localFile;
+        if (null == version && null != cachedFile) {
+            localFile = cachedFile;
+        } else {
+            localFile = getCacheFile();
+        }
         if (!localFile.exists())
             return false;
 
@@ -263,4 +278,7 @@ public class CacheEntry {
         return properties.isHeldByCurrentThread();
     }
 
+    public File getLocalFile() {
+        return localFile;
+    }
 }

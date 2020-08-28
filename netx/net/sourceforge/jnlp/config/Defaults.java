@@ -477,6 +477,21 @@ public class Defaults {
                         BasicValueValidators.getBooleanValidator(),
                         String.valueOf(false)
                 },
+                {
+                        DeploymentConfiguration.KEY_RH_ENABLE_CACHE_FSYNC,
+                        BasicValueValidators.getBooleanValidator(),
+                        String.valueOf(false)
+                },
+                {
+                        DeploymentConfiguration.KEY_RH_BACKGROUND_THREADS_COUNT,
+                        BasicValueValidators.getRangedIntegerValidator(1, 16),
+                        String.valueOf(3)
+                },
+                {
+                        DeploymentConfiguration.KEY_RH_MAX_URLS_DOWNLOAD_INDICATOR,
+                        BasicValueValidators.getRangedIntegerValidator(1, 1024),
+                        String.valueOf(16)
+                },
                 //**************
                 //* Native (rust) only - beggin
                 //**************

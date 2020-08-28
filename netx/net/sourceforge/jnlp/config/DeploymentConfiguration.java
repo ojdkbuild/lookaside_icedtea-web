@@ -256,6 +256,9 @@ public final class DeploymentConfiguration {
      */
     public static final String KEY_RH_SIGNED_UNSIGNED_JARS_PROMPT = "deployment.redhat.signed.unsigned.jars.prompt";
     public static final String KEY_RH_DISABLE_URL_CONNECTION_CACHES = "deployment.redhat.disable.url.connection.caches";
+    public static final String KEY_RH_ENABLE_CACHE_FSYNC = "deployment.redhat.enable.cache.fsync";
+    public static final String KEY_RH_BACKGROUND_THREADS_COUNT = "deployment.redhat.background.threads.count";
+    public static final String KEY_RH_MAX_URLS_DOWNLOAD_INDICATOR = "deployment.redhat.max.urls.download.indicator";
 
     public static final String TRANSFER_TITLE = "Legacy configuration and cache found. Those will be now transported to new locations";
     

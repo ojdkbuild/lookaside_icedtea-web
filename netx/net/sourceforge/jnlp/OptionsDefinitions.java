@@ -79,6 +79,7 @@ public class OptionsDefinitions {
         HTML("-html","BOHtml", NumberOfArguments.ONE_OR_MORE),
         BROWSER("-browser", "BrowserArg", NumberOfArguments.ONE_OR_MORE),
         HELP_URL("-helpurl","BOHelpUrl", NumberOfArguments.ONE),
+        STARTUP_TRACKER("-startuptracker","BOStartupTracker"),
         //itweb settings
         LIST("-list", "IBOList"),
         GET("-get", "name", "IBOGet", NumberOfArguments.ONE_OR_MORE),
@@ -224,7 +225,8 @@ public class OptionsDefinitions {
             OPTIONS.JNLP,
             OPTIONS.HTML,
             OPTIONS.BROWSER,
-            OPTIONS.HELP_URL
+            OPTIONS.HELP_URL,
+            OPTIONS.STARTUP_TRACKER
         });
     }
 

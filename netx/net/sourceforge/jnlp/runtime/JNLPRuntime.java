@@ -174,6 +174,7 @@ public class JNLPRuntime {
     /** help URL to open in browser */
     private static String helpUrl = "https://icedtea.classpath.org/wiki/IcedTea-Web#Common_Issues";
 
+    private static long startupTrackerMoment = 0;
 
     /** 
      * Header is not checked and so eg
@@ -906,6 +907,19 @@ public class JNLPRuntime {
 
     public static String getHelpUrl() {
         return JNLPRuntime.helpUrl;
+    }
+
+    // may only be called from Boot
+    public static void initStartupTracker() {
+        startupTrackerMoment = System.currentTimeMillis();
+    }
+
+    public static void addStartupTrackingEntry(String message) {
+        if (startupTrackerMoment > 0) {
+            long time = (System.currentTimeMillis() - startupTrackerMoment)/1000;
+            String msg = "Startup tracker: seconds elapsed: [" + time + "], message: [" + message + "]";
+            OutputController.getLogger().log(OutputController.Level.ERROR_ALL, msg);
+        }
     }
 
     private static boolean isPluginDebug() {
