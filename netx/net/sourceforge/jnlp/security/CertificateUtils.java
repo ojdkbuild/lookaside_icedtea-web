@@ -45,6 +45,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.math.BigInteger;
+import java.security.GeneralSecurityException;
 import java.security.Key;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
@@ -173,6 +174,35 @@ public class CertificateUtils {
                     } // else continue
                 }
             }catch (KeyStoreException e) {
+                OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e);
+                // continue
+            }
+        }
+        return false;
+    }
+
+    public static boolean issuerInKeyStores(X509Certificate c, KeyStore[] keyStores) {
+        for (KeyStore keyStore : keyStores) {
+            try {
+                // Check against all certs
+                Enumeration<String> aliases = keyStore.aliases();
+                while (aliases.hasMoreElements()) {
+                    // Verify against this entry
+                    String alias = aliases.nextElement();
+                    Certificate cert = keyStore.getCertificate(alias);
+                    if (cert instanceof X509Certificate) {
+                        X509Certificate x509 = (X509Certificate) cert;
+                        if (c.getIssuerX500Principal().equals(x509.getSubjectX500Principal())) {
+                            try {
+                                c.verify(x509.getPublicKey());
+                                return true;
+                            } catch (GeneralSecurityException e) {
+                                // continue
+                            }
+                        }
+                    }
+                }
+            } catch (KeyStoreException e) {
                 OutputController.getLogger().log(OutputController.Level.ERROR_ALL, e);
                 // continue
             }
