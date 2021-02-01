@@ -188,6 +188,7 @@ public class AppletEnvironment implements AppletContext, AppletStub {
                 Insets insets = frame.getInsets();
                 frame.setSize(appletDesc.getWidth() + insets.left + insets.right,
                               appletDesc.getHeight() + insets.top + insets.bottom);
+                frame.setResizable(true);
             }
 
             try {
