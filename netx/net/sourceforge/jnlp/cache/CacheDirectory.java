@@ -48,6 +48,7 @@ public final class CacheDirectory {
     private CacheDirectory(){}
     
     public static final String INFO_SUFFIX = ".info";
+    public static final String TEMP_SUFFIX = ".temp";
 
     /**
      * Get the structure of directory for keeping track of the protocol and

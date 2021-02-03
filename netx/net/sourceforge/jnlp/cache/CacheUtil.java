@@ -722,7 +722,8 @@ public class CacheUtil {
 
             File candidate = new File(FileUtils.sanitizePath(path.toString()));
             try {
-                if (candidate.getName().length() > 255) {
+                int suffixLen = CacheDirectory.INFO_SUFFIX.length() + CacheDirectory.TEMP_SUFFIX.length();
+                if (candidate.getName().length() + suffixLen > 255) {
                     /**
                      * When filename is longer then 255 chars, then then various
                      * filesystems have issues to save it. By saving the file by its

@@ -46,6 +46,8 @@ import java.util.*;
 
 import javax.swing.JFrame;
 import javax.swing.JOptionPane;
+
+import net.sourceforge.jnlp.cache.CacheDirectory;
 import net.sourceforge.swing.SwingUtils;
 
 import net.sourceforge.jnlp.config.DirectoryValidator;
@@ -242,7 +244,7 @@ public final class FileUtils {
      */
     private static void createRestrictedFile(File file, boolean isDir, boolean writableByOwner) throws IOException {
 
-        File tempFile = new File(file.getCanonicalPath() + ".temp");
+        File tempFile = new File(file.getCanonicalPath() + CacheDirectory.TEMP_SUFFIX);
 
         if (isDir) {
             if (!tempFile.mkdir()) {
