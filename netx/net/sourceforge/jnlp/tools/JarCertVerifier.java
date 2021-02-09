@@ -418,19 +418,13 @@ public class JarCertVerifier implements CertVerifier {
                         final ZonedDateTime tsaNotAfter = zonedDateTime(tsaCertificate.getNotAfter());
                         final ZonedDateTime signedAt = zonedDateTime(tsaDate);
 
-                        if (signedAt.isBefore(tsaNotBefore) || now.isBefore(tsaNotBefore)) {
+                        if (signedAt.isAfter(now)) {
                             certInfo.setNotYetValidCert();
                         }
-                        if (now.isAfter(tsaNotAfter) && now.isAfter(notAfter)) {
-                            certInfo.setHasExpiredCert();
-                        }  else if (expiresSoon.isAfter(tsaNotAfter)) {
-                            certInfo.setHasExpiringCert();
-                        }
-
-                        if (signedAt.isBefore(notBefore)) {
+                        if (signedAt.isBefore(notBefore) || signedAt.isBefore(tsaNotBefore)) {
                             certInfo.setNotYetValidCert();
                         }
-                        if (signedAt.isAfter(notAfter)) {
+                        if (signedAt.isAfter(notAfter) || signedAt.isAfter(tsaNotAfter)) {
                             certInfo.setHasExpiredCert();
                         }
                     } else {
