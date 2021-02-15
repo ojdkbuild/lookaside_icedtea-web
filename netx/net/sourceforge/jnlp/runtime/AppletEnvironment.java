@@ -91,7 +91,6 @@ public class AppletEnvironment implements AppletContext, AppletStub {
         this(file, appletInstance, null);
 
         Frame frame = new Frame(file.getApplet().getName() + " - Applet");
-        frame.setResizable(false);
 
         appletInstance.addWindow(frame);
         // may not need this once security manager can close windows
@@ -191,7 +190,6 @@ public class AppletEnvironment implements AppletContext, AppletStub {
                 Insets insets = frame.getInsets();
                 frame.setSize(appletDesc.getWidth() + insets.left + insets.right,
                               appletDesc.getHeight() + insets.top + insets.bottom);
-                frame.setResizable(true);
             }
 
             try {
