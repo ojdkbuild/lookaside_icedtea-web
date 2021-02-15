@@ -99,8 +99,11 @@ public class AppletEnvironment implements AppletContext, AppletStub {
         WindowListener closer = new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent event) {
-                appletInstance.destroy();
-                JNLPRuntime.exit(0);
+                try {
+                    appletInstance.destroy();
+                } finally {
+                    JNLPRuntime.exit(0);
+                }
             }
         };
         frame.addWindowListener(closer);
