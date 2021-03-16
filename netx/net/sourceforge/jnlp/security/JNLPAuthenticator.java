@@ -39,13 +39,56 @@ package net.sourceforge.jnlp.security;
 
 import java.net.Authenticator;
 import java.net.PasswordAuthentication;
+import java.net.URL;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.concurrent.Semaphore;
+
 import net.sourceforge.jnlp.security.dialogresults.NamePassword;
 
 public class JNLPAuthenticator extends Authenticator {
+    private final Semaphore mutex = new Semaphore(1);
+    private final AuthState state = new AuthState();
 
     @Override
     public PasswordAuthentication getPasswordAuthentication() {
 
+        final NamePassword response;
+        try {
+            try {
+                mutex.acquire();
+                NamePassword hostCreds = state.getHostCredentials(getRequestingHost());
+                if (null == hostCreds) {
+                    response = showAuthDialog(getRequestingPrompt());
+                    state.putHostCredentials(getRequestingHost(), response);
+                } else if (state.equalsThreadURL(getRequestingURL())) {
+                    if (state.sameThreadAndHostCredentials(getRequestingHost())) {
+                        response = showAuthDialog("repeat");
+                        state.putHostCredentials(getRequestingHost(), response);
+                    } else {
+                        response = hostCreds;
+                        state.setThreadCreds(hostCreds);
+                    }
+                } else {
+                    response = hostCreds;
+                }
+                state.setThreadURL(getRequestingURL());
+            } finally {
+                mutex.release();
+            }
+        } catch (InterruptedException e) {
+            return null;
+        }
+
+        if (response == null) {
+            return null;
+        } else {
+            return new PasswordAuthentication(response.getName(), response.getPassword());
+        }
+    }
+
+    private NamePassword showAuthDialog(String prompt) {
         // No security check is required here, because the only way to set
         // parameters for which auth info is needed
         // (Authenticator:requestPasswordAuthentication()), has a security check
@@ -54,14 +97,53 @@ public class JNLPAuthenticator extends Authenticator {
 
         String host = getRequestingHost();
         int port = getRequestingPort();
-        String prompt = getRequestingPrompt();
 
-        NamePassword response = SecurityDialogs.showAuthenicationPrompt(host, port, prompt, type);
-        if (response == null) {
-            return null;
-        } else {
-            return new PasswordAuthentication(response.getName(), response.getPassword());
+        return SecurityDialogs.showAuthenicationPrompt(host, port, prompt + Thread.currentThread().getId(), type);
+    }
+
+    private static class AuthState {
+        private final Map<String, NamePassword> hostCreds = new LinkedHashMap<>();
+        private final ThreadLocal<String> threadURL = new ThreadLocal<>();
+        private final ThreadLocal<NamePassword> threadCreds = new ThreadLocal<>();
+
+        NamePassword getHostCredentials(String hostname) {
+            String key = String.valueOf(hostname);
+            return hostCreds.get(key);
         }
+
+        void putHostCredentials(String hostname, NamePassword creds) {
+            String key = String.valueOf(hostname);
+            hostCreds.put(key, creds);
+            threadCreds.set(creds);
+        }
+
+        boolean equalsThreadURL(URL url) {
+            String reqUrl = String.valueOf(url);
+            String prevUrl = threadURL.get();
+            return reqUrl.equals(prevUrl);
+        }
+
+        void setThreadURL(URL url) {
+            String st = String.valueOf(url);
+            threadURL.set(st);
+        }
+
+        boolean sameThreadAndHostCredentials(String hostname) {
+            String key = String.valueOf(hostname);
+            NamePassword hc = hostCreds.get(key);
+            NamePassword tc = threadCreds.get();
+            if (null == hc || null == hc.getName() || null == hc.getPassword() ||
+                    null == tc || null == tc.getName() || null == tc.getPassword()) {
+                return false;
+            }
+            return hc.getName().equals(tc.getName()) &&
+                    Arrays.equals(hc.getPassword(), tc.getPassword());
+        }
+
+        void setThreadCreds(NamePassword creds) {
+            threadCreds.set(creds);
+        }
+
     }
 
 }
