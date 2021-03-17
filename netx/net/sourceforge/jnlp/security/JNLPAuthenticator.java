@@ -58,13 +58,22 @@ public class JNLPAuthenticator extends Authenticator {
         try {
             try {
                 mutex.acquire();
+                if (state.isCanceledByUser()) {
+                    throw new RuntimeException("Authentication canceled by user");
+                }
                 NamePassword hostCreds = state.getHostCredentials(getRequestingHost());
                 if (null == hostCreds) {
                     response = showAuthDialog(getRequestingPrompt());
+                    if (null == response) {
+                        state.markAsCanceledByUser();
+                    }
                     state.putHostCredentials(getRequestingHost(), response);
                 } else if (state.equalsThreadURL(getRequestingURL())) {
                     if (state.sameThreadAndHostCredentials(getRequestingHost())) {
                         response = showAuthDialog("repeat");
+                        if (null == response) {
+                            state.markAsCanceledByUser();
+                        }
                         state.putHostCredentials(getRequestingHost(), response);
                     } else {
                         response = hostCreds;
@@ -105,6 +114,7 @@ public class JNLPAuthenticator extends Authenticator {
         private final Map<String, NamePassword> hostCreds = new LinkedHashMap<>();
         private final ThreadLocal<String> threadURL = new ThreadLocal<>();
         private final ThreadLocal<NamePassword> threadCreds = new ThreadLocal<>();
+        private boolean canceledByUser = false;
 
         NamePassword getHostCredentials(String hostname) {
             String key = String.valueOf(hostname);
@@ -142,6 +152,14 @@ public class JNLPAuthenticator extends Authenticator {
 
         void setThreadCreds(NamePassword creds) {
             threadCreds.set(creds);
+        }
+
+        public boolean isCanceledByUser() {
+            return canceledByUser;
+        }
+
+        void markAsCanceledByUser() {
+            canceledByUser = true;
         }
 
     }

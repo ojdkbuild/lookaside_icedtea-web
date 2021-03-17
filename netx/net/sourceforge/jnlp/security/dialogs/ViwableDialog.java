@@ -112,6 +112,7 @@ public class ViwableDialog {
                 if (jd == null) {
                     jd = createJDialog();
                 }
+                jd.setAlwaysOnTop(true);
                 jd.setVisible(true);
             }
         });
