@@ -37,6 +37,7 @@ exception statement from your version. */
 
 package net.sourceforge.jnlp.security;
 
+import java.awt.*;
 import java.net.Authenticator;
 import java.net.PasswordAuthentication;
 import java.net.URL;
@@ -46,6 +47,10 @@ import java.util.Map;
 import java.util.concurrent.Semaphore;
 
 import net.sourceforge.jnlp.security.dialogresults.NamePassword;
+import net.sourceforge.jnlp.util.logging.OutputController;
+
+import static net.sourceforge.jnlp.security.SecurityDialogs.AuthRequestAttempt.FIRST_TIME;
+import static net.sourceforge.jnlp.security.SecurityDialogs.AuthRequestAttempt.REPEATED;
 
 public class JNLPAuthenticator extends Authenticator {
     private final Semaphore mutex = new Semaphore(1);
@@ -63,14 +68,14 @@ public class JNLPAuthenticator extends Authenticator {
                 }
                 NamePassword hostCreds = state.getHostCredentials(getRequestingHost());
                 if (null == hostCreds) {
-                    response = showAuthDialog(getRequestingPrompt());
+                    response = showAuthDialog(hostCreds, FIRST_TIME);
                     if (null == response) {
                         state.markAsCanceledByUser();
                     }
                     state.putHostCredentials(getRequestingHost(), response);
                 } else if (state.equalsThreadURL(getRequestingURL())) {
                     if (state.sameThreadAndHostCredentials(getRequestingHost())) {
-                        response = showAuthDialog("repeat");
+                        response = showAuthDialog(hostCreds, REPEATED);
                         if (null == response) {
                             state.markAsCanceledByUser();
                         }
@@ -97,17 +102,44 @@ public class JNLPAuthenticator extends Authenticator {
         }
     }
 
-    private NamePassword showAuthDialog(String prompt) {
+    private NamePassword showAuthDialog(NamePassword hostCreds, SecurityDialogs.AuthRequestAttempt attempt) {
         // No security check is required here, because the only way to set
         // parameters for which auth info is needed
         // (Authenticator:requestPasswordAuthentication()), has a security check
 
-        String type = this.getRequestorType() == RequestorType.PROXY ? "proxy" : "web";
+        if (isModalDialogActive()) {
+            // cannot show auth dialog when another dialog is modal
+            // assume that startup is canceled in this case
+            return null;
+        }
 
-        String host = getRequestingHost();
-        int port = getRequestingPort();
+        final String username;
+        if (null == hostCreds) {
+            username = "";
+        } else {
+            username = String.valueOf(hostCreds.getName());
+        }
 
-        return SecurityDialogs.showAuthenicationPrompt(host, port, prompt + Thread.currentThread().getId(), type);
+        SecurityDialogs.AuthUIContext ctx = new SecurityDialogs.AuthUIContext(username, getRequestingHost(),
+                getRequestingURL(), getRequestingPrompt(), getRequestorType(), attempt);
+
+        return SecurityDialogs.showAuthenicationPrompt(ctx);
+    }
+
+    private static boolean isModalDialogActive() {
+        try {
+            Window[] windows = Window.getWindows();
+            if (null != windows) {
+                for (Window w : windows) {
+                    if (null != w && w.isShowing() && w instanceof Dialog && ((Dialog) w).isModal()) {
+                        return true;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            OutputController.getLogger().log(OutputController.Level.ERROR_DEBUG, e);
+        }
+        return false;
     }
 
     private static class AuthState {

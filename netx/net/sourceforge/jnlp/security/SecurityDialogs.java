@@ -39,6 +39,7 @@ package net.sourceforge.jnlp.security;
 import java.awt.Dialog.ModalityType;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.net.Authenticator;
 import java.net.NetPermission;
 import java.net.URL;
 import java.security.AccessController;
@@ -212,15 +213,12 @@ public class SecurityDialogs {
      * and returns the user's response. The caller must have
      * NetPermission("requestPasswordAuthentication") for this to work.
      *
-     * @param host The host for with authentication is needed
-     * @param port The port being accessed
-     * @param prompt The prompt (realm) as presented by the server
-     * @param type The type of server (proxy/web)
+     * @param ctx detailed info to display in UI
      * @return an array of objects representing user's authentication tokens
      * @throws SecurityException if the caller does not have the appropriate
      * permissions.
      */
-    public static NamePassword showAuthenicationPrompt(String host, int port, String prompt, String type) {
+    public static NamePassword showAuthenicationPrompt(AuthUIContext ctx) {
 
         SecurityManager sm = System.getSecurityManager();
         if (sm != null) {
@@ -232,7 +230,7 @@ public class SecurityDialogs {
         final SecurityDialogMessage message = new SecurityDialogMessage(null);
 
         message.dialogType = DialogType.AUTHENTICATION;
-        message.extras = new Object[]{host, port, prompt, type};
+        message.extras = new Object[]{ctx};
 
         DialogResult response = getUserResponse(message);
         OutputController.getLogger().log(OutputController.Level.MESSAGE_DEBUG, "Decided action for matching alaca at  was " + response);
@@ -388,5 +386,30 @@ public class SecurityDialogs {
         }
         return true;
     }
+
+    public enum AuthRequestAttempt {
+        FIRST_TIME,
+        REPEATED
+    }
+
+    public static class AuthUIContext {
+        public final String username;
+        public final String hostname;
+        public final String url;
+        public final String prompt;
+        public final Authenticator.RequestorType type;
+        public final AuthRequestAttempt attempt;
+
+        public AuthUIContext(String username, String hostname, URL url, String prompt,
+                             Authenticator.RequestorType type, AuthRequestAttempt attempt) {
+            this.username = String.valueOf(username);
+            this.hostname = String.valueOf(hostname);
+            this.url = String.valueOf(url);
+            this.prompt = String.valueOf(prompt);
+            this.type = type;
+            this.attempt = attempt;
+        }
+    }
+
 
 }

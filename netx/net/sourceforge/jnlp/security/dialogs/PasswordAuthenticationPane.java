@@ -37,23 +37,20 @@ exception statement from your version. */
 
 package net.sourceforge.jnlp.security.dialogs;
 
-import java.awt.BorderLayout;
-import static net.sourceforge.jnlp.runtime.Translator.R;
+import java.awt.*;
 
-import java.awt.Dimension;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
-import java.awt.Insets;
+import static net.sourceforge.jnlp.runtime.Translator.R;
+import static net.sourceforge.jnlp.security.SecurityDialogs.AuthRequestAttempt.FIRST_TIME;
+
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 
-import javax.swing.JButton;
-import javax.swing.JFrame;
-import javax.swing.JLabel;
-import javax.swing.JPasswordField;
-import javax.swing.JTextField;
+import javax.swing.*;
+import javax.swing.border.EmptyBorder;
+
 import net.sourceforge.jnlp.runtime.Translator;
 import net.sourceforge.jnlp.security.SecurityDialog;
+import net.sourceforge.jnlp.security.SecurityDialogs;
 import net.sourceforge.jnlp.security.dialogresults.DialogResult;
 import net.sourceforge.jnlp.security.dialogresults.NamePassword;
 
@@ -66,29 +63,33 @@ public class PasswordAuthenticationPane extends SecurityDialogPanel {
     private final JTextField jtfUserName = new JTextField();
     private final JPasswordField jpfPassword = new JPasswordField();
 
-    private final String host;
-    private final int port;
-    private final String prompt;
-    private final String type;
-
     public PasswordAuthenticationPane(SecurityDialog parent, Object[] extras) {
         super(parent);
-        host = (String) extras[0];
-        port = (Integer) extras[1];
-        prompt = (String) extras[2];
-        type = (String) extras[3];
+        SecurityDialogs.AuthUIContext ctx = (SecurityDialogs.AuthUIContext) extras[0];
 
-        addComponents();
+        addComponents(ctx);
      }
 
     /**
      * Initialized the dialog components
      */
 
-    public final void addComponents() {
+    public final void addComponents(SecurityDialogs.AuthUIContext ctx) {
 
-        JLabel jlInfo = new JLabel("");
-        jlInfo.setText("<html>" + R("SAuthenticationPrompt", type, host, prompt)  + "</html>");
+        this.jtfUserName.setText(ctx.username);
+
+        final Icon icon;
+        final String msg;
+        if (FIRST_TIME.equals(ctx.attempt)) {
+            icon = UIManager.getIcon("OptionPane.informationIcon");
+            msg = R("SAuthenticationPromptFirstTime", ctx.hostname, ctx.url, ctx.prompt, ctx.type);
+        } else {
+            icon = UIManager.getIcon("OptionPane.warningIcon");
+            msg = R("SAuthenticationPromptRepeatedTime", ctx.hostname, ctx.url, ctx.prompt, ctx.type);
+        }
+
+        JLabel jlInfo = new JLabel("", icon, SwingConstants.LEFT);
+        jlInfo.setText("<html>" + msg  + "</html>");
 
         setLayout(new GridBagLayout());
 
@@ -138,21 +139,20 @@ public class PasswordAuthenticationPane extends SecurityDialogPanel {
         c.weightx = 1.0;
         add(jpfPassword, c);
 
-        c = new GridBagConstraints();
-        c.anchor = GridBagConstraints.SOUTHEAST;
-        c.gridx = 1;
-        c.gridy = 3;
-        c.insets = new Insets(5, 5, 3, 70);
-        c.weightx = 0.0;
-        add(jbCancel, c);
+        JPanel buttonPanel = new JPanel();
+        buttonPanel.setLayout(new FlowLayout());
+        buttonPanel.add(jbCancel);
+        buttonPanel.add(jbOK);
 
         c = new GridBagConstraints();
         c.anchor = GridBagConstraints.SOUTHEAST;
         c.gridx = 1;
         c.gridy = 3;
-        c.insets = new Insets(5, 5, 3, 3);
+        c.insets = new Insets(5, 5, 0, 0);
         c.weightx = 0.0;
-        add(jbOK, c);
+        add(buttonPanel, c);
+
+        setBorder(new EmptyBorder(10, 10, 10, 10));
 
         setMinimumSize(new Dimension(400, 150));
         setMaximumSize(new Dimension(1024, 150));
