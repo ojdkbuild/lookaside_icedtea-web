@@ -492,6 +492,16 @@ public class Defaults {
                         BasicValueValidators.getRangedIntegerValidator(1, 1024),
                         String.valueOf(16)
                 },
+                {
+                        DeploymentConfiguration.KEY_RH_RESOURCE_SKIP_DNS_CHECK,
+                        BasicValueValidators.getBooleanValidator(),
+                        String.valueOf(false)
+                },
+                {
+                        DeploymentConfiguration.KEY_RH_AUTH_DIALOG_MODALITY_CHECK,
+                        BasicValueValidators.getBooleanValidator(),
+                        String.valueOf(true)
+                },
                 //**************
                 //* Native (rust) only - beggin
                 //**************

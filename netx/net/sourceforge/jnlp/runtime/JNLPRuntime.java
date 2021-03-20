@@ -441,6 +441,10 @@ public class JNLPRuntime {
             return true;
         }
 
+        if (Boolean.parseBoolean(JNLPRuntime.getConfiguration().getProperty(DeploymentConfiguration.KEY_RH_RESOURCE_SKIP_DNS_CHECK))) {
+            return true;
+        }
+
         try {
             InetAddress.getByName(location.getHost());
         } catch (UnknownHostException e) {

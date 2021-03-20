@@ -47,10 +47,15 @@ import java.util.Map;
 import java.util.concurrent.Semaphore;
 
 import net.sourceforge.jnlp.security.dialogresults.NamePassword;
-import net.sourceforge.jnlp.util.logging.OutputController;
 
+import static java.lang.Boolean.parseBoolean;
+import static net.sourceforge.jnlp.config.DeploymentConfiguration.KEY_RH_AUTH_DIALOG_MODALITY_CHECK;
+import static net.sourceforge.jnlp.runtime.JNLPRuntime.getConfiguration;
 import static net.sourceforge.jnlp.security.SecurityDialogs.AuthRequestAttempt.FIRST_TIME;
 import static net.sourceforge.jnlp.security.SecurityDialogs.AuthRequestAttempt.REPEATED;
+import static net.sourceforge.jnlp.util.logging.OutputController.Level.ERROR_DEBUG;
+import static net.sourceforge.jnlp.util.logging.OutputController.Level.MESSAGE_ALL;
+import static net.sourceforge.jnlp.util.logging.OutputController.getLogger;
 
 public class JNLPAuthenticator extends Authenticator {
     private final Semaphore mutex = new Semaphore(1);
@@ -63,11 +68,13 @@ public class JNLPAuthenticator extends Authenticator {
         try {
             try {
                 mutex.acquire();
+                getLogger().log(MESSAGE_ALL, "Password authentication requested");
                 if (state.isCanceledByUser()) {
                     throw new RuntimeException("Authentication canceled by user");
                 }
                 NamePassword hostCreds = state.getHostCredentials(getRequestingHost());
                 if (null == hostCreds) {
+                    getLogger().log(MESSAGE_ALL, "No cached credentials found, displaying 'first time' auth dialog");
                     response = showAuthDialog(hostCreds, FIRST_TIME);
                     if (null == response) {
                         state.markAsCanceledByUser();
@@ -75,6 +82,7 @@ public class JNLPAuthenticator extends Authenticator {
                     state.putHostCredentials(getRequestingHost(), response);
                 } else if (state.equalsThreadURL(getRequestingURL())) {
                     if (state.sameThreadAndHostCredentials(getRequestingHost())) {
+                        getLogger().log(MESSAGE_ALL, "Credentials rejected, displaying 'repeated' auth dialog");
                         response = showAuthDialog(hostCreds, REPEATED);
                         if (null == response) {
                             state.markAsCanceledByUser();
@@ -107,7 +115,8 @@ public class JNLPAuthenticator extends Authenticator {
         // parameters for which auth info is needed
         // (Authenticator:requestPasswordAuthentication()), has a security check
 
-        if (isModalDialogActive()) {
+        boolean modCheckEnabled = parseBoolean(getConfiguration().getProperty(KEY_RH_AUTH_DIALOG_MODALITY_CHECK));
+        if (modCheckEnabled && isModalDialogActive()) {
             // cannot show auth dialog when another dialog is modal
             // assume that startup is canceled in this case
             return null;
@@ -137,7 +146,7 @@ public class JNLPAuthenticator extends Authenticator {
                 }
             }
         } catch (Exception e) {
-            OutputController.getLogger().log(OutputController.Level.ERROR_DEBUG, e);
+            getLogger().log(ERROR_DEBUG, e);
         }
         return false;
     }
