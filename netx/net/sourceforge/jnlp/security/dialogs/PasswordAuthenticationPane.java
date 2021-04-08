@@ -80,12 +80,18 @@ public class PasswordAuthenticationPane extends SecurityDialogPanel {
 
         final Icon icon;
         final String msg;
+        final String prompt;
+        if (!"".equals(ctx.prompt)) {
+            prompt = ctx.prompt;
+        } else {
+            prompt = "N/A";
+        }
         if (FIRST_TIME.equals(ctx.attempt)) {
             icon = UIManager.getIcon("OptionPane.informationIcon");
-            msg = R("SAuthenticationPromptFirstTime", ctx.hostname, ctx.url, ctx.prompt, ctx.type);
+            msg = R("SAuthenticationPromptFirstTime", ctx.hostname, ctx.url, prompt, ctx.type);
         } else {
             icon = UIManager.getIcon("OptionPane.warningIcon");
-            msg = R("SAuthenticationPromptRepeatedTime", ctx.hostname, ctx.url, ctx.prompt, ctx.type);
+            msg = R("SAuthenticationPromptRepeatedTime", ctx.hostname, ctx.url, prompt, ctx.type);
         }
 
         JLabel jlInfo = new JLabel("", icon, SwingConstants.LEFT);

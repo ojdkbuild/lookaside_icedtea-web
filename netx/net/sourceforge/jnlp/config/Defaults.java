@@ -502,6 +502,11 @@ public class Defaults {
                         BasicValueValidators.getBooleanValidator(),
                         String.valueOf(true)
                 },
+                {
+                        DeploymentConfiguration.KEY_RH_AUTH_DIALOG_FAILURE_ATTEMPTS_COUNT,
+                        BasicValueValidators.getRangedIntegerValidator(0, 256),
+                        String.valueOf(0)
+                },
                 //**************
                 //* Native (rust) only - beggin
                 //**************

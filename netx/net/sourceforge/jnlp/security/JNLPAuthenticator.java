@@ -49,7 +49,8 @@ import java.util.concurrent.Semaphore;
 import net.sourceforge.jnlp.security.dialogresults.NamePassword;
 
 import static java.lang.Boolean.parseBoolean;
-import static net.sourceforge.jnlp.config.DeploymentConfiguration.KEY_RH_AUTH_DIALOG_MODALITY_CHECK;
+import static java.lang.Integer.parseInt;
+import static net.sourceforge.jnlp.config.DeploymentConfiguration.*;
 import static net.sourceforge.jnlp.runtime.JNLPRuntime.getConfiguration;
 import static net.sourceforge.jnlp.security.SecurityDialogs.AuthRequestAttempt.FIRST_TIME;
 import static net.sourceforge.jnlp.security.SecurityDialogs.AuthRequestAttempt.REPEATED;
@@ -82,12 +83,18 @@ public class JNLPAuthenticator extends Authenticator {
                     state.putHostCredentials(getRequestingHost(), response);
                 } else if (state.equalsThreadURL(getRequestingURL())) {
                     if (state.sameThreadAndHostCredentials(getRequestingHost())) {
-                        getLogger().log(MESSAGE_ALL, "Credentials rejected, displaying 'repeated' auth dialog");
-                        response = showAuthDialog(hostCreds, REPEATED);
-                        if (null == response) {
-                            state.markAsCanceledByUser();
+                        if (state.getAttemptsCountBeforeRepeatedPrompt() > 0) {
+                            state.decrementAttemptsCountBeforeRepeatedPrompt();
+                            response = hostCreds;
+                        } else {
+                            getLogger().log(MESSAGE_ALL, "Credentials rejected, displaying 'repeated' auth dialog");
+                            response = showAuthDialog(hostCreds, REPEATED);
+                            if (null == response) {
+                                state.markAsCanceledByUser();
+                            }
+                            state.putHostCredentials(getRequestingHost(), response);
+                            state.resetAttemptsCountBeforeRepeatedPrompt();
                         }
-                        state.putHostCredentials(getRequestingHost(), response);
                     } else {
                         response = hostCreds;
                         state.setThreadCreds(hostCreds);
@@ -156,6 +163,7 @@ public class JNLPAuthenticator extends Authenticator {
         private final ThreadLocal<String> threadURL = new ThreadLocal<>();
         private final ThreadLocal<NamePassword> threadCreds = new ThreadLocal<>();
         private boolean canceledByUser = false;
+        private int attemptsCountBeforeRepeatedPrompt = parseInt(getConfiguration().getProperty(KEY_RH_AUTH_DIALOG_FAILURE_ATTEMPTS_COUNT));
 
         NamePassword getHostCredentials(String hostname) {
             String key = String.valueOf(hostname);
@@ -195,7 +203,7 @@ public class JNLPAuthenticator extends Authenticator {
             threadCreds.set(creds);
         }
 
-        public boolean isCanceledByUser() {
+        boolean isCanceledByUser() {
             return canceledByUser;
         }
 
@@ -203,6 +211,19 @@ public class JNLPAuthenticator extends Authenticator {
             canceledByUser = true;
         }
 
+        int getAttemptsCountBeforeRepeatedPrompt() {
+            return attemptsCountBeforeRepeatedPrompt;
+        }
+
+        void decrementAttemptsCountBeforeRepeatedPrompt() {
+            if (attemptsCountBeforeRepeatedPrompt > 0) {
+                attemptsCountBeforeRepeatedPrompt -= 1;
+            }
+        }
+
+        void resetAttemptsCountBeforeRepeatedPrompt() {
+            attemptsCountBeforeRepeatedPrompt = parseInt(getConfiguration().getProperty(KEY_RH_AUTH_DIALOG_FAILURE_ATTEMPTS_COUNT));
+        }
     }
 
 }
