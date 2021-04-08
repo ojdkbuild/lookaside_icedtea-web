@@ -27,6 +27,10 @@ import net.sourceforge.jnlp.runtime.JNLPClassLoader;
 import net.sourceforge.jnlp.runtime.ManageJnlpResources;
 import net.sourceforge.jnlp.runtime.JNLPRuntime;
 
+import static net.sourceforge.jnlp.util.logging.OutputController.Level.ERROR_ALL;
+import static net.sourceforge.jnlp.util.logging.OutputController.Level.MESSAGE_ALL;
+import static net.sourceforge.jnlp.util.logging.OutputController.getLogger;
+
 /**
  * The DownloadService JNLP service.
  *
@@ -46,10 +50,34 @@ class XDownloadService implements DownloadService {
     /**
      * Returns a listener that will automatically display download
      * progress to the user.
-     * @return always {@code null}
+     * @return logging impl
      */
     public DownloadServiceListener getDefaultProgressWindow() {
-        return null;
+        // note: url.toString() should not be used, it can mutate URL handler state
+        return new DownloadServiceListener() {
+            @Override
+            public void progress(URL url, String version, long readSoFar, long total, int overallPercent) {
+                getLogger().log(MESSAGE_ALL, "URL: [" + (null != url ? url.getPath() : null) + "], version: [" + version + "], " +
+                        " readSoFar: [" + readSoFar + "], total: [" + total + "], overallPercent: [" + overallPercent + "]");
+            }
+
+            @Override
+            public void validating(URL url, String version, long entry, long total, int overallPercent) {
+                getLogger().log(MESSAGE_ALL, "URL: [" + (null != url ? url.getPath() : null) + "], version: [" + version + "], " +
+                        " entry: [" + entry + "], total: [" + total + "], overallPercent: [" + overallPercent + "]");
+            }
+
+            @Override
+            public void upgradingArchive(URL url, String version, int patchPercent, int overallPercent) {
+                getLogger().log(MESSAGE_ALL, "URL: [" + (null != url ? url.getPath() : null) + "], version: [" + version + "], " +
+                        " patchPercent: [" + patchPercent + "], overallPercent: [" + overallPercent + "]");
+            }
+
+            @Override
+            public void downloadFailed(URL url, String version) {
+                getLogger().log(ERROR_ALL, "URL: [" + (null != url ? url.getPath() : null) + "], version: [" + version + "]");
+            }
+        };
     }
 
     /**
