@@ -34,6 +34,12 @@ import net.sourceforge.jnlp.splashscreen.SplashController;
 import net.sourceforge.jnlp.util.*;
 import net.sourceforge.swing.SwingUtils;
 
+import static java.lang.Boolean.parseBoolean;
+import static net.sourceforge.jnlp.config.DeploymentConfiguration.KEY_RH_APPLET_DISABLE_EARLY_INIT;
+import static net.sourceforge.jnlp.runtime.JNLPRuntime.getConfiguration;
+import static net.sourceforge.jnlp.util.logging.OutputController.Level.MESSAGE_ALL;
+import static net.sourceforge.jnlp.util.logging.OutputController.getLogger;
+
 /**
  * The applet environment including stub, context, and frame.  The
  * default environment puts the applet in a non-resiable frame;
@@ -193,15 +199,24 @@ public class AppletEnvironment implements AppletContext, AppletStub {
             }
 
             try {
+                final boolean earlyInitDisabled = parseBoolean(getConfiguration().getProperty(KEY_RH_APPLET_DISABLE_EARLY_INIT));
+
                 SwingUtils.callOnAppContext(new Runnable() {
                     @Override
                     public void run() {
-                        // do first because some applets need to be displayed before
-                        // starting (they use Component.getImage or something)
-                        cont.setVisible(true);
+                        if (!earlyInitDisabled) {
+                            // do first because some applets need to be displayed before
+                            // starting (they use Component.getImage or something)
+                            cont.setVisible(true);
+                        }
 
                         applet.init();
                         applet.start();
+
+                        if (earlyInitDisabled) {
+                            getLogger().log(MESSAGE_ALL, "Applet early init is disabled");
+                            cont.setVisible(true);
+                        }
 
                         cont.invalidate(); // this should force the applet to
                         cont.validate(); // the correct size and to repaint

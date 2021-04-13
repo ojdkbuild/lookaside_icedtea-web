@@ -507,6 +507,11 @@ public class Defaults {
                         BasicValueValidators.getRangedIntegerValidator(0, 256),
                         String.valueOf(0)
                 },
+                {
+                        DeploymentConfiguration.KEY_RH_APPLET_DISABLE_EARLY_INIT,
+                        BasicValueValidators.getBooleanValidator(),
+                        String.valueOf(false)
+                },
                 //**************
                 //* Native (rust) only - beggin
                 //**************
