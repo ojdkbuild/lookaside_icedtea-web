@@ -262,6 +262,7 @@ public final class DeploymentConfiguration {
     public static final String KEY_RH_RESOURCE_SKIP_DNS_CHECK = "deployment.redhat.resource.skip.dns.check";
     public static final String KEY_RH_AUTH_DIALOG_MODALITY_CHECK = "deployment.redhat.auth.dialog.modality.check";
     public static final String KEY_RH_AUTH_DIALOG_FAILURE_ATTEMPTS_COUNT = "deployment.redhat.auth.dialog.failure.attempts.count";
+    public static final String KEY_RH_AUTH_DIALOG_PERFORM_KERBEROS_LOGIN = "deployment.redhat.auth.dialog.perform.kerberos.login";
     public static final String KEY_RH_APPLET_DISABLE_EARLY_INIT = "deployment.redhat.applet.disable.early.init";
 
     public static final String TRANSFER_TITLE = "Legacy configuration and cache found. Those will be now transported to new locations";

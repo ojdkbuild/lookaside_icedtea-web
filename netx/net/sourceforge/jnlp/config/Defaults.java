@@ -508,6 +508,11 @@ public class Defaults {
                         String.valueOf(0)
                 },
                 {
+                        DeploymentConfiguration.KEY_RH_AUTH_DIALOG_PERFORM_KERBEROS_LOGIN,
+                        BasicValueValidators.getBooleanValidator(),
+                        String.valueOf(false)
+                },
+                {
                         DeploymentConfiguration.KEY_RH_APPLET_DISABLE_EARLY_INIT,
                         BasicValueValidators.getBooleanValidator(),
                         String.valueOf(false)

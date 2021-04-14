@@ -41,12 +41,21 @@ import java.awt.*;
 import java.net.Authenticator;
 import java.net.PasswordAuthentication;
 import java.net.URL;
+import java.security.AccessControlContext;
+import java.security.AccessController;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.Semaphore;
 
 import net.sourceforge.jnlp.security.dialogresults.NamePassword;
+import sun.security.jgss.GSSCaller;
+import sun.security.jgss.GSSUtil;
+import sun.security.jgss.LoginConfigImpl;
+
+import javax.security.auth.Subject;
+import javax.security.auth.callback.*;
+import javax.security.auth.login.LoginContext;
 
 import static java.lang.Boolean.parseBoolean;
 import static java.lang.Integer.parseInt;
@@ -54,8 +63,7 @@ import static net.sourceforge.jnlp.config.DeploymentConfiguration.*;
 import static net.sourceforge.jnlp.runtime.JNLPRuntime.getConfiguration;
 import static net.sourceforge.jnlp.security.SecurityDialogs.AuthRequestAttempt.FIRST_TIME;
 import static net.sourceforge.jnlp.security.SecurityDialogs.AuthRequestAttempt.REPEATED;
-import static net.sourceforge.jnlp.util.logging.OutputController.Level.ERROR_DEBUG;
-import static net.sourceforge.jnlp.util.logging.OutputController.Level.MESSAGE_ALL;
+import static net.sourceforge.jnlp.util.logging.OutputController.Level.*;
 import static net.sourceforge.jnlp.util.logging.OutputController.getLogger;
 
 public class JNLPAuthenticator extends Authenticator {
@@ -103,6 +111,12 @@ public class JNLPAuthenticator extends Authenticator {
                     response = hostCreds;
                 }
                 state.setThreadURL(getRequestingURL());
+
+                boolean krbLoginRequired = parseBoolean(getConfiguration().getProperty(KEY_RH_AUTH_DIALOG_PERFORM_KERBEROS_LOGIN));
+                if (krbLoginRequired && !state.isCanceledByUser() && null != response &&
+                        ("negotiate".equalsIgnoreCase(getRequestingScheme()) || "kerberos".equalsIgnoreCase(getRequestingScheme()))) {
+                    performKerberosLogin(response.getName(), response.getPassword());
+                }
             } finally {
                 mutex.release();
             }
@@ -156,6 +170,18 @@ public class JNLPAuthenticator extends Authenticator {
             getLogger().log(ERROR_DEBUG, e);
         }
         return false;
+    }
+
+    private static void performKerberosLogin(String username, char[] password) {
+        try {
+            AccessControlContext acc = AccessController.getContext();
+            Subject subj = Subject.getSubject(acc);
+            CallbackHandler cb = new KerberosCallbackHandler(username, password);
+            LoginContext lc = new LoginContext("", subj, cb, new LoginConfigImpl(GSSCaller.CALLER_INITIATE, GSSUtil.GSS_KRB5_MECH_OID));
+            lc.login();
+        } catch (Exception e) {
+            getLogger().log(ERROR_ALL, e);
+        }
     }
 
     private static class AuthState {
@@ -223,6 +249,36 @@ public class JNLPAuthenticator extends Authenticator {
 
         void resetAttemptsCountBeforeRepeatedPrompt() {
             attemptsCountBeforeRepeatedPrompt = parseInt(getConfiguration().getProperty(KEY_RH_AUTH_DIALOG_FAILURE_ATTEMPTS_COUNT));
+        }
+    }
+
+    private static class KerberosCallbackHandler implements CallbackHandler {
+        private final String username;
+        private final char[] password;
+
+        public KerberosCallbackHandler(String username, char[] password) {
+            this.username = username;
+            this.password = password;
+        }
+
+        @Override
+        public void handle(Callback[] callbacks) {
+            for (Callback cb : callbacks) {
+                if (cb instanceof TextOutputCallback) {
+                    TextOutputCallback toc = (TextOutputCallback) cb;
+                    getLogger().log(MESSAGE_ALL, "KerberosCallbackHandler," +
+                            " message type: [" + toc.getMessageType() + "], message: [" + toc.getMessage() + "]");
+                } else if (cb instanceof NameCallback) {
+                    NameCallback nc = (NameCallback) cb;
+                    nc.setName(username);
+                } else if (cb instanceof PasswordCallback) {
+                    PasswordCallback pc = (PasswordCallback) cb;
+                    pc.setPassword(password);
+                } else {
+                    String className = null != cb ? cb.getClass().getName() : "null";
+                    getLogger().log(MESSAGE_ALL, "KerberosCallbackHandler, class: [" + className + "]");
+                }
+            }
         }
     }
 
