@@ -49,8 +49,10 @@ import java.util.Map;
 import java.util.concurrent.Semaphore;
 
 import net.sourceforge.jnlp.security.dialogresults.NamePassword;
+import sun.net.www.protocol.http.HttpCallerInfo;
 import sun.security.jgss.GSSCaller;
 import sun.security.jgss.GSSUtil;
+import sun.security.jgss.HttpCaller;
 import sun.security.jgss.LoginConfigImpl;
 
 import javax.security.auth.Subject;
@@ -115,7 +117,8 @@ public class JNLPAuthenticator extends Authenticator {
                 boolean krbLoginRequired = parseBoolean(getConfiguration().getProperty(KEY_RH_AUTH_DIALOG_PERFORM_KERBEROS_LOGIN));
                 if (krbLoginRequired && !state.isCanceledByUser() && null != response &&
                         ("negotiate".equalsIgnoreCase(getRequestingScheme()) || "kerberos".equalsIgnoreCase(getRequestingScheme()))) {
-                    performKerberosLogin(response.getName(), response.getPassword());
+                    HttpCallerInfo hci = new HttpCallerInfo(getRequestingURL(), getRequestingHost(), getRequestingPort());
+                    performKerberosLogin(hci, response.getName(), response.getPassword());
                 }
             } finally {
                 mutex.release();
@@ -172,12 +175,13 @@ public class JNLPAuthenticator extends Authenticator {
         return false;
     }
 
-    private static void performKerberosLogin(String username, char[] password) {
+    private static void performKerberosLogin(HttpCallerInfo hci, String username, char[] password) {
         try {
             AccessControlContext acc = AccessController.getContext();
             Subject subj = Subject.getSubject(acc);
             CallbackHandler cb = new KerberosCallbackHandler(username, password);
-            LoginContext lc = new LoginContext("", subj, cb, new LoginConfigImpl(GSSCaller.CALLER_INITIATE, GSSUtil.GSS_KRB5_MECH_OID));
+            GSSCaller caller = new HttpCaller(hci);
+            LoginContext lc = new LoginContext("", subj, cb, new LoginConfigImpl(caller, GSSUtil.GSS_KRB5_MECH_OID));
             lc.login();
         } catch (Exception e) {
             getLogger().log(ERROR_ALL, e);
