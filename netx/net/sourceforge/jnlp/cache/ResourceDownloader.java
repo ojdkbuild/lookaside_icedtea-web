@@ -1,5 +1,6 @@
 package net.sourceforge.jnlp.cache;
 
+import static java.lang.Boolean.parseBoolean;
 import static net.sourceforge.jnlp.cache.Resource.Status.CONNECTED;
 import static net.sourceforge.jnlp.cache.Resource.Status.CONNECTING;
 import static net.sourceforge.jnlp.cache.Resource.Status.DOWNLOADED;
@@ -7,6 +8,7 @@ import static net.sourceforge.jnlp.cache.Resource.Status.DOWNLOADING;
 import static net.sourceforge.jnlp.cache.Resource.Status.ERROR;
 import static net.sourceforge.jnlp.cache.Resource.Status.PRECONNECT;
 import static net.sourceforge.jnlp.cache.Resource.Status.PREDOWNLOAD;
+import static net.sourceforge.jnlp.runtime.JNLPRuntime.getConfiguration;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -31,6 +33,7 @@ import java.util.zip.GZIPInputStream;
 import net.sourceforge.jnlp.DownloadOptions;
 import net.sourceforge.jnlp.OptionsDefinitions;
 import net.sourceforge.jnlp.Version;
+import net.sourceforge.jnlp.config.DeploymentConfiguration;
 import net.sourceforge.jnlp.runtime.Boot;
 import net.sourceforge.jnlp.runtime.JNLPRuntime;
 import net.sourceforge.jnlp.security.ConnectionFactory;
@@ -419,14 +422,26 @@ public class ResourceDownloader implements Runnable {
                 String IH = "Invalid Http response";
                 if (ex.getMessage().equals(IH)) {
                     OutputController.getLogger().log(ex);
-                    OutputController.getLogger().log(OutputController.Level.MESSAGE_ALL, "'" + IH + "' message detected. Attempting direct socket");
-                    Object[] result = UrlUtils.loadUrlWithInvalidHeaderBytes(connection.getURL());
-                    OutputController.getLogger().log("Header of: " + connection.getURL() + " (" + downloadLocation + ")");
-                    String head = (String) result[0];
-                    byte[] body = (byte[]) result[1];
-                    OutputController.getLogger().log(head);
-                    OutputController.getLogger().log("Body is: " + body.length + " bytes long");
-                    writeDownloadToFile(resource, downloadLocation, new ByteArrayInputStream(body));
+                    if (parseBoolean(getConfiguration().getProperty(DeploymentConfiguration.KEY_RH_RESOURCE_FALLBACK_DIRECT))) {
+                        OutputController.getLogger().log(OutputController.Level.MESSAGE_ALL, "'" + IH + "' message detected. Attempting direct socket");
+                        Object[] result = UrlUtils.loadUrlWithInvalidHeaderBytes(connection.getURL());
+                        OutputController.getLogger().log("Header of: " + connection.getURL() + " (" + downloadLocation + ")");
+                        String head = (String) result[0];
+                        byte[] body = (byte[]) result[1];
+                        OutputController.getLogger().log(head);
+                        OutputController.getLogger().log("Body is: " + body.length + " bytes long");
+                        writeDownloadToFile(resource, downloadLocation, new ByteArrayInputStream(body));
+                    } else {
+                        URLConnection conn = null;
+                        try {
+                            conn = getDownloadConnection(connection.getURL());
+                            writeDownloadToFile(resource, downloadLocation, new BufferedInputStream(conn.getInputStream()));
+                        } finally {
+                            if (null != conn) {
+                                ConnectionFactory.getConnectionFactory().disconnect(conn);
+                            }
+                        }
+                    }
                 } else {
                     throw ex;
                 }

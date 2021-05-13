@@ -498,6 +498,11 @@ public class Defaults {
                         String.valueOf(false)
                 },
                 {
+                        DeploymentConfiguration.KEY_RH_RESOURCE_FALLBACK_DIRECT,
+                        BasicValueValidators.getBooleanValidator(),
+                        String.valueOf(true)
+                },
+                {
                         DeploymentConfiguration.KEY_RH_AUTH_DIALOG_MODALITY_CHECK,
                         BasicValueValidators.getBooleanValidator(),
                         String.valueOf(true)

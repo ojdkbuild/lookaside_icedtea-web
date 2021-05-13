@@ -260,6 +260,7 @@ public final class DeploymentConfiguration {
     public static final String KEY_RH_BACKGROUND_THREADS_COUNT = "deployment.redhat.background.threads.count";
     public static final String KEY_RH_MAX_URLS_DOWNLOAD_INDICATOR = "deployment.redhat.max.urls.download.indicator";
     public static final String KEY_RH_RESOURCE_SKIP_DNS_CHECK = "deployment.redhat.resource.skip.dns.check";
+    public static final String KEY_RH_RESOURCE_FALLBACK_DIRECT = "deployment.redhat.resource.fallback.direct";
     public static final String KEY_RH_AUTH_DIALOG_MODALITY_CHECK = "deployment.redhat.auth.dialog.modality.check";
     public static final String KEY_RH_AUTH_DIALOG_FAILURE_ATTEMPTS_COUNT = "deployment.redhat.auth.dialog.failure.attempts.count";
     public static final String KEY_RH_APPLET_DISABLE_EARLY_INIT = "deployment.redhat.applet.disable.early.init";
