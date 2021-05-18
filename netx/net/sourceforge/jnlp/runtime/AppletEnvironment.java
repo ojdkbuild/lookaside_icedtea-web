@@ -36,6 +36,7 @@ import net.sourceforge.swing.SwingUtils;
 
 import static java.lang.Boolean.parseBoolean;
 import static net.sourceforge.jnlp.config.DeploymentConfiguration.KEY_RH_APPLET_DISABLE_EARLY_INIT;
+import static net.sourceforge.jnlp.config.DeploymentConfiguration.KEY_RH_APPLET_FRAME_MAXIMIZE;
 import static net.sourceforge.jnlp.runtime.JNLPRuntime.getConfiguration;
 import static net.sourceforge.jnlp.util.logging.OutputController.Level.MESSAGE_ALL;
 import static net.sourceforge.jnlp.util.logging.OutputController.getLogger;
@@ -196,6 +197,10 @@ public class AppletEnvironment implements AppletContext, AppletStub {
                 Insets insets = frame.getInsets();
                 frame.setSize(appletDesc.getWidth() + insets.left + insets.right,
                               appletDesc.getHeight() + insets.top + insets.bottom);
+
+                if (parseBoolean(getConfiguration().getProperty(KEY_RH_APPLET_FRAME_MAXIMIZE))) {
+                    frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
+                }
             }
 
             try {

@@ -517,6 +517,11 @@ public class Defaults {
                         BasicValueValidators.getBooleanValidator(),
                         String.valueOf(false)
                 },
+                {
+                        DeploymentConfiguration.KEY_RH_APPLET_FRAME_MAXIMIZE,
+                        BasicValueValidators.getBooleanValidator(),
+                        String.valueOf(false)
+                },
                 //**************
                 //* Native (rust) only - beggin
                 //**************
