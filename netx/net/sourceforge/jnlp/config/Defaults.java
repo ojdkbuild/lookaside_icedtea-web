@@ -522,6 +522,16 @@ public class Defaults {
                         BasicValueValidators.getBooleanValidator(),
                         String.valueOf(false)
                 },
+                {
+                        DeploymentConfiguration.KEY_RH_HTTP_AUTH_PREFERENCE,
+                        null,
+                        null
+                },
+                {
+                        DeploymentConfiguration.KEY_RH_JDK_HTTP_NTML_TRANSPARENT_AUTH,
+                        null,
+                        null
+                },
                 //**************
                 //* Native (rust) only - beggin
                 //**************

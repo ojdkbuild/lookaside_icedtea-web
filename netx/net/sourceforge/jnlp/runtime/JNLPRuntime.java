@@ -231,6 +231,20 @@ public class JNLPRuntime {
             }
         }
 
+        // allow to set these two properties outside of javaws_options.txt
+        String httpAuthPrefrerenceProp = JNLPRuntime.getConfiguration().getProperty(DeploymentConfiguration.KEY_RH_HTTP_AUTH_PREFERENCE);
+        if (null != httpAuthPrefrerenceProp) {
+            System.setProperty("http.auth.preference", httpAuthPrefrerenceProp);
+            OutputController.getLogger().log(OutputController.Level.MESSAGE_ALL,
+                    "'http.auth.preference' system property set to: [" + httpAuthPrefrerenceProp + "]");
+        }
+        String jdkHttpNtlmTransparentAuth = JNLPRuntime.getConfiguration().getProperty(DeploymentConfiguration.KEY_RH_JDK_HTTP_NTML_TRANSPARENT_AUTH);
+        if (null != jdkHttpNtlmTransparentAuth) {
+            System.setProperty("jdk.http.ntlm.transparentAuth", jdkHttpNtlmTransparentAuth);
+            OutputController.getLogger().log(OutputController.Level.MESSAGE_ALL,
+                    "'jdk.http.ntlm.transparentAuth' system property set to: [" + jdkHttpNtlmTransparentAuth + "]");
+        }
+
         SwingHelpers.enableDefaultLaF();
 
         if (JavaConsole.canShowOnStartup(isApplication)) {

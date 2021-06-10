@@ -265,6 +265,8 @@ public final class DeploymentConfiguration {
     public static final String KEY_RH_AUTH_DIALOG_FAILURE_ATTEMPTS_COUNT = "deployment.redhat.auth.dialog.failure.attempts.count";
     public static final String KEY_RH_APPLET_DISABLE_EARLY_INIT = "deployment.redhat.applet.disable.early.init";
     public static final String KEY_RH_APPLET_FRAME_MAXIMIZE = "deployment.redhat.applet.frame.maximize";
+    public static final String KEY_RH_HTTP_AUTH_PREFERENCE = "deployment.redhat.http.auth.preference";
+    public static final String KEY_RH_JDK_HTTP_NTML_TRANSPARENT_AUTH = "deployment.redhat.jdk.http.ntlm.transparentAuth";
 
     public static final String TRANSFER_TITLE = "Legacy configuration and cache found. Those will be now transported to new locations";
     
