@@ -141,7 +141,9 @@ public class ControlPanel extends JFrame {
         descriptionPanel.add(description);
 
         JLabel image = new JLabel();
-        image.setIcon(new ImageIcon(ImageResources.INSTANCE.getApplicationImages().get(0)));
+        if (ImageResources.INSTANCE.getApplicationImages().size() > 0) {
+            image.setIcon(new ImageIcon(ImageResources.INSTANCE.getApplicationImages().get(0)));
+        }
 
 
         JPanel topPanel = new JPanel(new BorderLayout());
