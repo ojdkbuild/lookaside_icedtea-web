@@ -532,6 +532,11 @@ public class Defaults {
                         null,
                         null
                 },
+                {
+                        DeploymentConfiguration.KEY_RH_MSCAPI_MUTUAL_AUTH,
+                        BasicValueValidators.getBooleanValidator(),
+                        String.valueOf(false)
+                },
                 //**************
                 //* Native (rust) only - beggin
                 //**************

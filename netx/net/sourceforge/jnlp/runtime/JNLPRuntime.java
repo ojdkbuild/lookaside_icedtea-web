@@ -297,7 +297,14 @@ public class JNLPRuntime {
         try {
             SSLSocketFactory sslSocketFactory;
             SSLContext context = SSLContext.getInstance("SSL");
-            KeyStore ks = KeyStores.getKeyStore(KeyStores.Level.USER, KeyStores.Type.CLIENT_CERTS).getKs();
+            final KeyStore ks;
+            if (Boolean.valueOf(JNLPRuntime.getConfiguration().getProperty(DeploymentConfiguration.KEY_RH_MSCAPI_MUTUAL_AUTH))) {
+                OutputController.getLogger().log(OutputController.Level.MESSAGE_ALL, "Using 'Windows-MY' keystore");
+                ks = KeyStore.getInstance("Windows-MY", "SunMSCAPI");
+                ks.load(null, null);
+            } else {
+                ks = KeyStores.getKeyStore(KeyStores.Level.USER, KeyStores.Type.CLIENT_CERTS).getKs();
+            }
             KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
             SecurityUtil.initKeyManagerFactory(kmf, ks);
             TrustManager[] trust = new TrustManager[] { getSSLSocketTrustManager() };
