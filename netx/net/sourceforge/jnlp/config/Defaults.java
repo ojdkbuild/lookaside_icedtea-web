@@ -537,6 +537,11 @@ public class Defaults {
                         BasicValueValidators.getBooleanValidator(),
                         String.valueOf(false)
                 },
+                {
+                        DeploymentConfiguration.KEY_RH_CLIENT_CERTIFICATE_ALIAS,
+                        null,
+                        null
+                },
                 //**************
                 //* Native (rust) only - beggin
                 //**************

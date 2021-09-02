@@ -39,16 +39,19 @@ import java.security.KeyStore;
 import java.security.Policy;
 import java.security.Security;
 import java.text.DateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
 import javax.jnlp.ServiceManager;
 import javax.naming.ConfigurationException;
 import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509KeyManager;
 import javax.swing.JOptionPane;
 import javax.swing.UIManager;
 import javax.swing.text.html.parser.ParserDelegator;
@@ -65,6 +68,7 @@ import net.sourceforge.jnlp.cache.UpdatePolicy;
 import net.sourceforge.jnlp.config.DeploymentConfiguration;
 import net.sourceforge.jnlp.config.PathsAndFiles;
 import net.sourceforge.jnlp.security.JNLPAuthenticator;
+import net.sourceforge.jnlp.security.JNLPKeyManager;
 import net.sourceforge.jnlp.security.KeyStores;
 import net.sourceforge.jnlp.security.SecurityDialogMessageHandler;
 import net.sourceforge.jnlp.security.SecurityUtil;
@@ -308,7 +312,24 @@ public class JNLPRuntime {
             KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
             SecurityUtil.initKeyManagerFactory(kmf, ks);
             TrustManager[] trust = new TrustManager[] { getSSLSocketTrustManager() };
-            context.init(kmf.getKeyManagers(), trust, null);
+            KeyManager[] kms = kmf.getKeyManagers();
+            String propAlias = JNLPRuntime.getConfiguration().getProperty(DeploymentConfiguration.KEY_RH_CLIENT_CERTIFICATE_ALIAS);
+            if (null != propAlias && !propAlias.isEmpty() && null != kms) {
+                OutputController.getLogger().log(OutputController.Level.MESSAGE_ALL, "Using client certificate, alias: '" + propAlias + "'");
+                List<KeyManager> jkms = new ArrayList<>();
+                for (KeyManager km : kms) {
+                    if (km instanceof X509KeyManager) {
+                        X509KeyManager xkm = (X509KeyManager) km;
+                        X509KeyManager jkm = new JNLPKeyManager(xkm, propAlias);
+                        jkms.add(jkm);
+                    } else {
+                        jkms.add(km);
+                    }
+                }
+                context.init(jkms.toArray(new KeyManager[0]), trust, null);
+            } else {
+                context.init(kms, trust, null);
+            }
             sslSocketFactory = context.getSocketFactory();
 
             HttpsURLConnection.setDefaultSSLSocketFactory(sslSocketFactory);
