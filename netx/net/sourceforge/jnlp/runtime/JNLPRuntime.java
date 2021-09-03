@@ -313,23 +313,24 @@ public class JNLPRuntime {
             SecurityUtil.initKeyManagerFactory(kmf, ks);
             TrustManager[] trust = new TrustManager[] { getSSLSocketTrustManager() };
             KeyManager[] kms = kmf.getKeyManagers();
-            String propAlias = JNLPRuntime.getConfiguration().getProperty(DeploymentConfiguration.KEY_RH_CLIENT_CERTIFICATE_ALIAS);
-            if (null != propAlias && !propAlias.isEmpty() && null != kms) {
-                OutputController.getLogger().log(OutputController.Level.MESSAGE_ALL, "Using client certificate, alias: '" + propAlias + "'");
-                List<KeyManager> jkms = new ArrayList<>();
-                for (KeyManager km : kms) {
-                    if (km instanceof X509KeyManager) {
-                        X509KeyManager xkm = (X509KeyManager) km;
-                        X509KeyManager jkm = new JNLPKeyManager(xkm, propAlias);
-                        jkms.add(jkm);
-                    } else {
-                        jkms.add(km);
-                    }
-                }
-                context.init(jkms.toArray(new KeyManager[0]), trust, null);
-            } else {
-                context.init(kms, trust, null);
+            if (null == kms) {
+                kms = new KeyManager[0];
             }
+            String propAlias = JNLPRuntime.getConfiguration().getProperty(DeploymentConfiguration.KEY_RH_CLIENT_CERTIFICATE_ALIAS);
+            if (null != propAlias && !propAlias.isEmpty()) {
+                OutputController.getLogger().log(OutputController.Level.MESSAGE_ALL, "Using client certificate, alias: '" + propAlias + "'");
+            }
+            List<KeyManager> jkms = new ArrayList<>();
+            for (KeyManager km : kms) {
+                if (km instanceof X509KeyManager) {
+                    X509KeyManager xkm = (X509KeyManager) km;
+                    X509KeyManager jkm = new JNLPKeyManager(xkm, propAlias);
+                    jkms.add(jkm);
+                } else {
+                    jkms.add(km);
+                }
+            }
+            context.init(jkms.toArray(new KeyManager[0]), trust, null);
             sslSocketFactory = context.getSocketFactory();
 
             HttpsURLConnection.setDefaultSSLSocketFactory(sslSocketFactory);

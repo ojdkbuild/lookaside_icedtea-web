@@ -44,6 +44,7 @@ import java.net.NetPermission;
 import java.net.URL;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Semaphore;
 
@@ -55,6 +56,7 @@ import net.sourceforge.jnlp.cache.Resource;
 import net.sourceforge.jnlp.runtime.JNLPClassLoader.SecurityDelegate;
 import net.sourceforge.jnlp.runtime.JNLPRuntime;
 import net.sourceforge.jnlp.security.dialogresults.AccessWarningPaneComplexReturn;
+import net.sourceforge.jnlp.security.dialogresults.CertAlias;
 import net.sourceforge.jnlp.security.dialogresults.DialogResult;
 import net.sourceforge.jnlp.security.dialogresults.NamePassword;
 import net.sourceforge.jnlp.security.dialogresults.YesCancel;
@@ -95,7 +97,8 @@ public class SecurityDialogs {
         UNSIGNED_EAS_NO_PERMISSIONS_WARNING, /* when Extended applet security is at High Security and no permission attribute is find, */
         MISSING_ALACA, /*alaca - Application-Library-Allowable-Codebase Attribute*/
         MATCHING_ALACA,
-        SECURITY_511
+        SECURITY_511,
+        CERT_ALIAS_LIST
     }
 
     /**
@@ -291,6 +294,14 @@ public class SecurityDialogs {
         }
 
         return false;
+    }
+
+    public static String showCertAliasListPrompt(String ipAddress, String keyType, List<String> aliases) {
+        final SecurityDialogMessage message = new SecurityDialogMessage(null);
+        message.dialogType = DialogType.CERT_ALIAS_LIST;
+        message.extras = new Object[]{ipAddress, keyType, aliases};
+        CertAlias response = (CertAlias) getUserResponse(message);
+        return response.getValue();
     }
 
     /**

@@ -47,6 +47,7 @@ import java.security.cert.X509Certificate;
 
 import javax.swing.JDialog;
 import java.awt.Window;
+import java.util.List;
 import net.sourceforge.swing.SwingUtils;
 
 import net.sourceforge.jnlp.JNLPFile;
@@ -57,6 +58,7 @@ import net.sourceforge.jnlp.security.dialogresults.DialogResult;
 import net.sourceforge.jnlp.security.dialogs.AccessWarningPane;
 import net.sourceforge.jnlp.security.dialogs.AppletWarningPane;
 import net.sourceforge.jnlp.security.dialogs.CertWarningPane;
+import net.sourceforge.jnlp.security.dialogs.CertAliasListPanel;
 import net.sourceforge.jnlp.security.dialogs.CertsInfoPane;
 import net.sourceforge.jnlp.security.dialogs.InetSecurity511Panel;
 import net.sourceforge.jnlp.security.dialogs.MissingALACAttributePanel;
@@ -296,6 +298,8 @@ public class SecurityDialog {
             dialogTitle = "Security Warning";
         else if (dtype == DialogType.AUTHENTICATION)
             dialogTitle = "Authentication Required";
+        else if (dtype == DialogType.CERT_ALIAS_LIST)
+            dialogTitle = "TLS Authentication Required";
         return dialogTitle;
     }
 
@@ -357,6 +361,8 @@ public class SecurityDialog {
             lpanel = AppTrustWarningDialog.matchingAlaca(sd, sd.file, (String) sd.extras[0], (String) sd.extras[1]);
         } else if (type == DialogType.SECURITY_511) {
             lpanel = new InetSecurity511Panel(sd, (URL) sd.extras[0]);
+        } else if(type == DialogType.CERT_ALIAS_LIST) {
+            lpanel = new CertAliasListPanel(sd, (String) sd.extras[0], (String) sd.extras[1], (List<String>) sd.extras[2]);
         } else {
             throw new RuntimeException("Unknown value of " + sd.dialogType + ". Panel will be null. Tahts not allowed.");
         }

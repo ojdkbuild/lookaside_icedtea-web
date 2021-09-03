@@ -42,8 +42,17 @@ import java.net.Socket;
 import java.security.Principal;
 import java.security.PrivateKey;
 import java.security.cert.X509Certificate;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.Semaphore;
 
 public class JNLPKeyManager implements X509KeyManager {
+    private static final Semaphore mutex = new Semaphore(1);
+    private static Map<String, String> chosenAliases = new LinkedHashMap<>();
+    private static boolean canceledByUser = false;
+
     private final X509KeyManager km;
     private final String propAlias;
 
@@ -59,13 +68,22 @@ public class JNLPKeyManager implements X509KeyManager {
 
     @Override
     public String chooseClientAlias(String[] keyTypes, Principal[] issuers, Socket socket) {
-        if (null != propAlias && null != keyTypes) {
+        if (null != keyTypes) {
             for (String kt : keyTypes) {
-                String[] aliases = getClientAliases(kt, issuers);
-                if (aliases != null) {
-                    for (String alias : aliases) {
-                        if (propAlias.equalsIgnoreCase(alias)) {
-                            return alias;
+                if (null != kt) {
+                    String[] aliases = getClientAliases(kt, issuers);
+                    if (null != aliases) {
+                        if (null != propAlias && !propAlias.isEmpty()) {
+                            for (String alias : aliases) {
+                                if (propAlias.equalsIgnoreCase(alias)) {
+                                    return alias;
+                                }
+                            }
+                        } else if (aliases.length > 1) {
+                            String chosen = getChosenAlias(socket, kt, Arrays.asList(aliases));
+                            if (null != chosen) {
+                                return chosen;
+                            }
                         }
                     }
                 }
@@ -92,5 +110,44 @@ public class JNLPKeyManager implements X509KeyManager {
     @Override
     public PrivateKey getPrivateKey(String alias) {
         return km.getPrivateKey(alias);
+    }
+
+    private static String getChosenAlias(Socket socket, String keyType, List<String> aliases) {
+        try {
+            try {
+                mutex.acquire();
+                if (canceledByUser) {
+                    return null;
+                }
+                String chosenBefore = chosenAliases.get(keyType);
+                if (null != chosenBefore) {
+                    if (aliases.contains(chosenBefore)) {
+                        return chosenBefore;
+                    } else {
+                        chosenAliases.remove(keyType);
+                    }
+                }
+                String ipAddress = getIpAddress(socket);
+                String chosen = SecurityDialogs.showCertAliasListPrompt(ipAddress, keyType, aliases);
+                if (null != chosen) {
+                    chosenAliases.put(keyType, chosen);
+                } else {
+                    canceledByUser = true;
+                }
+                return chosen;
+            } finally {
+                mutex.release();
+            }
+        } catch (InterruptedException e) {
+            return null;
+        }
+    }
+
+    private static String getIpAddress(Socket socket) {
+        try {
+            return socket.getInetAddress().getHostAddress();
+        } catch (Exception e) {
+            return "N/A";
+        }
     }
 }
