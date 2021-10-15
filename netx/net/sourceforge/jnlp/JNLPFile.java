@@ -614,7 +614,9 @@ public class JNLPFile {
                     }
                     if (hasUsableLocale
                             && stringMatches(os, rescDesc.getOS())
-                            && stringMatches(arch, rescDesc.getArch())) {
+                            && stringMatches(arch, rescDesc.getArch())
+                            && !x86ArchMixup(arch, rescDesc.getArch())
+                    ) {
                         List<T> ll = rescDesc.getResources(launchType);
                         result.addAll(ll);
                     } else {
@@ -850,6 +852,32 @@ public class JNLPFile {
         }
 
         return false;
+    }
+
+    static boolean x86ArchMixup(String prefixStr, String available[]) {
+        if (!"x86".equals(prefixStr)) {
+            return false;
+        }
+
+        if (available == null || available.length == 0){
+            return false;
+        }
+
+        if (!stringMatches(prefixStr, available)) {
+            return false;
+        }
+
+        for (String candidate : available) {
+            String trimmedCandidate = null;
+            if (candidate != null) {
+                trimmedCandidate = candidate.split("\\s+")[0];
+            }
+            if (trimmedCandidate != null && trimmedCandidate.startsWith(prefixStr) && !"x86_64".equals(trimmedCandidate)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
