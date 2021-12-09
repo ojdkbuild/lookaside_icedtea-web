@@ -60,6 +60,7 @@ public class OptionsDefinitions {
         //javaws run-options
         VERSION("-version", "BOVersion"),
         ARG("-arg", "arg", "BOArg", NumberOfArguments.ONE_OR_MORE),
+        OPEN("-open", "open", "BOParam", NumberOfArguments.ONE),
         PARAM("-param", "name=value", "BOParam", NumberOfArguments.ONE_OR_MORE),
         PROPERTY("-property", "name=value", "BOProperty", NumberOfArguments.ONE_OR_MORE),
         UPDATE("-update", "seconds", "BOUpdate", NumberOfArguments.ONE),
@@ -208,6 +209,7 @@ public class OptionsDefinitions {
         return Arrays.asList(new OPTIONS[]{
             OPTIONS.VERSION,
             OPTIONS.ARG,
+            OPTIONS.OPEN,
             OPTIONS.PARAM,
             OPTIONS.PROPERTY,
             OPTIONS.UPDATE,

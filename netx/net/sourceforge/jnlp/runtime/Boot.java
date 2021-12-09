@@ -19,6 +19,7 @@ import java.io.File;
 import java.net.URL;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -382,7 +383,14 @@ public final class Boot implements PrivilegedAction<Void> {
             return null;
         }
 
-        extra.put("arguments", optionParser.getParams(OptionsDefinitions.OPTIONS.ARG));
+        List<String> argsAndOpens = new ArrayList<String>();
+        argsAndOpens.addAll(optionParser.getParams(OptionsDefinitions.OPTIONS.ARG));
+        List<String> opens = optionParser.getParams(OptionsDefinitions.OPTIONS.OPEN);
+        if (opens.size() > 0) {
+            argsAndOpens.add("-open");
+            argsAndOpens.addAll(opens);
+        }
+        extra.put("arguments", argsAndOpens);
         extra.put("parameters", optionParser.getParams(OptionsDefinitions.OPTIONS.PARAM));
         extra.put("properties", optionParser.getParams(OptionsDefinitions.OPTIONS.PROPERTY));
 
