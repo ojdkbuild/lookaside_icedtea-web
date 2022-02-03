@@ -55,6 +55,10 @@ public class AppletStartupSecuritySettings {
         return AppletSecurityLevel.getDefault();
     }
 
+    public boolean unsignedAppletActionGlobalStorageExists() {
+        return PathsAndFiles.APPLET_TRUST_SETTINGS_SYS.getFile().exists();
+    }
+
     /**
      *
      * @return storage with global items from /etc/

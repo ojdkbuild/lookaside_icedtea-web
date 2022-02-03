@@ -36,6 +36,9 @@
 
 package net.sourceforge.jnlp.security.appletextendedsecurity;
 
+import static java.lang.Boolean.parseBoolean;
+import static net.sourceforge.jnlp.config.DeploymentConfiguration.KEY_RH_USE_GLOBAL_APPLET_TRUST_FILE;
+import static net.sourceforge.jnlp.runtime.JNLPRuntime.getConfiguration;
 import static net.sourceforge.jnlp.runtime.Translator.R;
 
 import java.net.URL;
@@ -172,6 +175,16 @@ public class UnsignedAppletTrustConfirmation {
                 return;
             }
               if (rememberForCodeBase == null){
+                  if (parseBoolean(getConfiguration().getProperty(KEY_RH_USE_GLOBAL_APPLET_TRUST_FILE)) &&
+                          securitySettings.unsignedAppletActionGlobalStorageExists()) {
+                      UnsignedAppletActionStorage globalActionStorage = securitySettings.getUnsignedAppletActionGlobalStorage();
+                      UnsignedAppletActionEntry globalEntry = getMatchingItem(globalActionStorage, file, id);
+                      if (null != globalEntry) {
+                          globalEntry.setTimeStamp(new Date());
+                          userActionStorage.add(globalEntry);
+                          return;
+                      }
+                  }
                   throw new RuntimeException("Trying to create new entry without codebase. Thats forbidden.");
               } 
                               /* Else, create a new entry */

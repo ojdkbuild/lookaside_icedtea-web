@@ -542,6 +542,11 @@ public class Defaults {
                         null,
                         null
                 },
+                {
+                        DeploymentConfiguration.KEY_RH_USE_GLOBAL_APPLET_TRUST_FILE,
+                        BasicValueValidators.getBooleanValidator(),
+                        String.valueOf(false)
+                },
                 //**************
                 //* Native (rust) only - beggin
                 //**************
