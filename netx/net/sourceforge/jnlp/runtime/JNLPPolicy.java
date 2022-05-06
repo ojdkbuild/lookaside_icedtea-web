@@ -195,8 +195,12 @@ public class JNLPPolicy extends Policy {
     }
 
     public boolean implies(ProtectionDomain domain, Permission permission) {
-        //Include the permissions that may be added during runtime.
-        PermissionCollection pc = getPermissions(domain.getCodeSource());
-        return super.implies(domain, permission) || pc.implies(permission);
+        try {
+            //Include the permissions that may be added during runtime.
+            PermissionCollection pc = getPermissions(domain.getCodeSource());
+            return super.implies(domain, permission) || pc.implies(permission);
+        } catch (NullPointerException e) {
+            return false;
+        }
     }
 }
