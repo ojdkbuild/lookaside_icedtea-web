@@ -270,6 +270,7 @@ public final class DeploymentConfiguration {
     public static final String KEY_RH_MSCAPI_MUTUAL_AUTH = "deployment.redhat.mscapi.mutual.auth";
     public static final String KEY_RH_CLIENT_CERTIFICATE_ALIAS = "deployment.redhat.client.certificate.alias";
     public static final String KEY_RH_USE_GLOBAL_APPLET_TRUST_FILE = "deployment.redhat.use.global.applet.trust.file";
+    public static final String KEY_RH_LOAD_EXTERNAL_JARS = "deployment.redhat.load.external.jars";
 
     public static final String TRANSFER_TITLE = "Legacy configuration and cache found. Those will be now transported to new locations";
     

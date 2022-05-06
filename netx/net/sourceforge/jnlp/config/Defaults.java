@@ -547,6 +547,11 @@ public class Defaults {
                         BasicValueValidators.getBooleanValidator(),
                         String.valueOf(false)
                 },
+                {
+                        DeploymentConfiguration.KEY_RH_LOAD_EXTERNAL_JARS,
+                        BasicValueValidators.getBooleanValidator(),
+                        String.valueOf(true)
+                },
                 //**************
                 //* Native (rust) only - beggin
                 //**************

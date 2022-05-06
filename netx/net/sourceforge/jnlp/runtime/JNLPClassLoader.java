@@ -2045,25 +2045,43 @@ public class JNLPClassLoader extends URLClassLoader {
      */
     protected SecurityDesc getCodeSourceSecurity(URL source) {
         SecurityDesc sec = jarLocationSecurityMap.get(source);
-        synchronized (alreadyTried) {
-            if (sec == null && !alreadyTried.contains(source)) {
-                alreadyTried.add(source);
-                //try to load the jar which is requesting the permissions, but was NOT downloaded by standard way
-                OutputController.getLogger().log("Application is trying to get permissions for " + source.toString() + ", which was not added by standard way. Trying to download and verify!");
-                try {
-                    JARDesc des = new JARDesc(source, null, null, false, false, false, false);
-                    addNewJar(des);
-                    sec = jarLocationSecurityMap.get(source);
-                } catch (Throwable t) {
-                    OutputController.getLogger().log(t);
-                    sec = null;
+        if (canLoadExternalJars()) {
+            synchronized (alreadyTried) {
+                if (sec == null && !alreadyTried.contains(source)) {
+                    alreadyTried.add(source);
+                    //try to load the jar which is requesting the permissions, but was NOT downloaded by standard way
+                    OutputController.getLogger().log("Application is trying to get permissions for " + source.toString() + ", which was not added by standard way. Trying to download and verify!");
+                    try {
+                        JARDesc des = new JARDesc(source, null, null, false, false, false, false);
+                        addNewJar(des);
+                        sec = jarLocationSecurityMap.get(source);
+                    } catch (Throwable t) {
+                        OutputController.getLogger().log(t);
+                        sec = null;
+                    }
                 }
             }
-        }
-        if (sec == null) {
-            OutputController.getLogger().log(OutputController.Level.MESSAGE_ALL, Translator.R("LNoSecInstance", source.toString()));
+            if (sec == null) {
+                OutputController.getLogger().log(OutputController.Level.MESSAGE_ALL, Translator.R("LNoSecInstance", source.toString()));
+            }
         }
         return sec;
+    }
+
+    private boolean canLoadExternalJars() {
+        try {
+            return AccessController.doPrivileged(new PrivilegedAction<Boolean>() {
+                @Override
+                public Boolean run() {
+                    DeploymentConfiguration dc = JNLPRuntime.getConfiguration();
+                    String prop = dc.getProperty(DeploymentConfiguration.KEY_RH_LOAD_EXTERNAL_JARS);
+                    return Boolean.parseBoolean(prop);
+                }
+            });
+        } catch (Throwable t) {
+            OutputController.getLogger().log(t);
+            return true;
+        }
     }
 
     /**
